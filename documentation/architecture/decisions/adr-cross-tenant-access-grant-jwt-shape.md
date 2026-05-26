@@ -145,7 +145,223 @@ $cmt$;
 | `@a4c-consultant-callable-reason:` | free text | required for `no` / `pending-*`; codegen+CI enforce |
 | `@a4c-phase-target:` | `1` \| `3` \| `4` \| `none` | new — single grep finds all RPCs needing work in a given phase |
 
-The full 15-step Phase 1 manifest (steps 1-12 from JWT-shape work + steps 13-15 from Phase 0.3) is enumerated in **Consequences → Phase 1 migration manifest** below — single canonical location to avoid drift.
+The full 17-step Phase 1 manifest (steps 1-12 from JWT-shape work + steps 13-15 from Phase 0.3 + steps 16-17 from Phase 0.4) is enumerated in **Consequences → Phase 1 migration manifest** below — single canonical location to avoid drift.
+
+## Phase 0.4 — Grant Write-Side
+
+The grant-creation emit RPC, `grant_role_templates` schema, `var_partnerships_projection` + event family, `authorization_reference` column add, and revocation flow. Architect-reviewed pre-write (2026-05-26 REQUEST CHANGES verdict; 14 decisions locked, including 2 blocker corrections + 4 important findings folded in).
+
+### Decisions locked at 0.4
+
+**User-confirmed via AskUserQuestion**:
+
+- **v1 scope** = VAR partnerships only. Court orders, agency assignments, family consents deferred to Phase N or v1.1+ subsequent cards. Rationale: VARs have organizational precedent (`partner_type='var'` enum, `is_subdomain_required()` gates DNS, bootstrap workflow handles partner orgs); the other 3 types are zero-infrastructure and would triple Phase 2 surface.
+- **`authorization_reference uuid` column** added to `cross_tenant_access_grants_projection` in Phase 1. Architecture doc (`provider-partners-architecture.md` L343) documents the intent; baseline_v4 schema didn't have the column.
+- **Event-sourced backing tables**. `var_partnerships_projection` is fed by a new `var_partnership.*` event family with its own router branch.
+
+**Architect-promoted to "locked at 0.4"** (analogous to Phase 0.1+0.2's "4 promotions"; 2026-05-26 review):
+
+- **Permission-gate direction**: caller holds `grant.create` at `p_provider_org_id` path (NOT `p_consultant_org_id` path). **Provider authorizes disclosure — they own the PHI**. Consultant org admin cannot self-issue grants pulling PHI from any provider.
+- **Stream_id resolution**: `v_grant_id := gen_random_uuid()` at top of `api.create_access_grant` body; passed as `p_stream_id`; readback uses `WHERE id = v_grant_id`.
+- **Template identifier**: `p_grant_role_template_name text NOT NULL` (NOT `_id uuid`). Mirrors `api.get_role_permission_templates(p_role_name text)` precedent.
+- **`var_default` template seed permission list**: `{partner.view_analytics, partner.view_support_tickets, partner.view_billing_reports, partner.export_reports}` with `default_terms: {phi_restricted: true}` per arch doc L375-376.
+- **`default_terms jsonb` column on `grant_role_templates`**: HIPAA-defaults snapshot at template level; emit RPC merges `template.default_terms || p_terms`.
+- **Grant immutability**: NO `api.modify_access_grant`. Modifications via revoke + reissue. Preserves audit trail per hybrid-snapshot invariant.
+- **`var_partnerships_projection.status` CHECK**: 4-value superset `('active', 'expired', 'terminated', 'suspended')`.
+- **`authorization_reference` CHECK**: `IS NOT NULL OR authorization_type = 'emergency_access'`. Emergency access is in-band override per arch doc L313.
+- **`permissions` key shape in event payload**: top-level `event_data->'permissions'` (matches deployed handler at baseline_v4:10446). Arch doc L325-365's `data.scope.permissions` nested form is **INCORRECT**; this ADR fixes the doc.
+- **`grant.create` + `grant.view` + `grant.revoke` permission seeding**: Phase 1 manifest step 12 emits `permission.defined` events (current registry has none of them; verified by architect grep).
+- **Phase 1 manifest step 12 expansion** (NOT new step 18): the original Phase 0.4 draft proposed a duplicative step 18; resolved by EXPANDING step 12 (single handler addition for `access_grant.policy_override_applied` + permission seeding) and adding only 2 net new steps (steps 16-17). Total = 17 ordered steps.
+
+### Decision C.1 — `api.create_access_grant` (emit-grant RPC)
+
+Single RPC, NOT per-type. The `authorization_type` parameter discriminates; the RPC validates the backing record exists via per-type private helpers (scalable to court/agency/family in Phase N).
+
+Signature (locked):
+
+```sql
+CREATE OR REPLACE FUNCTION api.create_access_grant(
+    p_consultant_org_id        uuid NOT NULL,
+    p_provider_org_id          uuid NOT NULL,
+    p_consultant_user_id       uuid DEFAULT NULL,         -- NULL = org-wide grant
+    p_scope                    text NOT NULL,             -- 'organization_unit' | 'client_specific'
+    p_scope_id                 uuid NOT NULL,
+    p_authorization_type       text NOT NULL,             -- 5-value CHECK enforced
+    p_authorization_reference  uuid DEFAULT NULL,         -- NULL only for emergency_access (CHECK)
+    p_legal_reference          text DEFAULT NULL,
+    p_grant_role_template_name text NOT NULL,             -- resolves against grant_role_templates
+    p_permission_overrides     text[] DEFAULT NULL,       -- narrowing only via INTERSECT, never widening
+    p_terms                    jsonb DEFAULT '{}'::jsonb, -- merged on top of template.default_terms
+    p_expires_at               timestamptz DEFAULT NULL,
+    p_reason                   text DEFAULT 'Grant created via cross-tenant grant flow'
+) RETURNS jsonb
+```
+
+Body skeleton:
+
+1. `v_grant_id := gen_random_uuid();` (Decision-locked stream_id resolution).
+2. **HIPAA permission gate**: `has_platform_privilege()` OR `has_effective_permission('grant.create', <provider_org_path>)`. Provider-admin authority is load-bearing.
+3. **Per-type validation** via `public._validate_authorization_<type>(p_reference uuid, p_consultant_org_id uuid, p_provider_org_id uuid) RETURNS boolean` helpers. v1 implements `_validate_authorization_var_contract` (queries `var_partnerships_projection` for active row matching all three IDs) and `_validate_authorization_emergency_access` (accepts NULL reference). Phase N adds court/agency/family helpers.
+4. **Permission snapshot resolution**:
+   - `SELECT permission_name, default_terms FROM grant_role_templates WHERE template_name = p_grant_role_template_name AND is_active = TRUE`
+   - `v_permissions := ARRAY(SELECT unnest(v_template_perms) INTERSECT SELECT unnest(p_permission_overrides))` (when overrides non-null; INTERSECT = narrowing only)
+   - `v_terms := v_template_default_terms || p_terms` (right-hand wins)
+5. **Emit `access_grant.created`** with `p_stream_id := v_grant_id`. Event_data carries the resolved `permissions` jsonb array at TOP LEVEL (matches handler at baseline_v4:10446), plus `authorization_reference`, all 12 other handler-read keys.
+6. **Pattern A v2 readback**: SELECT FROM `cross_tenant_access_grants_projection WHERE id = v_grant_id`; check `processing_error` on captured `v_event_id`; envelope on either failure.
+7. Success envelope: `{success: true, grant: {id: v_grant_id, consultant_org_id, provider_org_id, expires_at, ...}}`.
+8. `COMMENT ON FUNCTION ... @a4c-rpc-shape: envelope @a4c-bucket: B @a4c-consultant-callable: no @a4c-consultant-callable-reason: provider-admin only @a4c-phase-target: 2`.
+
+Single-event Pattern A (no per-event loop). Forward-compat note: future grant-creation may also emit separate `notification.sent` or `audit.high_risk_action.logged` events on different streams — single-event-per-grant invariant on `access_grant` stream is preserved.
+
+### Decision C.2 — `grant_role_templates` schema
+
+Mirrors `role_permission_templates` flat structure with architect-recommended additions (explicit UNIQUE constraint, `default_terms jsonb`):
+
+```sql
+CREATE TABLE public.grant_role_templates (
+    id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    template_name       text NOT NULL,                 -- e.g., 'var_default'
+    authorization_type  text NOT NULL,                 -- same 5-value CHECK as grant projection
+    permission_name     text NOT NULL,
+    default_terms       jsonb DEFAULT '{}'::jsonb,     -- HIPAA defaults snapshot
+    is_active           boolean DEFAULT true NOT NULL,
+    created_at          timestamptz DEFAULT now() NOT NULL,
+    updated_at          timestamptz DEFAULT now() NOT NULL,
+    created_by          uuid,
+    UNIQUE (template_name, permission_name)
+);
+
+CREATE INDEX idx_grant_role_templates_active
+    ON grant_role_templates (template_name) WHERE is_active = true;
+CREATE INDEX idx_grant_role_templates_authtype
+    ON grant_role_templates (authorization_type) WHERE is_active = true;
+```
+
+RLS mirrors `role_permission_templates`: public read; service_role read; super_admin-only write.
+
+Phase 1 seed (v1 = VAR only):
+
+```sql
+INSERT INTO grant_role_templates (template_name, authorization_type, permission_name, default_terms) VALUES
+  ('var_default', 'var_contract', 'partner.view_analytics',       '{"phi_restricted": true}'::jsonb),
+  ('var_default', 'var_contract', 'partner.view_support_tickets', '{"phi_restricted": true}'::jsonb),
+  ('var_default', 'var_contract', 'partner.view_billing_reports', '{"phi_restricted": true}'::jsonb),
+  ('var_default', 'var_contract', 'partner.export_reports',       '{"phi_restricted": true}'::jsonb);
+```
+
+If any of the four `partner.*` permissions don't yet exist in the registry, Phase 1 manifest step 12 emits `permission.defined` events to create them (alongside `grant.create/view/revoke`).
+
+Read RPC (Phase 2): `api.get_grant_role_templates(p_authorization_type text)` mirroring `api.get_role_permission_templates`. Returns `TABLE("template_name" text, "permission_name" text, "default_terms" jsonb)`.
+
+### Decision C.3 — `var_partnerships_projection` + `var_partnership.*` event family
+
+New projection (v1 scope; status CHECK locked at 4-value superset; denormalized name columns retained per existing doc):
+
+```sql
+CREATE TABLE public.var_partnerships_projection (
+    id                       uuid PRIMARY KEY,
+    partner_org_id           uuid NOT NULL REFERENCES organizations_projection(id),
+    partner_org_name         text NOT NULL,
+    provider_org_id          uuid NOT NULL REFERENCES organizations_projection(id),
+    provider_org_name        text NOT NULL,
+    partnership_type         text NOT NULL CHECK (partnership_type IN ('standard', 'white_label')),
+    contract_number          text,
+    contract_start_date      date NOT NULL,
+    contract_end_date        date,
+    revenue_share_percentage numeric(5,2),
+    support_level            text CHECK (support_level IN ('tier1', 'tier1_tier2', 'full')),
+    terms                    jsonb DEFAULT '{}'::jsonb,
+    status                   text NOT NULL DEFAULT 'active'
+                             CHECK (status IN ('active', 'expired', 'terminated', 'suspended')),
+    created_at               timestamptz NOT NULL DEFAULT now(),
+    updated_at               timestamptz NOT NULL DEFAULT now(),
+    terminated_at            timestamptz,
+    terminated_by            uuid,
+    termination_reason       text,
+    suspended_at             timestamptz,
+    suspended_by             uuid,
+    suspension_reason        text,
+    UNIQUE (partner_org_id, provider_org_id)
+);
+```
+
+Doc reconciliation: arch doc L498-514 already has the denormalized name columns; needs `contract_number`, 4-value status CHECK, and suspension/termination audit columns added in lockstep with this ADR addendum.
+
+Event family (added to `stream_type` allowed values; new router branch):
+
+| event_type | Handler action |
+|---|---|
+| `var_partnership.created` | INSERT row |
+| `var_partnership.updated` | UPDATE non-immutable fields; also sync denormalized names on `org.updated` cross-events |
+| `var_partnership.terminated` | status='terminated' + audit columns |
+| `var_partnership.suspended` | status='suspended' + audit columns |
+| `var_partnership.reactivated` | status='active'; clear suspension fields |
+| `var_partnership.expired` | status='expired'. Emitter shape decided in Phase 0.5 (scheduled job vs RPC) |
+
+`contract_renewed` is NOT a separate event — it's `var_partnership.updated` with `contract_end_date` extension. Business label, not event-sourcing distinction.
+
+New router: `process_var_partnership_event(p_event record)` with strict ELSE `RAISE EXCEPTION` per CLAUDE.md guard rails. Dispatcher gains `WHEN 'var_partnership' THEN PERFORM process_var_partnership_event(NEW);` at baseline_v4:10789-area CASE.
+
+Phase 2 emit RPCs: `api.create_var_partnership`, `api.update_var_partnership`, `api.terminate_var_partnership`. All Pattern A v2 envelope.
+
+RLS posture (locked):
+- `var_partnerships_read_admin` — SELECT WHERE caller has org_admin in `partner_org_id` OR `provider_org_id`
+- `var_partnerships_platform_admin` — SELECT for platform admins (global)
+- `var_partnerships_service_role` — SELECT for handlers
+- **NO consultant-direct table access** — consultants read partnership context only through their grant via Phase N `api.list_my_active_grants_with_partnership_context()` RPC
+- NO INSERT/UPDATE/DELETE policy — event-sourced via SECURITY DEFINER handler
+
+**Pattern transferability**: the `authorization_reference uuid` indirection works uniformly for court/agency/family. The grant's `scope='client_specific' + scope_id=client_uuid` handles client-level enforcement; the type-specific projection handles legal-instrument metadata via `authorization_reference`. Pattern transfers without modification when Phase N adds the remaining authorization types.
+
+AsyncAPI contract sketch (Phase 2 deliverable; PR expands payloads):
+
+```yaml
+channels:
+  var_partnership:
+    description: VAR partnership lifecycle events
+    messages:
+      VarPartnershipCreated:       { title: VarPartnershipCreated,       payload: {...} }
+      VarPartnershipUpdated:       { title: VarPartnershipUpdated,       payload: {...} }
+      VarPartnershipTerminated:    { title: VarPartnershipTerminated,    payload: {...} }
+      VarPartnershipSuspended:     { title: VarPartnershipSuspended,     payload: {...} }
+      VarPartnershipReactivated:   { title: VarPartnershipReactivated,   payload: {...} }
+      VarPartnershipExpired:       { title: VarPartnershipExpired,       payload: {...} }
+```
+
+Each message MUST carry a `title` property (avoid AnonymousSchema generation per `infrastructure/supabase/CLAUDE.md` AsyncAPI rules).
+
+### Decision C.4 — `authorization_reference` column addition (Phase 1)
+
+```sql
+ALTER TABLE public.cross_tenant_access_grants_projection
+    ADD COLUMN authorization_reference uuid;
+
+ALTER TABLE public.cross_tenant_access_grants_projection
+    ADD CONSTRAINT cross_tenant_access_grants_authorization_reference_check
+    CHECK (authorization_reference IS NOT NULL OR authorization_type = 'emergency_access');
+
+CREATE INDEX idx_access_grants_authorization_reference
+    ON cross_tenant_access_grants_projection (authorization_reference)
+    WHERE authorization_reference IS NOT NULL;
+```
+
+Extend `process_access_grant_event.access_grant.created` branch (baseline_v4:10417-10451) to populate from `(p_event.event_data->>'authorization_reference')::uuid`.
+
+Pre-flight: re-verify `SELECT COUNT(*) FROM cross_tenant_access_grants_projection;` returns 0 before Phase 1 ships. (Existing zero rows assumed; UAT may have populated dev rows.)
+
+### Decision C.5 — Revocation flow
+
+**Single-grant revocation**: `api.revoke_access_grant(p_grant_id uuid, p_reason text, p_revocation_details text DEFAULT NULL)` emits `access_grant.revoked` (handler at baseline_v4:10454 reads `revocation_details` from event_data). Pattern A v2 envelope.
+
+**Policy-override revocation** (per Decision B.3): `api.revoke_permission_across_grants(p_permission_name text)` is the Phase 2 emitter; Phase 1 ships handler-only for `access_grant.policy_override_applied` event type (Phase 1 manifest step 12 — single handler addition; collision-free per Decision-locked manifest cleanup).
+
+**Immutability invariant**: NO `api.modify_access_grant`. Permission narrowing post-creation is via revoke + reissue. Preserves hybrid-snapshot audit trail.
+
+**JWT staleness window** (explicit ADR documentation):
+
+> Revocation does NOT terminate active sessions; in-flight requests during the staleness window (up to ~1hr, the default Supabase refresh-token cycle) remain authorized. For emergency revocation (HIPAA breach detected), pair the standard revocation with `auth.admin.signOut(consultant_user_id)` to force re-authentication. Phase 2 may expose `api.revoke_access_grant_with_session_termination(p_grant_id uuid, p_emergency boolean)` for this combined flow.
+
+Documented residual HIPAA risk that operational mitigation (immediate audit logging + notification) handles. Phase 2's grant-write-side design must include the emergency-revoke variant.
 
 ## Decisions
 
@@ -233,10 +449,12 @@ The following changes MUST ship in a single transactional migration. Step 5 (bac
 9. `COMMENT ON FUNCTION ... IS '... @a4c-rpc-shape: envelope|read ...'` re-tags for ALL 10 RPCs normalized in step 7 — `CREATE OR REPLACE` invalidates `pg_description` only if the signature changes; M3 DROP+CREATE rule says re-issue the comment in the migration to be safe (see [infrastructure/supabase/CLAUDE.md](../../../infrastructure/supabase/CLAUDE.md) § RPC Shape Registry).
 10. `ALTER TABLE public.cross_tenant_access_grants_projection ADD CONSTRAINT cross_tenant_access_grants_projection_authorization_type_check CHECK (authorization_type IN ('var_contract', 'court_order', 'family_participation', 'social_services_assignment', 'emergency_access'));` — closes the schema-open hole. Must be paired with documentation reconciliation (see "Documentation reconciliation" below).
 11. `CREATE TABLE public.grant_role_templates (...)` — per Decision B.1. Schema details deferred to Phase 0.4; Phase 1 may stub with a minimal column set.
-12. Add the `access_grant.policy_override_applied` event handler to `process_access_grant_event()` (handler-only; no emit RPC yet — per Decision B.3, the full emitter ships in Phase 2).
+12. Add the `access_grant.policy_override_applied` event handler to `process_access_grant_event()` (handler-only; no emit RPC yet — per Decision B.3, the full emitter ships in Phase 2). **Also emit `permission.defined` events for `grant.create`, `grant.view`, `grant.revoke` and the 4 `partner.*` permissions seeded by `var_default`** (none of these exist in the current permission registry; verified by architect grep). Per the PR #43 permission-projection rollout pattern.
 13. **Backfill `COMMENT ON FUNCTION` tags** for all 104 `api.*` RPCs with `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-consultant-callable-reason` (when applicable) + `@a4c-phase-target` per the Phase 0.3 matrix. Must happen BEFORE steps 14-15 so codegen has deterministic input. Note: step 7's normalization of 10 C-legacy RPCs flips their bucket from `C-legacy` to `C` (post-normalization), so the backfill tag for those 10 is `@a4c-bucket: C` reflecting their post-step-7 state.
 14. **Ship codegen script** `frontend/scripts/gen-rpc-reachability-matrix.cjs` (mirrors `frontend/scripts/gen-rpc-registry.cjs`). Reads `pg_description` from a local Supabase container, parses the tag set, emits the markdown matrix table + per-bucket count tables + Phase 3 / Phase 1 / Phase 4 target subset tables to `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`. Hard-fails on missing required tag.
 15. **Ship CI workflow** `.github/workflows/rpc-reachability-matrix-sync.yml` (mirrors `.github/workflows/rpc-registry-sync.yml`). Triggers on changes to `infrastructure/supabase/supabase/migrations/`, the codegen, or the matrix doc. Spins up local container, applies migrations, regenerates, diffs against committed matrix. Failing tags → CI red. Matrix doc transitions from hand-edited to generated artifact at this point.
+16. **Add `authorization_reference uuid` column to `cross_tenant_access_grants_projection`** + CHECK constraint (`IS NOT NULL OR authorization_type = 'emergency_access'`) + partial index `WHERE authorization_reference IS NOT NULL`. Extend `process_access_grant_event.access_grant.created` branch (baseline_v4:10417-10451) to populate from `(p_event.event_data->>'authorization_reference')::uuid`. Per Phase 0.4 Decision C.4. **Pre-flight**: re-verify `SELECT COUNT(*) FROM cross_tenant_access_grants_projection;` returns 0 before deploy (existing zero rows assumed; UAT may have populated dev rows).
+17. **`CREATE TABLE public.grant_role_templates (...)`** + RLS policies (mirror `role_permission_templates`: public read; service_role read; super_admin-only write) + indexes (`idx_grant_role_templates_active`, `idx_grant_role_templates_authtype`). Seed `var_default` template (4 rows × `partner.*` permissions × `{"phi_restricted": true}` default_terms) per Phase 0.4 Decision C.2.
 
 ### Post-migration deliverables (same Phase 1 PR)
 

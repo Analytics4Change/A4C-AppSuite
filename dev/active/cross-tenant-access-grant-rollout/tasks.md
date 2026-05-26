@@ -217,3 +217,73 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 - **Comment vocabulary refined**: replaced single `conditional` value with `pending-phase3-refactor` and `pending-phase4-rls` (operationally explicit). Added `@a4c-phase-target: 1|3|4|none` tag for single-grep work discovery.
 - **Phase 1 manifest cleanup**: removed dual-residence between Phase 0.3 section and Consequences; full 15-step manifest now canonical in Consequences only.
 - **Architect-flagged sub-audit**: `check_user_org_membership` is SECURITY DEFINER (bypasses caller-RLS) — Phase 4 should decide on narrowing or documenting the open-by-design behavior.
+
+---
+
+## Phase 0.4 — Outcomes (grant write-side)
+
+### Decisions locked (14 total)
+
+**User-confirmed via AskUserQuestion** (3):
+
+1. **v1 scope** → VAR partnerships only. Court/agency/family deferred to Phase N or v1.1+.
+2. **Schema gap (authorization_reference)** → add new column `authorization_reference uuid` to grant projection in Phase 1.
+3. **Backing-table write flow** → event-sourced (`var_partnership.*` event family with own router branch).
+
+**Architect-promoted at Phase 0.4 review** (11, analogous to 0.1+0.2's "4 promotions" pattern):
+
+4. **Permission-gate direction** → `has_effective_permission('grant.create', <provider_org_path>)` (NOT consultant_org_path). HIPAA: provider owns the PHI.
+5. **Stream_id resolution** → `v_grant_id := gen_random_uuid()` at top of `api.create_access_grant`; passed as `p_stream_id`; readback uses `WHERE id = v_grant_id`.
+6. **Template identifier** → `p_grant_role_template_name text NOT NULL` (NOT `_id uuid`). Mirrors `api.get_role_permission_templates(p_role_name)`.
+7. **`var_default` seed permission list** → `{partner.view_analytics, partner.view_support_tickets, partner.view_billing_reports, partner.export_reports}` with `default_terms: {phi_restricted: true}`.
+8. **`default_terms jsonb` column on `grant_role_templates`** → HIPAA defaults snapshot at template level.
+9. **Grant immutability** → NO `api.modify_access_grant`; modifications via revoke + reissue.
+10. **`var_partnerships_projection.status` CHECK** → 4-value superset `('active', 'expired', 'terminated', 'suspended')`.
+11. **`authorization_reference` CHECK** → `IS NOT NULL OR authorization_type = 'emergency_access'`.
+12. **`permissions` key shape in event payload** → top-level `event_data->'permissions'` (matches deployed handler at baseline_v4:10446). Arch doc L325-365 had INCORRECT nested form; fixed in lockstep.
+13. **`grant.create` + `grant.view` + `grant.revoke` permission seeding** → Phase 1 manifest step 12 emits `permission.defined` events (current registry has none of them).
+14. **Phase 1 manifest cleanup** → step 12 expanded to include permission seeding; steps 16-17 added; total = **17 ordered steps** (not 18 — the original draft's step 18 was duplicate).
+
+### Decision summary (C.1-C.5)
+
+| Decision | Summary |
+|---|---|
+| **C.1** | `api.create_access_grant` — single RPC with `p_authorization_type` discriminator; per-type validation via `public._validate_authorization_<type>` helpers; permission snapshot via `grant_role_templates` lookup + INTERSECT for narrowing; Pattern A v2 readback; HIPAA permission gate at provider path. |
+| **C.2** | `grant_role_templates` schema — mirror `role_permission_templates` flat structure + UNIQUE constraint + `default_terms jsonb`. Seed `var_default` template. |
+| **C.3** | `var_partnerships_projection` + `var_partnership.*` event family (6 event types: created/updated/terminated/suspended/reactivated/expired). New router `process_var_partnership_event`. RLS: org-admin read both sides, platform-admin global, NO consultant-direct access. Pattern transferable to court/agency/family. |
+| **C.4** | Add `authorization_reference uuid` column to grant projection in Phase 1 with emergency_access CHECK exception and partial index. Handler extension to populate from `event_data->>'authorization_reference'`. |
+| **C.5** | Single-grant revocation via `api.revoke_access_grant(p_grant_id, p_reason, p_revocation_details)`. Policy-override via Phase 2 `api.revoke_permission_across_grants` (Phase 1 handler-only). Immutability invariant. JWT staleness window documented; emergency revoke combined-flow flagged for Phase 2. |
+
+### Phase 1 manifest (15 → 17 steps — finalized)
+
+- **Steps 1-11** unchanged from Phase 0.1+0.2 ADR.
+- **Step 12 expanded** — `access_grant.policy_override_applied` handler + `permission.defined` event seeding for `grant.create/view/revoke` + 4 `partner.*` permissions.
+- **Steps 13-15** unchanged from Phase 0.3 (comment backfill + codegen + CI workflow).
+- **Step 16 (NEW)** — `authorization_reference` column + CHECK + partial index + handler extension.
+- **Step 17 (NEW)** — `grant_role_templates` table + RLS + indexes + `var_default` seed.
+
+### Phase 2 manifest (sketched)
+
+- `CREATE TABLE var_partnerships_projection` + RLS + indexes
+- `process_var_partnership_event` router + dispatcher CASE branch
+- `api.create_access_grant` emit RPC (+ per-type private validation helpers)
+- `api.revoke_access_grant(p_grant_id, p_reason, p_revocation_details)` single-grant revocation
+- `api.create_var_partnership`, `api.update_var_partnership`, `api.terminate_var_partnership` (and suspend/reactivate if needed)
+- `api.revoke_permission_across_grants(p_permission_name)` policy-override emitter (Decision B.3 completion)
+- `api.get_grant_role_templates(p_authorization_type)` read RPC
+- `api.expire_var_partnership` — emitter shape decided in Phase 0.5 (scheduled job vs RPC)
+- AsyncAPI `contracts/asyncapi.yaml` updates: `var_partnership` channel + 6 message types
+- Comment-tagging for all new RPCs (`@a4c-rpc-shape` + `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-phase-target`)
+
+### Phase 0.5 unblocks
+
+The 0.4 deliverables unblock 0.5 (phasing decision): Phase 1 manifest is 17 steps with hard ordering constraints (must-pair set: 1, 7, 8, 9 atomic; 16 before 17 because grant_role_templates seeding requires the partner.* permissions to exist first). Phase 2 manifest enumerated above. Phase 3 (1 RPC: `list_users`) + Phase 4 (35 RPCs by table cluster) handoffs locked at 0.3. Phase N: court/agency/family backing tables — sequenced post-VAR-GA per stakeholder availability.
+
+### Architect-review provenance
+
+Independent architect review (software-architect-dbc) on 2026-05-26 — verdict REQUEST CHANGES. Findings folded into the shipped Phase 0.4 deliverables:
+
+- **2 blockers**: HIPAA permission-gate direction reversed (consultant → provider); `var_default` seed permission list locked explicitly.
+- **4 important findings**: doc-vs-handler `permissions` key shape mismatch fixed (arch doc L325-365 updated to top-level form); `grant.create` permission seeding added to Phase 1 step 12; `var_partnerships_projection` schema deltas reconciled (contract_number + 4-value status + suspension/termination audit columns); Phase 1 step 12/18 collision resolved.
+- **11 sub-decisions** promoted from "deferred to Phase 1" to "locked at 0.4".
+- **Pattern improvements**: per-authorization-type validation extracted to `public._validate_authorization_<type>` helpers; INTERSECT for permission narrowing; index naming consistency; AsyncAPI YAML sketch in ADR addendum; forward-compat note on grant immutability.
