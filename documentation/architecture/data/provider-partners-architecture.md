@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-13
+last_updated: 2026-05-26
 ---
 
 <!-- TL;DR-START -->
@@ -37,9 +37,24 @@ last_updated: 2026-05-13
 > - ❌ Type-specific relationship projections (VAR contracts, court authorizations, etc.)
 
 **Status**: ✅ Foundation Implemented | ⏳ Type-Specific Features Planned
-**Version**: 2.3 (Boundary repair: cross-provider invitation gate)
-**Last Updated**: 2026-05-13
+**Version**: 2.4 (Phase 0 ADR — JWT shape + permission source decided)
+**Last Updated**: 2026-05-26
 **Authentication**: Supabase Auth
+
+> [!IMPORTANT]
+> **Phase 0 ADR (2026-05-26)** — the JWT-claim-shape and grant-permission-source
+> architecture for cross-tenant grants is now decided in
+> [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md):
+> Path B (extend `compute_effective_permissions` with a `grant_derived_perms`
+> CTE; tightened `DISTINCT ON (permission_name, scope_path)`; sync trigger so
+> `accessible_organizations` includes active grant-target orgs) + hybrid
+> snapshot (resolved permissions snapshotted into
+> `cross_tenant_access_grants_projection.permissions` jsonb at grant-creation
+> time; no template join at JWT issuance). The RLS-with-grants pattern
+> sketched below in `## Cross-Tenant Access Model` remains the canonical
+> data-tier enforcement layer; the ADR specifies how the JWT side of that
+> enforcement is populated. Read the ADR before designing grant-write-side
+> RPCs or extending the auth hook.
 
 > [!IMPORTANT]
 > **Boundary Repair (2026-05-13)** — `accept-invitation` and `invite-user` Edge
@@ -295,7 +310,7 @@ family_consents_projection:          -- Family member consents
 cross_tenant_access_grants_projection:
   consultant_org_id: [partner_org_id]
   provider_org_id: org_provider_a
-  authorization_type: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation'
+  authorization_type: 'var_contract' | 'court_order' | 'family_participation' | 'social_services_assignment' | 'emergency_access'
   authorization_reference: [relationship_record_id]
   status: 'active'
 ```
@@ -303,6 +318,9 @@ cross_tenant_access_grants_projection:
 ---
 
 ## Cross-Tenant Access Model
+
+> [!NOTE]
+> The RLS-with-grants pattern described in this section is the **data-tier enforcement layer**. The companion **JWT-tier** enforcement (how grant-derived permissions enter the consultant's `effective_permissions` claim and how `accessible_organizations` extends to include grant-target orgs) is specified by [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md). The two work together: the ADR populates the JWT; this section's RLS clauses gate the actual rows. The ADR's hybrid snapshot mechanism reads from the same `permissions jsonb` column written by `access_grant.created` events documented below.
 
 ### Unified Access Grant System (IMPLEMENTED ✅)
 
@@ -321,7 +339,7 @@ interface AccessGrantCreatedEvent {
     consultant_user_id: string;     // Partner user
     consultant_org_id: string;      // Partner organization
     provider_org_id: string;        // Target provider
-    authorization_type: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation';
+    authorization_type: 'var_contract' | 'court_order' | 'family_participation' | 'social_services_assignment' | 'emergency_access';
     authorization_reference: string; // Relationship record ID
     scope: {
       data_types: string[];          // Type-specific data access

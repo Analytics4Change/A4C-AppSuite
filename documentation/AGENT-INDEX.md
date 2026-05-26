@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-24
+last_updated: 2026-05-26
 purpose: agent-navigation
 ---
 
@@ -83,6 +83,12 @@ purpose: agent-navigation
 | `contact-phones` | [contact_phones.md](infrastructure/reference/database/tables/contact_phones.md) | contacts_projection.md |
 | `confirm-dialog` | [schedule-management.md](frontend/reference/schedule-management.md) | ui-patterns.md |
 | `contacts` | [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | provider-partners-architecture.md |
+| `cross-tenant-grant` | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | provider-partners-architecture.md, multi-tenancy-architecture.md, adr-multi-role-effective-permissions.md |
+| `provider-partner` | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | provider-partners-architecture.md |
+| `jwt-claim-shape` | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | custom-claims-setup.md, multi-tenancy-architecture.md |
+| `compute-effective-permissions` | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | adr-multi-role-effective-permissions.md, scoping-architecture.md |
+| `accessible-organizations` | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | multi-tenancy-architecture.md, infrastructure/supabase/CLAUDE.md |
+| `hybrid-snapshot` | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | provider-partners-architecture.md |
 | `contract-drift` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, workflows/CLAUDE.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
@@ -326,6 +332,7 @@ purpose: agent-navigation
 | [adr-client-ou-placement.md](architecture/decisions/adr-client-ou-placement.md) | ADR: Client OU placement — single-path OU mutation, `client.transfer` permission, row lock, read-time OU state enrichment | `adr`, `client-placement`, `client-transfer`, `organization-unit`, `placement-history`, `row-lock`, `cqrs-read-model` | 1200 |
 | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | ADR: All `api.update_*`/`change_*` RPCs use Pattern A (return-error envelope) for handler-driven failures; RAISE EXCEPTION forbidden because it rolls back the audit row | `adr`, `rpc-readback`, `processing-error`, `projection-guard`, `api-contract` | 2400 |
 | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | ADR: SQL RPC is the default for write operations; Edge Functions reserved for 6 load-bearing criteria (LB1–LB6). Includes inventory of all 7 Edge Functions with per-operation classification + extraction backlog. | `adr`, `edge-function`, `sql-rpc`, `orchestration-tier`, `cqrs` | 2800 |
+| [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | ADR: Cross-tenant grants extend the JWT via `compute_effective_permissions` (Path B); grant permissions snapshotted into `cross_tenant_access_grants_projection.permissions` at write time (hybrid snapshot); asymmetric `DISTINCT ON (permission_name, scope_path)`; separate `grant_role_templates` table; opt-in implication propagation. | `adr`, `cross-tenant-grant`, `jwt-claim-shape`, `compute-effective-permissions`, `provider-partner`, `accessible-organizations`, `hybrid-snapshot` | 2500 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |
