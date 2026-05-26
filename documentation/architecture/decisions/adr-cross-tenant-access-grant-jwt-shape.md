@@ -88,6 +88,65 @@ Consultants do NOT receive cross-tenant access via the normal invite-user / role
 
 The grant projection IS the source of truth for cross-tenant access. RLS clauses on data tables consult it via `has_cross_tenant_access(...)`. The consultant's JWT — refreshed after grant creation — carries the snapshotted permissions at the grant's scope per the decisions below.
 
+## Phase 0.3 — RPC Reachability Matrix
+
+The companion artifact [cross-tenant-access-grant-rpc-reachability-matrix.md](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) classifies all 104 `api.*` SQL RPCs into five buckets and records the consultant-callability decision per RPC. This section captures the per-bucket decisions and the freshness mechanism design that govern the matrix.
+
+### Five-bucket taxonomy (strict definitions)
+
+| Bucket | Defining behavior | Count |
+|---|---|---:|
+| **A** | Early-return tenancy guard: `IF NOT (has_platform_privilege() OR p_org_id = get_current_org_id()) THEN RETURN; END IF;`. Canonical exemplar: `api.list_users` (PR #66). | 1 |
+| **A-variant** | Same `p_org_id = get_current_org_id()` equality check but RAISEs instead of RETURNs and/or adds permission-gate. Treated as Phase 3 refactor target alongside strict A. | 1 |
+| **B** | Derives target org from JWT (`v_org_id := public.get_current_org_id();`); no `p_org_id` parameter. | 15 |
+| **C** | Scope-path signature; gates via `has_effective_permission(perm, p_scope_path)`. Only PR #67's three sister RPCs. | 3 |
+| **C-legacy** | Variant of C using the legacy `get_permission_scope() + manual ltree @>` two-step pattern. `LIMIT 1` semantics break under multi-entry-per-permission JWTs. **Architect-review found 10 RPCs, not 2**: 2 role-management mutation siblings + 5 OU mutators + 3 OU readers. | 10 |
+| **D** | Entity-lookup signature; no inline tenancy guard; RLS-enforced. Includes RPCs with `p_org_id` but no early-return guard. | 34 |
+| **D-variant** | D with an explicit permission-gate (e.g., `has_platform_privilege()`) in addition to RLS. | 1 |
+| **E** | No org/scope context; platform reference data, user-as-identity surface, or session-bound writes. | 38 |
+| **E-variant** | Sui generis (mixed self-context + org-admin predicate). | 1 |
+| **Total** | | **104** |
+
+See [cross-tenant-access-grant-rpc-reachability-matrix.md](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) for the per-RPC table.
+
+### Per-bucket consultant-callability decisions
+
+| Bucket | Decision | Rationale |
+|---|---|---|
+| A + A-variant | **NOT consultant-callable; Phase 3 refactor target (2 RPCs)** | Forward-incompatible by definition. Early-return/early-raise guard rejects non-home-org callers. Phase 3 refactor replaces guard with PR #67 three-step skeleton. |
+| B | **NOT consultant-callable; case-by-case parameterization in subsequent cards** | `get_current_org_id()` returns home org; no parameter to target grant org. Per-RPC variant design out of Phase 0.3 scope. |
+| C | **Consultant-callable natively under Path B; no work needed** | Scope-bound permission check evaluates grant-derived permissions automatically (the snapshot in `cross_tenant_access_grants_projection.permissions` is read by `compute_effective_permissions` and surfaces in the JWT at the grant's scope). |
+| C-legacy | **NOT consultant-callable without Phase 1 fix; normalize in same migration as DISTINCT ON tightening (10 RPCs)** | LIMIT-1 semantics break under multi-entry-per-permission JWTs. **All 10 RPCs MUST ship the normalization in the same transactional migration as the `compute_effective_permissions` extension** (operational tripwire from PR #67 close-out; expanded scope per Phase 0.3 architect review). |
+| D + D-variant | **Consultant-callable IFF Phase 4 RLS extension lands per-table** | RLS is the enforcement mechanism; per-table audit decides per-RPC. Phase 4 extends RLS clauses to consult `has_cross_tenant_access(...)`. |
+| E + E-variant | **Consultant-callable by default; case-by-case for any RPC with implicit org context** | Grant-irrelevant; permission-gated RPCs benefit from JWT extension automatically. |
+
+### Comment vocabulary (Phase 1 codegen contract)
+
+To prevent matrix drift, every `api.*` RPC's `COMMENT ON FUNCTION` declares its bucket, consultant-callability, reason, and phase-target via tags (extending the existing M3 `@a4c-rpc-shape` vocabulary from [adr-rpc-readback-pattern.md](./adr-rpc-readback-pattern.md) § "Type-level enforcement (M3)"):
+
+```sql
+COMMENT ON FUNCTION api.list_users(uuid, ...) IS $cmt$Lists users in an org with role assignments.
+
+@a4c-rpc-shape: read
+@a4c-bucket: A
+@a4c-consultant-callable: pending-phase3-refactor
+@a4c-consultant-callable-reason: early-return tenancy guard; PR #66 pattern; forward-incompatible with grant-bearers
+@a4c-phase-target: 3
+$cmt$;
+```
+
+**Grammar summary** (full grammar in [matrix doc](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) § "Comment vocabulary specification"):
+
+| Tag | Values | Required |
+|---|---|---|
+| `@a4c-rpc-shape:` | `envelope` \| `read` | pre-existing (M3) |
+| `@a4c-bucket:` | `A` \| `B` \| `C` \| `C-legacy` \| `D` \| `E` | new |
+| `@a4c-consultant-callable:` | `yes` \| `no` \| `pending-phase3-refactor` \| `pending-phase4-rls` | new |
+| `@a4c-consultant-callable-reason:` | free text | required for `no` / `pending-*`; codegen+CI enforce |
+| `@a4c-phase-target:` | `1` \| `3` \| `4` \| `none` | new — single grep finds all RPCs needing work in a given phase |
+
+The full 15-step Phase 1 manifest (steps 1-12 from JWT-shape work + steps 13-15 from Phase 0.3) is enumerated in **Consequences → Phase 1 migration manifest** below — single canonical location to avoid drift.
+
 ## Decisions
 
 ### Decision A — JWT shape: extend `compute_effective_permissions` (Path B)
@@ -163,12 +222,21 @@ The following changes MUST ship in a single transactional migration. Step 5 (bac
    ```
    Idempotent: dedupes via `DISTINCT unnest()` so re-run is safe.
 6. `CREATE INDEX idx_access_grants_consultant_user_status_partial ON public.cross_tenant_access_grants_projection (consultant_user_id, status) WHERE status='active';` — closes the auth-hook query gap. The existing `idx_access_grants_consultant_user` is single-column partial WHERE NOT NULL; it does not cover the `status='active'` filter the auth hook will run.
-7. `CREATE OR REPLACE FUNCTION api.bulk_assign_role(...)` — normalize the legacy `get_permission_scope() + manual ltree @>` two-step pattern (baseline_v4:362 area) to `has_effective_permission(perm, scope_path)`.
-8. `CREATE OR REPLACE FUNCTION api.sync_role_assignments(...)` — same normalization (baseline_v4:5571 area).
-9. `COMMENT ON FUNCTION api.bulk_assign_role(...) IS '... @a4c-rpc-shape: envelope'` and the same for `api.sync_role_assignments` — `CREATE OR REPLACE` invalidates `pg_description`; the M3 RPC Shape Registry CI will fail otherwise (see [infrastructure/supabase/CLAUDE.md](../../../infrastructure/supabase/CLAUDE.md) § RPC Shape Registry).
+7. **Normalize 10 C-legacy RPCs** (expanded scope per Phase 0.3 architect review — see [matrix doc](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) § Phase 1 must-pair normalization):
+   - **Role-management mutations** (2): `api.bulk_assign_role` (`20260430002824_*.sql:260`), `api.sync_role_assignments` (`20260430002824_*.sql:417`)
+   - **OU mutators** (5): `api.create_organization_unit`, `api.update_organization_unit`, `api.delete_organization_unit`, `api.deactivate_organization_unit`, `api.reactivate_organization_unit`
+   - **OU readers** (3): `api.get_organization_unit_by_id`, `api.get_organization_unit_descendants`, `api.get_organization_units`
+   
+   Each: replace `v_scope_path := get_permission_scope('<perm>')` + manual `@>` check with single `IF NOT has_effective_permission('<perm>', <scope_path>) THEN RAISE EXCEPTION ... END IF;` (or scope-bound query predicate for the readers).
+
+8. *(merged into step 7 above)*
+9. `COMMENT ON FUNCTION ... IS '... @a4c-rpc-shape: envelope|read ...'` re-tags for ALL 10 RPCs normalized in step 7 — `CREATE OR REPLACE` invalidates `pg_description` only if the signature changes; M3 DROP+CREATE rule says re-issue the comment in the migration to be safe (see [infrastructure/supabase/CLAUDE.md](../../../infrastructure/supabase/CLAUDE.md) § RPC Shape Registry).
 10. `ALTER TABLE public.cross_tenant_access_grants_projection ADD CONSTRAINT cross_tenant_access_grants_projection_authorization_type_check CHECK (authorization_type IN ('var_contract', 'court_order', 'family_participation', 'social_services_assignment', 'emergency_access'));` — closes the schema-open hole. Must be paired with documentation reconciliation (see "Documentation reconciliation" below).
 11. `CREATE TABLE public.grant_role_templates (...)` — per Decision B.1. Schema details deferred to Phase 0.4; Phase 1 may stub with a minimal column set.
 12. Add the `access_grant.policy_override_applied` event handler to `process_access_grant_event()` (handler-only; no emit RPC yet — per Decision B.3, the full emitter ships in Phase 2).
+13. **Backfill `COMMENT ON FUNCTION` tags** for all 104 `api.*` RPCs with `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-consultant-callable-reason` (when applicable) + `@a4c-phase-target` per the Phase 0.3 matrix. Must happen BEFORE steps 14-15 so codegen has deterministic input. Note: step 7's normalization of 10 C-legacy RPCs flips their bucket from `C-legacy` to `C` (post-normalization), so the backfill tag for those 10 is `@a4c-bucket: C` reflecting their post-step-7 state.
+14. **Ship codegen script** `frontend/scripts/gen-rpc-reachability-matrix.cjs` (mirrors `frontend/scripts/gen-rpc-registry.cjs`). Reads `pg_description` from a local Supabase container, parses the tag set, emits the markdown matrix table + per-bucket count tables + Phase 3 / Phase 1 / Phase 4 target subset tables to `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`. Hard-fails on missing required tag.
+15. **Ship CI workflow** `.github/workflows/rpc-reachability-matrix-sync.yml` (mirrors `.github/workflows/rpc-registry-sync.yml`). Triggers on changes to `infrastructure/supabase/supabase/migrations/`, the codegen, or the matrix doc. Spins up local container, applies migrations, regenerates, diffs against committed matrix. Failing tags → CI red. Matrix doc transitions from hand-edited to generated artifact at this point.
 
 ### Post-migration deliverables (same Phase 1 PR)
 
@@ -241,6 +309,7 @@ The principal risk under Path B is that `compute_effective_permissions`'s extend
 
 ## Related Documentation
 
+- [cross-tenant-access-grant-rpc-reachability-matrix.md](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) — Phase 0.3 deliverable; per-RPC classification of all 104 `api.*` functions plus per-bucket consultant-callability decisions plus comment vocabulary spec for the Phase 1 codegen.
 - [provider-partners-architecture.md](../data/provider-partners-architecture.md) — Canonical narrative on `provider_partner` org type, four authorization-type patterns, RLS-with-grants sketch (L305-411). This ADR's Path B + hybrid snapshot is the data-tier enforcement mechanism that narrative depends on.
 - [adr-multi-role-effective-permissions.md](../authorization/adr-multi-role-effective-permissions.md) — RBAC + Effective Permissions over ReBAC; defines the `compute_effective_permissions` semantics this ADR extends.
 - [adr-rpc-readback-pattern.md](./adr-rpc-readback-pattern.md) — Pattern A v2 read-back contract that `api.revoke_permission_across_grants` (and the grant-write-side emit RPC) will conform to in Phase 2.

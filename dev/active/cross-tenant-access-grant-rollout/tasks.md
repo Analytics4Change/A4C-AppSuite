@@ -75,10 +75,10 @@ Pending. Likely shape (NOT committed):
 
 ## Current Status
 
-**Phase**: Phase 0 — Architecture design (0.1 + 0.2 SHIPPED; 0.3-0.5 pending)
-**Status**: ADR landed 2026-05-26 (`documentation/architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md`); architect-reviewed pre-write; provider-partners-architecture.md updated to reference; AGENT-INDEX.md updated
+**Phase**: Phase 0 — Architecture design (0.1 + 0.2 + 0.3 SHIPPED; 0.4-0.5 pending)
+**Status**: Phase 0.3 RPC reachability matrix landed 2026-05-26 (`documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`); ADR addendum captures per-bucket decisions + Phase 1 manifest expanded 12→15 steps; AGENT-INDEX.md updated
 **Last Updated**: 2026-05-26
-**Next Step**: Re-enter plan mode for 0.3 (RPC reachability matrix) against the now-locked JWT shape. 0.4 (grant write-side) follows; the locked `grant_role_templates` separate-table decision is its starting input.
+**Next Step**: Phase 0.4 (grant write-side) — design the emit-grant RPC contract, `grant_role_templates` schema, authorization-type validation. The Phase 0.3 matrix's Bucket A (1 RPC) and Bucket D (34 RPCs) target lists become Phase 3 and Phase 4 inputs respectively.
 
 ---
 
@@ -142,3 +142,78 @@ The grant projection IS the source of truth for cross-tenant access.
 ### Architect-review provenance
 
 Plan at `/home/lars/.claude/plans/deep-snacking-globe.md` was independently architect-reviewed (software-architect-dbc) on 2026-05-22 — verdict APPROVE WITH IN-PR FIXES. Five factual claims were refuted (composite-index keying, PR #66 guard citation, `organizations_projection.type` CHECK line number, projection column count, `authorization_type` CHECK existence) and four sub-decisions were promoted from "deferred to 0.4 / Phase 1" to "locked at 0.2": asymmetric DISTINCT ON formulation, separate `grant_role_templates` table, opt-in implication propagation default (overrode initial YES → NO on HIPAA grounds), event-sourced policy-override mechanism. All architect findings are folded into the shipped ADR.
+
+---
+
+## Phase 0.3 — Outcomes (RPC reachability matrix)
+
+### Decisions locked
+
+1. **Bucket A definition** → **strict**: only RPCs implementing the PR #66 early-return tenancy guard pattern (`IF NOT (has_platform_privilege() OR p_org_id = get_current_org_id()) THEN RETURN; END IF;`). Functions with `p_org_id` but RLS-only enforcement are Bucket D, not A.
+2. **Deliverable shape** → **new reference doc + ADR addendum**. Matrix at `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`; ADR gains Phase 0.3 section with per-bucket decisions.
+3. **Freshness mechanism** → **comment-driven codegen** (mirrors M3). New `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-consultant-callable-reason` tags in `COMMENT ON FUNCTION` per RPC. Phase 1 ships `frontend/scripts/gen-rpc-reachability-matrix.cjs` + `.github/workflows/rpc-reachability-matrix-sync.yml`. Matrix doc switches from hand-edited to generated.
+
+### Verified counts (104 total `api.*` RPCs — post-architect-review correction)
+
+| Bucket | R | W | Total | Phase target |
+|---|---:|---:|---:|---|
+| A (strict) | 1 | 0 | **1** | Phase 3 refactor (`api.list_users`) |
+| A-variant | 1 | 0 | **1** | Phase 3 refactor (`api.list_invitations` — RAISE-not-RETURN variant) |
+| B | 4 | 11 | **15** | Case-by-case in subsequent cards |
+| C (strict) | 3 | 0 | **3** | No work needed — only PR #67's three sister RPCs |
+| C-legacy | 3 | 7 | **10** | **Phase 1 must-pair normalization (expanded from 2 → 10): 2 role-mutation siblings + 5 OU mutators + 3 OU readers** |
+| D | 31 | 3 | **34** | Phase 4 RLS audit + grant-aware EXISTS extension |
+| D-variant | 1 | 0 | **1** | Phase 4 (with explicit permission-gate note) |
+| E | 19 | 19 | **38** | Mostly no work |
+| E-variant | 1 | 0 | **1** | `list_user_organizations` — sui generis |
+
+### Phase 1 manifest expansion (12 → 15 steps; step 7 scope expanded 2 → 10 RPCs)
+
+ADR Phase 1 manifest changes:
+
+- **Step 7 expanded**: Normalize 10 C-legacy RPCs (was 2 — architect-review found OU mutators + OU readers also use legacy two-step). The operational tripwire applies to ALL 10.
+- **13. (new)** Backfill `COMMENT ON FUNCTION` tags for all 104 `api.*` RPCs (`@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-consultant-callable-reason` + `@a4c-phase-target`).
+- **14. (new)** Ship codegen script `frontend/scripts/gen-rpc-reachability-matrix.cjs`.
+- **15. (new)** Ship CI workflow `.github/workflows/rpc-reachability-matrix-sync.yml`.
+
+### Phase 3 handoff (2-RPC scope after architect review)
+
+| RPC | Bucket | Work |
+|---|---|---|
+| `api.list_users` | A (strict) | Replace early-return guard with PR #67 three-step skeleton |
+| `api.list_invitations` | A-variant | Replace early-RAISE guard with three-step skeleton + permission check on `invitation.read` |
+
+### Phase 4 handoff (Bucket D + D-variant RLS audit scope — 35 RPCs)
+
+35 RPCs cluster by underlying RLS-protected table (OU readers moved OUT to C-legacy per Phase 1 normalization scope; `list_invitations` moved OUT to A-variant per Phase 3):
+
+- `invitations_projection` → 6 RPCs (excluding `list_invitations` which moved to A-variant)
+- `phones_projection` → 5 RPCs
+- `roles_projection` / `role_permissions_projection` → 5 RPCs
+- `users` / `user_roles_projection` / `user_organizations_projection` → 4 RPCs
+- `organizations_projection` → 3 RPCs
+- `contacts_projection` → 2 RPCs
+- `user_addresses` → 2 RPCs (incl. `get_user_addresses_for_org` D-variant)
+- `user_schedules_projection` → 2 RPCs
+- `addresses_projection`, `emails`, `bootstrap_projections`, `user_client_assignments_projection` → 1 each
+- Entity writes (RLS-enforced + explicit-org-param without strict-A guard) → 4 (`add_user_phone`, `revoke_invitation`, `update_user`, `update_user_notification_preferences`)
+
+Phase 4 deliverable per table: extend each policy's `USING` clause with `OR public.has_cross_tenant_access(<table>.organization_id, ...)` (or equivalent EXISTS against `cross_tenant_access_grants_projection`). Phase 4 may sub-divide into per-table sub-cards.
+
+**Sub-audit note**: `check_user_org_membership` (baseline_v4:593-606) is SECURITY DEFINER — DEFINER bypasses caller-RLS so it's effectively an unauthenticated org-membership probe. Forward-compatible with cross-tenant grants by accident; Phase 4 should decide whether to narrow the surface or document the open-by-design behavior explicitly.
+
+### Phase 0.4 / 0.5 unblocks
+
+- **0.4** (grant write-side) is unblocked — `grant_role_templates` separate-table decision is the starting input; emit RPC contract sketched in ADR addendum.
+- **0.5** (phasing decision) — Phase 1 manifest (now 15 steps; step 7 covers 10 C-legacy RPCs not 2) is the Phase 1 commit; Phase 2 = grant write-side + `api.revoke_permission_across_grants` emitter; Phase 3 = `api.list_users` + `api.list_invitations` refactor (2 RPCs); Phase 4 = Bucket D + D-variant RLS audit (35 RPCs, may sub-divide).
+
+### Architect-review provenance (Phase 0.3)
+
+Independent architect review (software-architect-dbc) on 2026-05-26 — verdict REQUEST CHANGES. Findings folded into the shipped matrix + ADR addendum:
+
+- **8 OU functions reclassified C → C-legacy** (5 mutators: create/update/delete/deactivate/reactivate_organization_unit; 3 readers: get_organization_unit_by_id/descendants, get_organization_units). Phase 1 must-pair scope expanded 2 → 10 RPCs — the operational tripwire would have mis-fired without this correction.
+- **3 functions reclassified B ↔ D ↔ E**: `update_user` and `update_user_notification_preferences` moved B → D (take `p_org_id` explicitly, not JWT-derived). `list_user_org_access` moved B → E (self-context). `modify_user_roles` moved E → B (is JWT-bound write).
+- **2 functions flagged as variants**: `list_invitations` is A-variant (RAISE-not-RETURN); `list_user_organizations` is E-variant (sui generis mixed predicate); `get_user_addresses_for_org` is D-variant (explicit permission-gate). The matrix uses root-bucket for the `@a4c-bucket` tag and captures variant nuance in `@a4c-consultant-callable-reason`.
+- **Comment vocabulary refined**: replaced single `conditional` value with `pending-phase3-refactor` and `pending-phase4-rls` (operationally explicit). Added `@a4c-phase-target: 1|3|4|none` tag for single-grep work discovery.
+- **Phase 1 manifest cleanup**: removed dual-residence between Phase 0.3 section and Consequences; full 15-step manifest now canonical in Consequences only.
+- **Architect-flagged sub-audit**: `check_user_org_membership` is SECURITY DEFINER (bypasses caller-RLS) — Phase 4 should decide on narrowing or documenting the open-by-design behavior.
