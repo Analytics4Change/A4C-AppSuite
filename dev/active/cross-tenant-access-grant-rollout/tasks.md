@@ -75,10 +75,10 @@ Pending. Likely shape (NOT committed):
 
 ## Current Status
 
-**Phase**: Phase 0 — Architecture design (0.1 + 0.2 + 0.3 SHIPPED; 0.4-0.5 pending)
-**Status**: Phase 0.3 RPC reachability matrix landed 2026-05-26 (`documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`); ADR addendum captures per-bucket decisions + Phase 1 manifest expanded 12→15 steps; AGENT-INDEX.md updated
+**Phase**: Phase 0 — Architecture design (0.1 + 0.2 + 0.3 + 0.4 + 0.5 SHIPPED; closing on merge of PR #68)
+**Status**: All 5 sub-phase outcomes blocks complete (see sections below). 4 architect-review passes (one per sub-phase commit + one final cohesion pass on PR #68) with findings folded in. PR #68 open for external review.
 **Last Updated**: 2026-05-26
-**Next Step**: Phase 0.4 (grant write-side) — design the emit-grant RPC contract, `grant_role_templates` schema, authorization-type validation. The Phase 0.3 matrix's Bucket A (1 RPC) and Bucket D (34 RPCs) target lists become Phase 3 and Phase 4 inputs respectively.
+**Next Step**: After PR #68 merges, seed `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md tracking the 15-step migration manifest from ADR Consequences. Branch `feat/cross-tenant-grant-phase-1-jwt-shape` from main.
 
 ---
 
@@ -242,7 +242,7 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 11. **`authorization_reference` CHECK** → `IS NOT NULL OR authorization_type = 'emergency_access'`.
 12. **`permissions` key shape in event payload** → top-level `event_data->'permissions'` (matches deployed handler at baseline_v4:10446). Arch doc L325-365 had INCORRECT nested form; fixed in lockstep.
 13. **`grant.create` + `grant.view` + `grant.revoke` permission seeding** → Phase 1 manifest step 12 emits `permission.defined` events (current registry has none of them).
-14. **Phase 1 manifest cleanup** → step 12 expanded to include permission seeding; steps 16-17 added; total = **17 ordered steps** (not 18 — the original draft's step 18 was duplicate).
+14. **Phase 1 manifest cleanup** → step 12 expanded to include permission seeding; steps 16-17 added; total = **17 ordered steps** at Phase 0.4 close (not 18 — the original draft's step 18 was duplicate). *(Further reduced to **15 steps** post-PR-#68-cohesion-review per Step 9-into-8 absorption + Step 11 stub deletion; see PR #68 architect-review-provenance entry below.)*
 
 ### Decision summary (C.1-C.5)
 
@@ -254,7 +254,7 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 | **C.4** | Add `authorization_reference uuid` column to grant projection in Phase 1 with emergency_access CHECK exception and partial index. Handler extension to populate from `event_data->>'authorization_reference'`. |
 | **C.5** | Single-grant revocation via `api.revoke_access_grant(p_grant_id, p_reason, p_revocation_details)`. Policy-override via Phase 2 `api.revoke_permission_across_grants` (Phase 1 handler-only). Immutability invariant. JWT staleness window documented; emergency revoke combined-flow flagged for Phase 2. |
 
-### Phase 1 manifest (15 → 17 steps — finalized)
+### Phase 1 manifest (15 → 17 steps at Phase 0.4 close; → 15 final post-PR-#68-cohesion-fix)
 
 - **Steps 1-11** unchanged from Phase 0.1+0.2 ADR.
 - **Step 12 expanded** — `access_grant.policy_override_applied` handler + `permission.defined` event seeding for `grant.create/view/revoke` + 4 `partner.*` permissions.
@@ -277,7 +277,7 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 
 ### Phase 0.5 unblocks
 
-The 0.4 deliverables unblock 0.5 (phasing decision): Phase 1 manifest is 17 steps with hard ordering constraints (must-pair set: 1, 7, 8, 9 atomic; 16 before 17 because grant_role_templates seeding requires the partner.* permissions to exist first). Phase 2 manifest enumerated above. Phase 3 (1 RPC: `list_users`) + Phase 4 (35 RPCs by table cluster) handoffs locked at 0.3. Phase N: court/agency/family backing tables — sequenced post-VAR-GA per stakeholder availability.
+The 0.4 deliverables unblock 0.5 (phasing decision): Phase 1 manifest is 15 steps with hard ordering constraints (must-pair set: 1, 7, 8 atomic; 14 before 15 because grant_role_templates seeding requires the partner.* permissions to exist first; counts reflect post-PR-#68-cohesion-fix renumber). Phase 2 manifest enumerated above. Phase 3 (2 RPCs: `list_users` + `list_invitations` A-variant) + Phase 4 (35 RPCs by table cluster: 34 strict-D + 1 D-variant) handoffs locked at 0.3. Phase N: court/agency/family backing tables — sequenced post-VAR-GA per stakeholder availability.
 
 ### Architect-review provenance
 
@@ -287,6 +287,7 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 - **4 important findings**: doc-vs-handler `permissions` key shape mismatch fixed (arch doc L325-365 updated to top-level form); `grant.create` permission seeding added to Phase 1 step 12; `var_partnerships_projection` schema deltas reconciled (contract_number + 4-value status + suspension/termination audit columns); Phase 1 step 12/18 collision resolved.
 - **11 sub-decisions** promoted from "deferred to Phase 1" to "locked at 0.4".
 - **Pattern improvements**: per-authorization-type validation extracted to `public._validate_authorization_<type>` helpers; INTERSECT for permission narrowing; index naming consistency; AsyncAPI YAML sketch in ADR addendum; forward-compat note on grant immutability.
+- **PR #68 cohesion-pass review (2026-05-26)** — 4th architect-review pass on the assembled Phase 0 design body (post all 4 phase commits). Verdict REQUEST CHANGES. 2 blockers (Step 11/17 `grant_role_templates` CREATE collision regression of the 0.4 12/18 class; stale Authorization Type Patterns code blocks at provider-partners L376-433 contradicting the Phase 0.4 doc correction). 4 important findings (Step 8 placeholder broke "17 ordered steps" claim — manifest was actually 15 substantive once Step 9 absorbed into Step 8 + Step 11 stub deleted; provider-partners doc footer not bumped; AGENT-INDEX Phase 3/4 counts stale 1/34 → 2/35; tasks.md Current Status pre-0.4-shipping). 3 nits folded in (`permissions jsonb` shape contract invariant; `accessible_organizations` user-visibility consequence with `EXISTS`-against-grant-projection corrected predicate; JWT staleness window quantification via `access_token_expiry_seconds` + HIPAA operational SLA). All 9 findings + 3 plan-review architect-flagged plan corrections resolved in the 5th commit on this branch. **Final Phase 1 manifest = 15 substantive steps** (not 17 as previously claimed at Phase 0.4 close).
 
 ---
 
@@ -341,8 +342,8 @@ This card (`cross-tenant-access-grant-rollout/`) completes Phase 0 at this commi
 After Phase 0 PR merges to main:
 
 1. Branch `feat/cross-tenant-grant-phase-1-jwt-shape` from main (per branch-on-decision rule).
-2. Seed `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md tracking the 17-step migration manifest from ADR Consequences.
+2. Seed `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md tracking the 15-step migration manifest from ADR Consequences.
 3. Phase 1 plan-mode pass: identify any unresolved sub-decisions (e.g., `var_partnership.expired` emitter shape — scheduled job vs RPC, currently deferred).
 4. Architect review of Phase 1 plan before any migration is written.
-5. Phase 1 implementation: produce the migration file (transactional `.sql` covering all 17 steps), regenerate `database.types.ts` for both frontend + workflows, smoke-test against dev Supabase.
+5. Phase 1 implementation: produce the migration file (transactional `.sql` covering all 15 steps), regenerate `database.types.ts` for both frontend + workflows, smoke-test against dev Supabase.
 6. PR + UAT + merge.

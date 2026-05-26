@@ -192,7 +192,7 @@ If future RPCs adopt the early-return/early-raise guard pattern (anti-recommende
 
 ## Phase 1 must-pair normalization (Bucket C-legacy — 10 RPCs)
 
-**10 RPCs** that ship in the same transactional migration as the DISTINCT ON tightening + `compute_effective_permissions` extension (per ADR Phase 1 manifest steps 7, 8, 9 — now significantly expanded from the original 2-RPC scope per architect-review findings).
+**10 RPCs** that ship in the same transactional migration as the DISTINCT ON tightening + `compute_effective_permissions` extension (per ADR Phase 1 manifest steps 7, 8 — Step 7 covers the body normalization; Step 8 covers the M3 RPC Shape Registry re-tag + post-migration assertion; now significantly expanded from the original 2-RPC scope per architect-review findings).
 
 ### Role-management mutations (2 — PR #67 known)
 
@@ -221,7 +221,7 @@ If future RPCs adopt the early-return/early-raise guard pattern (anti-recommende
 
 ### Post-normalization comment re-tagging
 
-For every `CREATE OR REPLACE FUNCTION` in the Phase 1 migration (all 10 above), re-issue `COMMENT ON FUNCTION ... '@a4c-rpc-shape: envelope|read'` (per M3 DROP+CREATE rule from `infrastructure/supabase/CLAUDE.md` § RPC Shape Registry). Phase 1 migration step 9 in ADR Consequences enforces this — verify expansion captures all 10 RPCs, not just the 2 role-management siblings.
+For every `CREATE OR REPLACE FUNCTION` in the Phase 1 migration (all 10 above), re-issue `COMMENT ON FUNCTION ... '@a4c-rpc-shape: envelope|read'` (per M3 DROP+CREATE rule from `infrastructure/supabase/CLAUDE.md` § RPC Shape Registry). Phase 1 migration step 8 in ADR Consequences enforces this — verify expansion captures all 10 RPCs, not just the 2 role-management siblings.
 
 ### Audit query (pre-merge guard)
 

@@ -76,6 +76,7 @@ What this formalizes:
 - **Prevented**: any read of an org's data by a user not in `accessible_organizations` and without a valid grant.
 - **Boundary location**: RLS policies on data tables consulting `has_cross_tenant_access()`. The Phase 1 migration makes the stub real.
 - **Multi-channel access**: a user who is BOTH a partner consultant AND a direct provider-org member by legacy role assignment is allowed both pathways; their legitimate-access set is the UNION (not an XOR).
+- **User-visibility consequence (Phase 3/4 UI implication)**: the Phase 1 `sync_accessible_organizations_from_grants` trigger adds grant-target orgs to `public.users.accessible_organizations`. Combined with the PR #67 `accessible_organizations @>` membership predicate in `list_users_for_*`, a consultant with a grant into provider org X appears in X's admin user lists as a "member" even with zero `user_organizations_projection` rows there. This is intentional per the UNION-not-XOR rule above, but Phase 3/4 user-list UIs may need a second-axis filter (an `EXISTS`-against-grant-projection predicate keyed by `(consultant_user_id, provider_org_id)`) to distinguish direct members from grant-bearers. Downstream consumers affected: `api.list_users_for_*` (Phase 3 refactor target), `api.list_user_org_access`, `api.get_user_org_details`, `api.list_user_organizations` (E-variant), `api.list_invitations` (Phase 3 A-variant refactor target). Phase 3/4 cards inherit this requirement.
 
 ## Two flows — consultant identity vs. grant write-side
 
@@ -145,7 +146,7 @@ $cmt$;
 | `@a4c-consultant-callable-reason:` | free text | required for `no` / `pending-*`; codegen+CI enforce |
 | `@a4c-phase-target:` | `1` \| `3` \| `4` \| `none` | new — single grep finds all RPCs needing work in a given phase |
 
-The full 17-step Phase 1 manifest (steps 1-12 from JWT-shape work + steps 13-15 from Phase 0.3 + steps 16-17 from Phase 0.4) is enumerated in **Consequences → Phase 1 migration manifest** below — single canonical location to avoid drift.
+The full 15-step Phase 1 manifest (steps 1-10 from JWT-shape work + steps 11-13 from Phase 0.3 + steps 14-15 from Phase 0.4; post-PR-#68-cohesion-fix renumber) is enumerated in **Consequences → Phase 1 migration manifest** below — single canonical location to avoid drift.
 
 ## Phase 0.4 — Grant Write-Side
 
@@ -170,8 +171,8 @@ The grant-creation emit RPC, `grant_role_templates` schema, `var_partnerships_pr
 - **`var_partnerships_projection.status` CHECK**: 4-value superset `('active', 'expired', 'terminated', 'suspended')`.
 - **`authorization_reference` CHECK**: `IS NOT NULL OR authorization_type = 'emergency_access'`. Emergency access is in-band override per arch doc L313.
 - **`permissions` key shape in event payload**: top-level `event_data->'permissions'` (matches deployed handler at baseline_v4:10446). Arch doc L325-365's `data.scope.permissions` nested form is **INCORRECT**; this ADR fixes the doc.
-- **`grant.create` + `grant.view` + `grant.revoke` permission seeding**: Phase 1 manifest step 12 emits `permission.defined` events (current registry has none of them; verified by architect grep).
-- **Phase 1 manifest step 12 expansion** (NOT new step 18): the original Phase 0.4 draft proposed a duplicative step 18; resolved by EXPANDING step 12 (single handler addition for `access_grant.policy_override_applied` + permission seeding) and adding only 2 net new steps (steps 16-17). Total = 17 ordered steps.
+- **`grant.create` + `grant.view` + `grant.revoke` permission seeding**: Phase 1 manifest step 10 emits `permission.defined` events (current registry has none of them; verified by architect grep). Post-PR-#68-cohesion-fix this step was renumbered from 12 → 10 after Step 9 absorption + Step 11 stub deletion.
+- **Phase 1 manifest cleanup history**: original Phase 0.4 draft proposed a duplicative step 18; that pass resolved by EXPANDING step 12 (single handler addition for `access_grant.policy_override_applied` + permission seeding) and adding net new steps 16-17. PR #68 cohesion review then surfaced a SECOND collision (Step 11 stub vs Step 17 full spec for `grant_role_templates`); resolved by deleting Step 11, absorbing Step 9 into Step 8, and renumbering. **Final = 15 ordered steps**.
 
 ### Decision C.1 — `api.create_access_grant` (emit-grant RPC)
 
@@ -249,7 +250,7 @@ INSERT INTO grant_role_templates (template_name, authorization_type, permission_
   ('var_default', 'var_contract', 'partner.export_reports',       '{"phi_restricted": true}'::jsonb);
 ```
 
-If any of the four `partner.*` permissions don't yet exist in the registry, Phase 1 manifest step 12 emits `permission.defined` events to create them (alongside `grant.create/view/revoke`).
+If any of the four `partner.*` permissions don't yet exist in the registry, Phase 1 manifest step 10 emits `permission.defined` events to create them (alongside `grant.create/view/revoke`).
 
 Read RPC (Phase 2): `api.get_grant_role_templates(p_authorization_type text)` mirroring `api.get_role_permission_templates`. Returns `TABLE("template_name" text, "permission_name" text, "default_terms" jsonb)`.
 
@@ -353,19 +354,21 @@ Pre-flight: re-verify `SELECT COUNT(*) FROM cross_tenant_access_grants_projectio
 
 **Single-grant revocation**: `api.revoke_access_grant(p_grant_id uuid, p_reason text, p_revocation_details text DEFAULT NULL)` emits `access_grant.revoked` (handler at baseline_v4:10454 reads `revocation_details` from event_data). Pattern A v2 envelope.
 
-**Policy-override revocation** (per Decision B.3): `api.revoke_permission_across_grants(p_permission_name text)` is the Phase 2 emitter; Phase 1 ships handler-only for `access_grant.policy_override_applied` event type (Phase 1 manifest step 12 — single handler addition; collision-free per Decision-locked manifest cleanup).
+**Policy-override revocation** (per Decision B.3): `api.revoke_permission_across_grants(p_permission_name text)` is the Phase 2 emitter; Phase 1 ships handler-only for `access_grant.policy_override_applied` event type (Phase 1 manifest step 10 — single handler addition; collision-free per Decision-locked manifest cleanup).
 
 **Immutability invariant**: NO `api.modify_access_grant`. Permission narrowing post-creation is via revoke + reissue. Preserves hybrid-snapshot audit trail.
 
 **JWT staleness window** (explicit ADR documentation):
 
-> Revocation does NOT terminate active sessions; in-flight requests during the staleness window (up to ~1hr, the default Supabase refresh-token cycle) remain authorized. For emergency revocation (HIPAA breach detected), pair the standard revocation with `auth.admin.signOut(consultant_user_id)` to force re-authentication. Phase 2 may expose `api.revoke_access_grant_with_session_termination(p_grant_id uuid, p_emergency boolean)` for this combined flow.
+> Revocation does NOT terminate active sessions; in-flight requests during the staleness window remain authorized. The window is bounded by the configured `access_token_expiry_seconds` (Supabase project setting; default 3600s, typically tightened in production). Refresh-token revocation alone does not invalidate an in-flight access token. For emergency revocation (HIPAA breach detected), pair the standard revocation with `auth.admin.signOut(consultant_user_id)` to force re-authentication. Phase 2 may expose `api.revoke_access_grant_with_session_termination(p_grant_id uuid, p_emergency boolean)` for this combined flow.
+>
+> **Operational SLA**: cold-revoke (non-emergency policy lifecycle) is effective within `access_token_expiry_seconds`. Emergency-revoke MUST be paired with `auth.admin.signOut` for sub-second effectiveness. Phase 2's grant-write-side card MUST capture this SLA explicitly in the emergency-revoke RPC contract.
 
 Documented residual HIPAA risk that operational mitigation (immediate audit logging + notification) handles. Phase 2's grant-write-side design must include the emergency-revoke variant.
 
 ## Phase 0.5 — Phasing Decision
 
-Sequencing of the multi-phase rollout against the now-finalized Phase 1 manifest (17 ordered steps), Phase 2 manifest sketch, Phase 3 scope (2 RPCs from the 0.3 matrix), Phase 4 scope (35 RPCs from the 0.3 matrix), and Phase N scope (court/agency/family — deferred per 0.4 v1 scope decision).
+Sequencing of the multi-phase rollout against the now-finalized Phase 1 manifest (15 ordered steps, post-PR-#68-cohesion-fix), Phase 2 manifest sketch, Phase 3 scope (2 RPCs from the 0.3 matrix), Phase 4 scope (35 RPCs from the 0.3 matrix), and Phase N scope (court/agency/family — deferred per 0.4 v1 scope decision).
 
 ### Card structure (user-confirmed)
 
@@ -410,7 +413,7 @@ Each card uses the VAR Phase 2 pattern as template. Independent timelines per st
                              │ unblocks
                              ▼
                     ┌────────────────┐
-                    │ Phase 1        │ 17-step migration: JWT shape +
+                    │ Phase 1        │ 15-step migration: JWT shape +
                     │ JWT SHAPE +    │ has_cross_tenant_access() real +
                     │ FOUNDATION     │ grant_role_templates table +
                     └────┬───┬───┬───┘ authorization_reference column
@@ -448,7 +451,7 @@ Each card uses the VAR Phase 2 pattern as template. Independent timelines per st
 
 ### Phase 1 next-step pointer
 
-After Phase 0 closes (this commit), the next work is **Phase 1 card seed**: create `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md + tasks.md tracking the 17-step migration manifest from Consequences below. Phase 1 branch (`feat/cross-tenant-grant-phase-1-jwt-shape`) branches from `main` per branch-on-decision rule.
+After Phase 0 closes (this commit), the next work is **Phase 1 card seed**: create `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md + tasks.md tracking the 15-step migration manifest from Consequences below. Phase 1 branch (`feat/cross-tenant-grant-phase-1-jwt-shape`) branches from `main` per branch-on-decision rule.
 
 ## Decisions
 
@@ -492,7 +495,7 @@ Rationale: operationally lighter than revoke-and-reissue, audit-trail-complete (
 
 ### Phase 1 migration manifest
 
-The following changes MUST ship in a single transactional migration. Step 5 (backfill) may run as a `DO $$ ... $$;` block within the same migration file. Steps 1, 7, 8, 9 are the operational-tripwire must-pair set — split them and multi-scope users hit intermittent permission failures because `get_permission_scope` does `LIMIT 1` and picks arbitrarily from the relaxed multi-entry permission set.
+The following changes MUST ship in a single transactional migration. Step 5 (backfill) may run as a `DO $$ ... $$;` block within the same migration file. Steps 1, 7, 8 are the operational-tripwire must-pair set — split them and multi-scope users hit intermittent permission failures because `get_permission_scope` does `LIMIT 1` and picks arbitrarily from the relaxed multi-entry permission set. (Step 8 covers BOTH the M3 re-tag for the 10 normalized RPCs AND the post-migration `UncategorizedRpcs = never` assertion; pre-PR-#68-cohesion-fix this was split across steps 8 and 9.)
 
 1. `CREATE OR REPLACE FUNCTION public.compute_effective_permissions(...)` — tightened `DISTINCT ON (permission_name, scope_path)` in the outer CTE; new `grant_derived_perms` CTE selecting from `cross_tenant_access_grants_projection` filtered by `status='active' AND (expires_at IS NULL OR expires_at > now())`; implication propagation gated on the new `propagate_through_grants` flag.
 2. `ALTER TABLE public.permission_implications ADD COLUMN propagate_through_grants boolean NOT NULL DEFAULT false` (per Decision B.2).
@@ -532,16 +535,14 @@ The following changes MUST ship in a single transactional migration. Step 5 (bac
    
    Each: replace `v_scope_path := get_permission_scope('<perm>')` + manual `@>` check with single `IF NOT has_effective_permission('<perm>', <scope_path>) THEN RAISE EXCEPTION ... END IF;` (or scope-bound query predicate for the readers).
 
-8. *(merged into step 7 above)*
-9. `COMMENT ON FUNCTION ... IS '... @a4c-rpc-shape: envelope|read ...'` re-tags for ALL 10 RPCs normalized in step 7 — `CREATE OR REPLACE` invalidates `pg_description` only if the signature changes; M3 DROP+CREATE rule says re-issue the comment in the migration to be safe (see [infrastructure/supabase/CLAUDE.md](../../../infrastructure/supabase/CLAUDE.md) § RPC Shape Registry).
-10. `ALTER TABLE public.cross_tenant_access_grants_projection ADD CONSTRAINT cross_tenant_access_grants_projection_authorization_type_check CHECK (authorization_type IN ('var_contract', 'court_order', 'family_participation', 'social_services_assignment', 'emergency_access'));` — closes the schema-open hole. Must be paired with documentation reconciliation (see "Documentation reconciliation" below).
-11. `CREATE TABLE public.grant_role_templates (...)` — per Decision B.1. Schema details deferred to Phase 0.4; Phase 1 may stub with a minimal column set.
-12. Add the `access_grant.policy_override_applied` event handler to `process_access_grant_event()` (handler-only; no emit RPC yet — per Decision B.3, the full emitter ships in Phase 2). **Also emit `permission.defined` events for `grant.create`, `grant.view`, `grant.revoke` and the 4 `partner.*` permissions seeded by `var_default`** (none of these exist in the current permission registry; verified by architect grep). Per the PR #43 permission-projection rollout pattern.
-13. **Backfill `COMMENT ON FUNCTION` tags** for all 104 `api.*` RPCs with `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-consultant-callable-reason` (when applicable) + `@a4c-phase-target` per the Phase 0.3 matrix. Must happen BEFORE steps 14-15 so codegen has deterministic input. Note: step 7's normalization of 10 C-legacy RPCs flips their bucket from `C-legacy` to `C` (post-normalization), so the backfill tag for those 10 is `@a4c-bucket: C` reflecting their post-step-7 state.
-14. **Ship codegen script** `frontend/scripts/gen-rpc-reachability-matrix.cjs` (mirrors `frontend/scripts/gen-rpc-registry.cjs`). Reads `pg_description` from a local Supabase container, parses the tag set, emits the markdown matrix table + per-bucket count tables + Phase 3 / Phase 1 / Phase 4 target subset tables to `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`. Hard-fails on missing required tag.
-15. **Ship CI workflow** `.github/workflows/rpc-reachability-matrix-sync.yml` (mirrors `.github/workflows/rpc-registry-sync.yml`). Triggers on changes to `infrastructure/supabase/supabase/migrations/`, the codegen, or the matrix doc. Spins up local container, applies migrations, regenerates, diffs against committed matrix. Failing tags → CI red. Matrix doc transitions from hand-edited to generated artifact at this point.
-16. **Add `authorization_reference uuid` column to `cross_tenant_access_grants_projection`** + CHECK constraint (`IS NOT NULL OR authorization_type = 'emergency_access'`) + partial index `WHERE authorization_reference IS NOT NULL`. Extend `process_access_grant_event.access_grant.created` branch (baseline_v4:10417-10451) to populate from `(p_event.event_data->>'authorization_reference')::uuid`. Per Phase 0.4 Decision C.4. **Pre-flight**: re-verify `SELECT COUNT(*) FROM cross_tenant_access_grants_projection;` returns 0 before deploy (existing zero rows assumed; UAT may have populated dev rows).
-17. **`CREATE TABLE public.grant_role_templates (...)`** + RLS policies (mirror `role_permission_templates`: public read; service_role read; super_admin-only write) + indexes (`idx_grant_role_templates_active`, `idx_grant_role_templates_authtype`). Seed `var_default` template (4 rows × `partner.*` permissions × `{"phi_restricted": true}` default_terms) per Phase 0.4 Decision C.2.
+8. **M3 RPC Shape Registry re-tag** for ALL 10 C-legacy RPCs normalized in step 7: re-issue `COMMENT ON FUNCTION ... IS '... @a4c-rpc-shape: envelope|read ...'` in the migration body. `CREATE OR REPLACE` preserves the comment only if the signature is unchanged; the M3 DROP+CREATE rule says re-issue the comment defensively (see [infrastructure/supabase/CLAUDE.md](../../../infrastructure/supabase/CLAUDE.md) § RPC Shape Registry). Plus post-migration assertion: regenerate `frontend/src/services/api/rpc-registry.generated.ts` and verify `UncategorizedRpcs = never` (no untagged `api.*` functions). Same M3 check the existing `rpc-registry-sync.yml` enforces in CI.
+9. `ALTER TABLE public.cross_tenant_access_grants_projection ADD CONSTRAINT cross_tenant_access_grants_projection_authorization_type_check CHECK (authorization_type IN ('var_contract', 'court_order', 'family_participation', 'social_services_assignment', 'emergency_access'));` — closes the schema-open hole. Must be paired with documentation reconciliation (see "Documentation reconciliation" below).
+10. Add the `access_grant.policy_override_applied` event handler to `process_access_grant_event()` (handler-only; no emit RPC yet — per Decision B.3, the full emitter ships in Phase 2). **Also emit `permission.defined` events for `grant.create`, `grant.view`, `grant.revoke` and the 4 `partner.*` permissions seeded by `var_default`** (none of these exist in the current permission registry; verified by architect grep). Per the PR #43 permission-projection rollout pattern.
+11. **Backfill `COMMENT ON FUNCTION` tags** for all 104 `api.*` RPCs with `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-consultant-callable-reason` (when applicable) + `@a4c-phase-target` per the Phase 0.3 matrix. Must happen BEFORE steps 12-13 so codegen has deterministic input. Note: step 7's normalization of 10 C-legacy RPCs flips their bucket from `C-legacy` to `C` (post-normalization), so the backfill tag for those 10 is `@a4c-bucket: C` reflecting their post-step-7 state.
+12. **Ship codegen script** `frontend/scripts/gen-rpc-reachability-matrix.cjs` (mirrors `frontend/scripts/gen-rpc-registry.cjs`). Reads `pg_description` from a local Supabase container, parses the tag set, emits the markdown matrix table + per-bucket count tables + Phase 3 / Phase 1 / Phase 4 target subset tables to `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`. Hard-fails on missing required tag.
+13. **Ship CI workflow** `.github/workflows/rpc-reachability-matrix-sync.yml` (mirrors `.github/workflows/rpc-registry-sync.yml`). Triggers on changes to `infrastructure/supabase/supabase/migrations/`, the codegen, or the matrix doc. Spins up local container, applies migrations, regenerates, diffs against committed matrix. Failing tags → CI red. Matrix doc transitions from hand-edited to generated artifact at this point.
+14. **Add `authorization_reference uuid` column to `cross_tenant_access_grants_projection`** + CHECK constraint (`IS NOT NULL OR authorization_type = 'emergency_access'`) + partial index `WHERE authorization_reference IS NOT NULL`. Extend `process_access_grant_event.access_grant.created` branch (baseline_v4:10417-10451) to populate from `(p_event.event_data->>'authorization_reference')::uuid`. Per Phase 0.4 Decision C.4. **Pre-flight**: re-verify `SELECT COUNT(*) FROM cross_tenant_access_grants_projection;` returns 0 before deploy (existing zero rows assumed; UAT may have populated dev rows).
+15. **`CREATE TABLE public.grant_role_templates (...)`** + RLS policies (mirror `role_permission_templates`: public read; service_role read; super_admin-only write) + indexes (`idx_grant_role_templates_active`, `idx_grant_role_templates_authtype`). Seed `var_default` template (4 rows × `partner.*` permissions × `{"phi_restricted": true}` default_terms) per Phase 0.4 Decision C.2. **Phase 1 manifest step count is final at 15** (Step 9 absorbed into Step 8 per PR #68 cohesion-fix; Step 11 stub deleted per same review).
 
 ### Post-migration deliverables (same Phase 1 PR)
 
@@ -589,6 +590,10 @@ JWT size: grants are narrow-scoped; per-grant permission lists are small (typica
 ### Non-negotiable invariant: grant projection has no consultant-write path
 
 The `cross_tenant_access_grants_projection` table has only SELECT policies (`cross_tenant_grants_org_admin_select` baseline_v4:15252-15259 + `platform_admin_all` L15625). No INSERT/UPDATE/DELETE policy exists. Grant writes are exclusively event-sourced via SECURITY DEFINER handlers triggered by `access_grant.*` events. Phase 2 grant-write design must preserve this — no consultant-direct write path under any circumstances.
+
+### Non-negotiable invariant: `permissions jsonb` shape is part of the JWT contract
+
+`cross_tenant_access_grants_projection.permissions` is read by THREE independent enforcement paths: (a) JWT issuance via `compute_effective_permissions`; (b) RLS predicates via `has_cross_tenant_access(...)`; (c) the `sync_accessible_organizations_from_grants` trigger. Any future migration that reshapes this column MUST pair with a `claims_version` bump and the five-tier consumer audit (PL/pgSQL helpers + frontend claim parsing + Edge Functions + workflows + RLS policy bodies). Treating the jsonb shape as schema-internal is incorrect — it is the wire contract between the grant write-side and three downstream enforcement layers. Cheap insurance against the Rule 12 staleness class.
 
 ## Alternatives considered
 

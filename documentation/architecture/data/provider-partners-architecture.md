@@ -371,67 +371,15 @@ interface AccessGrantCreatedEvent {
 
 ### Authorization Type Patterns
 
-**VAR Contract Authorization**:
-```typescript
-{
-  authorization_type: 'var_contract',
-  authorization_reference: 'partnership_uuid',
-  scope: {
-    data_types: ['usage_analytics', 'support_tickets', 'billing_reports'],
-    permissions: ['view', 'export'],
-    restrictions: {
-      phi_restricted: true  // No PHI access by default
-    }
-  }
-}
-```
+> Per-type narratives below describe permission categories + data-class scope + restrictions semantics. The wire-level shape is the corrected TypeScript interface above (top-level keys: `permissions: string[]`, `terms: { phi_restricted, time_limited, client_specific, ... }`, `scope: 'organization_unit' | 'client_specific'`). See [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md) Decision C.1 for the canonical emit-RPC contract.
 
-**Court Order Authorization**:
-```typescript
-{
-  authorization_type: 'court_order',
-  authorization_reference: 'court_authorization_uuid',
-  scope: {
-    data_types: ['client_records', 'medication_history', 'treatment_plans'],
-    permissions: ['view', 'export'],
-    restrictions: {
-      client_specific: 'client_uuid',
-      time_limited: '2025-12-31T23:59:59Z'
-    }
-  }
-}
-```
+**VAR Contract Authorization** — VAR contracts typically grant `view` and `export` operations on analytics-class data: usage analytics, support tickets, billing reports. `phi_restricted: true` is the default in `terms` per HIPAA-grade VAR-default policy (locked by ADR Decision C.2's `var_default` template seed: 4 `partner.*` permissions with PHI-restricted default terms). `authorization_reference` points at the `var_partnerships_projection` row.
 
-**Agency Assignment Authorization**:
-```typescript
-{
-  authorization_type: 'social_services_assignment',
-  authorization_reference: 'assignment_uuid',
-  scope: {
-    data_types: ['case_notes', 'service_plans', 'progress_reports'],
-    permissions: ['view', 'update', 'create'],
-    restrictions: {
-      client_specific: 'assigned_client_uuid'
-    }
-  }
-}
-```
+**Court Order Authorization** — Court orders grant `view` + `export` operations on client-specific records: client records, medication history, treatment plans. Always `client_specific` (scope = `'client_specific'` with `scope_id = client_uuid`) and `time_limited` (bounded by `expires_at` mirroring court-order expiration). The `legal_reference` field carries the court order number; `authorization_reference` points at the `court_authorizations_projection` row (Phase N).
 
-**Family Consent Authorization**:
-```typescript
-{
-  authorization_type: 'family_participation',
-  authorization_reference: 'consent_uuid',
-  scope: {
-    data_types: ['basic_health_status', 'appointment_schedules'],
-    permissions: ['view'],
-    restrictions: {
-      client_specific: 'family_member_client_uuid',
-      phi_restricted: true  // Limited health information only
-    }
-  }
-}
-```
+**Agency Assignment Authorization** — Social services agency assignments grant `view` + `update` + `create` on case-management data: case notes, service plans, progress reports. Caseworker-specific (`consultant_user_id` non-NULL, points at the caseworker's user UUID). `scope` typically `'client_specific'` keyed to the assigned client; `authorization_reference` points at the `agency_assignments_projection` row (Phase N).
+
+**Family Consent Authorization** — Family consents grant `view` on basic-status data: basic health status, appointment schedules. Relationship-verified (`consent_verified: true` on the backing record); `consent_method` distinguishes in-person / notarized / digital / court-appointed. Strict `client_specific` scoping with `phi_restricted: true` for limited health information only. `authorization_reference` points at the `family_consents_projection` row (Phase N).
 
 ### RLS Policy Integration
 
@@ -865,7 +813,7 @@ CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 
 ---
 
-**Document Version:** 2.3
-**Last Updated:** 2026-05-13
+**Document Version:** 2.4
+**Last Updated:** 2026-05-26
 **Status:** Foundation Implemented | Type-Specific Features Planned
 **Owner:** A4C Architecture Team
