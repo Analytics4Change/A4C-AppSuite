@@ -112,18 +112,7 @@ The grant projection IS the source of truth for cross-tenant access.
 
 ### Phase 1 migration manifest (must-pair, single transactional file)
 
-1. `CREATE OR REPLACE FUNCTION public.compute_effective_permissions(...)` — tightened DISTINCT ON; new `grant_derived_perms` CTE; opt-in implication propagation.
-2. `ALTER TABLE public.permission_implications ADD COLUMN propagate_through_grants boolean NOT NULL DEFAULT false`.
-3. `CREATE OR REPLACE FUNCTION public.custom_access_token_hook(...)` — rebase on `20260226002002_organization_manage_page_phase1.sql` body; preserve org-is-active gate, `access_blocked` branch, exception branch; bump `claims_version` to 5.
-4. `CREATE OR REPLACE FUNCTION public.sync_accessible_organizations_from_grants() RETURNS trigger` + `CREATE TRIGGER trg_sync_accessible_orgs_from_grants AFTER INSERT OR UPDATE OR DELETE ON public.cross_tenant_access_grants_projection ...`.
-5. **One-time backfill** of `public.users.accessible_organizations` from existing active grants (idempotent via `DISTINCT unnest`; sketch in ADR Consequences).
-6. `CREATE INDEX idx_access_grants_consultant_user_status_partial ON public.cross_tenant_access_grants_projection (consultant_user_id, status) WHERE status='active';`
-7. `CREATE OR REPLACE FUNCTION api.bulk_assign_role(...)` — normalize legacy two-step pattern.
-8. `CREATE OR REPLACE FUNCTION api.sync_role_assignments(...)` — same.
-9. `COMMENT ON FUNCTION ... '@a4c-rpc-shape: envelope'` re-tags for both (M3 RPC Shape Registry CI invariant).
-10. `ALTER TABLE public.cross_tenant_access_grants_projection ADD CONSTRAINT ... CHECK (authorization_type IN (5 canonical values));`
-11. `CREATE TABLE public.grant_role_templates (...)` — Phase 0.4 schema; Phase 1 stub acceptable.
-12. Add `access_grant.policy_override_applied` handler branch to `process_access_grant_event()` (no emit RPC yet).
+The canonical 15-step manifest lives in [adr-cross-tenant-access-grant-jwt-shape.md](../../../documentation/architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) § Consequences → Phase 1 migration manifest. Single source of truth, post-PR-#68-cohesion-fix renumber. Do not duplicate the manifest here — that's exactly the F1/F6 drift class the PR #68 cohesion review eliminated.
 
 **Post-migration deliverables (same PR)**: regenerate `frontend/src/types/database.types.ts` AND `workflows/src/types/database.types.ts`; reconcile `provider-partners-architecture.md` `authorization_type` list to 5 values (DONE 2026-05-26); five-tier JWT consumer audit (PL/pgSQL / frontend / Edge Functions / workflows / RLS).
 
@@ -241,7 +230,7 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 10. **`var_partnerships_projection.status` CHECK** → 4-value superset `('active', 'expired', 'terminated', 'suspended')`.
 11. **`authorization_reference` CHECK** → `IS NOT NULL OR authorization_type = 'emergency_access'`.
 12. **`permissions` key shape in event payload** → top-level `event_data->'permissions'` (matches deployed handler at baseline_v4:10446). Arch doc L325-365 had INCORRECT nested form; fixed in lockstep.
-13. **`grant.create` + `grant.view` + `grant.revoke` permission seeding** → Phase 1 manifest step 12 emits `permission.defined` events (current registry has none of them).
+13. **`grant.create` + `grant.view` + `grant.revoke` permission seeding** → Phase 1 manifest step 10 emits `permission.defined` events (current registry has none of them). Post-PR-#68-cohesion-fix renumber: was step 12 at Phase 0.4 close.
 14. **Phase 1 manifest cleanup** → step 12 expanded to include permission seeding; steps 16-17 added; total = **17 ordered steps** at Phase 0.4 close (not 18 — the original draft's step 18 was duplicate). *(Further reduced to **15 steps** post-PR-#68-cohesion-review per Step 9-into-8 absorption + Step 11 stub deletion; see PR #68 architect-review-provenance entry below.)*
 
 ### Decision summary (C.1-C.5)

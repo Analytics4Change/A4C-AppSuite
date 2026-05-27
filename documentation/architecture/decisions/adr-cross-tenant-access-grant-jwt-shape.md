@@ -557,7 +557,7 @@ Three sources disagree on `authorization_type` values today:
 |---|---|---|
 | Projection COMMENT (baseline_v4:12516) | 5 values (includes `emergency_access`) | unchanged — already correct |
 | [provider-partners-architecture.md](../data/provider-partners-architecture.md) L324 | 4 values (no `emergency_access`) | updated to 5 |
-| Schema CHECK constraint | absent | added (per migration step 10), 5 values |
+| Schema CHECK constraint | absent | added (per migration step 9), 5 values |
 
 The Phase 1 PR updates the doc in lockstep with the constraint.
 

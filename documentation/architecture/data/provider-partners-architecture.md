@@ -430,10 +430,11 @@ USING (
             AND fc.consent_verified = true
         ))
       )
-      -- Client-specific access restriction
+      -- Client-specific access restriction (post-Phase-0.4: scope is a TEXT enum,
+      -- scope_id IS the client UUID when scope='client_specific')
       AND (
-        ctag.scope->'restrictions'->>'client_specific' IS NULL
-        OR clients.id = (ctag.scope->'restrictions'->>'client_specific')::uuid
+        ctag.scope != 'client_specific'
+        OR clients.id = ctag.scope_id
       )
   )
 );
