@@ -141,7 +141,7 @@ jobs:
           deno-version: v2.x
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v2
         with:
           version: latest
 
