@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-13
+last_updated: 2026-05-26
 ---
 
 <!-- TL;DR-START -->
@@ -37,9 +37,24 @@ last_updated: 2026-05-13
 > - ❌ Type-specific relationship projections (VAR contracts, court authorizations, etc.)
 
 **Status**: ✅ Foundation Implemented | ⏳ Type-Specific Features Planned
-**Version**: 2.3 (Boundary repair: cross-provider invitation gate)
-**Last Updated**: 2026-05-13
+**Version**: 2.4 (Phase 0 ADR — JWT shape + permission source decided)
+**Last Updated**: 2026-05-26
 **Authentication**: Supabase Auth
+
+> [!IMPORTANT]
+> **Phase 0 ADR (2026-05-26)** — the JWT-claim-shape and grant-permission-source
+> architecture for cross-tenant grants is now decided in
+> [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md):
+> Path B (extend `compute_effective_permissions` with a `grant_derived_perms`
+> CTE; tightened `DISTINCT ON (permission_name, scope_path)`; sync trigger so
+> `accessible_organizations` includes active grant-target orgs) + hybrid
+> snapshot (resolved permissions snapshotted into
+> `cross_tenant_access_grants_projection.permissions` jsonb at grant-creation
+> time; no template join at JWT issuance). The RLS-with-grants pattern
+> sketched below in `## Cross-Tenant Access Model` remains the canonical
+> data-tier enforcement layer; the ADR specifies how the JWT side of that
+> enforcement is populated. Read the ADR before designing grant-write-side
+> RPCs or extending the auth hook.
 
 > [!IMPORTANT]
 > **Boundary Repair (2026-05-13)** — `accept-invitation` and `invite-user` Edge
@@ -295,7 +310,7 @@ family_consents_projection:          -- Family member consents
 cross_tenant_access_grants_projection:
   consultant_org_id: [partner_org_id]
   provider_org_id: org_provider_a
-  authorization_type: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation'
+  authorization_type: 'var_contract' | 'court_order' | 'family_participation' | 'social_services_assignment' | 'emergency_access'
   authorization_reference: [relationship_record_id]
   status: 'active'
 ```
@@ -304,37 +319,45 @@ cross_tenant_access_grants_projection:
 
 ## Cross-Tenant Access Model
 
+> [!NOTE]
+> The RLS-with-grants pattern described in this section is the **data-tier enforcement layer**. The companion **JWT-tier** enforcement (how grant-derived permissions enter the consultant's `effective_permissions` claim and how `accessible_organizations` extends to include grant-target orgs) is specified by [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md). The two work together: the ADR populates the JWT; this section's RLS clauses gate the actual rows. The ADR's hybrid snapshot mechanism reads from the same `permissions jsonb` column written by `access_grant.created` events documented below.
+
 ### Unified Access Grant System (IMPLEMENTED ✅)
 
 All provider partner types use the same cross-tenant access grant infrastructure with type-specific authorization:
 
 **Event:** `access_grant.created`
 
+> [!IMPORTANT]
+> **Phase 0.4 correction (2026-05-26)** — the canonical payload shape matches the deployed handler at `baseline_v4:10415-10451`, NOT the nested `data.scope.permissions` form shown in earlier revisions of this doc. The handler reads `permissions`, `scope`, `scope_id`, `terms`, `authorization_reference` as TOP-LEVEL keys of `event_data`. See [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md) Phase 0.4 § Decision-locked permissions key shape.
+
 ```typescript
 interface AccessGrantCreatedEvent {
   id: string;
-  streamId: string;  // Provider org ID
+  streamId: string;  // Grant UUID (NOT provider org ID per handler)
   streamType: 'access_grant';
   eventType: 'access_grant.created';
   data: {
-    grant_id: string;
-    consultant_user_id: string;     // Partner user
-    consultant_org_id: string;      // Partner organization
-    provider_org_id: string;        // Target provider
-    authorization_type: 'var_contract' | 'court_order' | 'social_services_assignment' | 'family_participation';
-    authorization_reference: string; // Relationship record ID
-    scope: {
-      data_types: string[];          // Type-specific data access
-      permissions: string[];         // Allowed operations
-      restrictions: {
-        client_specific?: string;    // Limit to specific client (court/family)
-        time_limited?: string;       // Expiration date (court orders)
-        phi_restricted?: boolean;    // Non-PHI only (VARs by default)
-      };
+    // All fields at TOP LEVEL of data — matches deployed handler at baseline_v4:10417-10451
+    consultant_user_id: string | null;  // NULL = org-wide grant
+    consultant_org_id: string;          // Partner organization
+    provider_org_id: string;            // Target provider
+    authorization_type: 'var_contract' | 'court_order' | 'family_participation' | 'social_services_assignment' | 'emergency_access';
+    authorization_reference: string | null;  // Relationship record ID (NULL only for emergency_access per CHECK)
+    legal_reference: string | null;     // Contract number / case number / etc.
+    scope: 'organization_unit' | 'client_specific';  // TEXT enum (NOT a nested object)
+    scope_id: string;                   // OU UUID or client UUID
+    permissions: string[];              // Pre-resolved snapshot — TOP-LEVEL, not nested under scope
+    terms: {                            // TOP-LEVEL — restrictions live here, not under scope
+      phi_restricted?: boolean;         // Non-PHI only (VAR default)
+      time_limited?: string;            // Expiration hint (court orders)
+      client_specific?: string;         // Client restriction (court/family)
+      read_only?: boolean;
+      data_retention_days?: number;
+      notification_required?: boolean;
     };
-    granted_by: string;              // Authorizing user
-    granted_at: string;
-    expires_at: string | null;
+    granted_by: string;                 // Authorizing admin (provider-org admin per HIPAA — see ADR Decision C.1)
+    expires_at: string | null;          // ISO timestamp; NULL for permanent grants
   };
   metadata: {
     userId: string;
@@ -348,67 +371,15 @@ interface AccessGrantCreatedEvent {
 
 ### Authorization Type Patterns
 
-**VAR Contract Authorization**:
-```typescript
-{
-  authorization_type: 'var_contract',
-  authorization_reference: 'partnership_uuid',
-  scope: {
-    data_types: ['usage_analytics', 'support_tickets', 'billing_reports'],
-    permissions: ['view', 'export'],
-    restrictions: {
-      phi_restricted: true  // No PHI access by default
-    }
-  }
-}
-```
+> Per-type narratives below describe permission categories + data-class scope + restrictions semantics. The wire-level shape is the corrected TypeScript interface above (top-level keys: `permissions: string[]`, `terms: { phi_restricted, time_limited, client_specific, ... }`, `scope: 'organization_unit' | 'client_specific'`). See [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md) Decision C.1 for the canonical emit-RPC contract.
 
-**Court Order Authorization**:
-```typescript
-{
-  authorization_type: 'court_order',
-  authorization_reference: 'court_authorization_uuid',
-  scope: {
-    data_types: ['client_records', 'medication_history', 'treatment_plans'],
-    permissions: ['view', 'export'],
-    restrictions: {
-      client_specific: 'client_uuid',
-      time_limited: '2025-12-31T23:59:59Z'
-    }
-  }
-}
-```
+**VAR Contract Authorization** — VAR contracts typically grant `view` and `export` operations on analytics-class data: usage analytics, support tickets, billing reports. `phi_restricted: true` is the default in `terms` per HIPAA-grade VAR-default policy (locked by ADR Decision C.2's `var_default` template seed: 4 `partner.*` permissions with PHI-restricted default terms). `authorization_reference` points at the `var_partnerships_projection` row.
 
-**Agency Assignment Authorization**:
-```typescript
-{
-  authorization_type: 'social_services_assignment',
-  authorization_reference: 'assignment_uuid',
-  scope: {
-    data_types: ['case_notes', 'service_plans', 'progress_reports'],
-    permissions: ['view', 'update', 'create'],
-    restrictions: {
-      client_specific: 'assigned_client_uuid'
-    }
-  }
-}
-```
+**Court Order Authorization** — Court orders grant `view` + `export` operations on client-specific records: client records, medication history, treatment plans. Always `client_specific` (scope = `'client_specific'` with `scope_id = client_uuid`) and `time_limited` (bounded by `expires_at` mirroring court-order expiration). The `legal_reference` field carries the court order number; `authorization_reference` points at the `court_authorizations_projection` row (Phase N).
 
-**Family Consent Authorization**:
-```typescript
-{
-  authorization_type: 'family_participation',
-  authorization_reference: 'consent_uuid',
-  scope: {
-    data_types: ['basic_health_status', 'appointment_schedules'],
-    permissions: ['view'],
-    restrictions: {
-      client_specific: 'family_member_client_uuid',
-      phi_restricted: true  // Limited health information only
-    }
-  }
-}
-```
+**Agency Assignment Authorization** — Social services agency assignments grant `view` + `update` + `create` on case-management data: case notes, service plans, progress reports. Caseworker-specific (`consultant_user_id` non-NULL, points at the caseworker's user UUID). `scope` typically `'client_specific'` keyed to the assigned client; `authorization_reference` points at the `agency_assignments_projection` row (Phase N).
+
+**Family Consent Authorization** — Family consents grant `view` on basic-status data: basic health status, appointment schedules. Relationship-verified (`consent_verified: true` on the backing record); `consent_method` distinguishes in-person / notarized / digital / court-appointed. Strict `client_specific` scoping with `phi_restricted: true` for limited health information only. `authorization_reference` points at the `family_consents_projection` row (Phase N).
 
 ### RLS Policy Integration
 
@@ -459,10 +430,11 @@ USING (
             AND fc.consent_verified = true
         ))
       )
-      -- Client-specific access restriction
+      -- Client-specific access restriction (post-Phase-0.4: scope is a TEXT enum,
+      -- scope_id IS the client UUID when scope='client_specific')
       AND (
-        ctag.scope->'restrictions'->>'client_specific' IS NULL
-        OR clients.id = (ctag.scope->'restrictions'->>'client_specific')::uuid
+        ctag.scope != 'client_specific'
+        OR clients.id = ctag.scope_id
       )
   )
 );
@@ -472,33 +444,61 @@ USING (
 
 ## Database Schema
 
+> [!IMPORTANT]
+> **Phase 0.4 v1 scope (2026-05-26)** — Only `var_partnerships_projection` ships in Phase 2 (v1). The court/agency/family projections below are documented for forward design but are deferred to Phase N. Per the [Phase 0.4 ADR addendum](../decisions/adr-cross-tenant-access-grant-jwt-shape.md), VARs have organizational precedent (`partner_type='var'` enum, `is_subdomain_required()` gates DNS, bootstrap workflow handles partner orgs); the other 3 types are zero-infrastructure and would triple Phase 2 surface. Each later type can use the VAR pattern as template.
+>
+> **Companion table** (also Phase 1 — see ADR addendum): `public.grant_role_templates` — mirrors `role_permission_templates` flat structure with `default_terms jsonb` for HIPAA defaults snapshot at template level. Seeded with `var_default` template (4 `partner.*` permissions, `{"phi_restricted": true}` default_terms).
+
 ### Type-Specific Relationship Projections
 
 **var_partnerships_projection** (VAR-specific contracts):
 
 ```sql
+-- Phase 0.4 (2026-05-26): schema reconciled with adr-cross-tenant-access-grant-jwt-shape.md
+-- Decision C.3 — contract_number added, status CHECK expanded to 4-value superset, suspension+termination audit columns added.
 CREATE TABLE var_partnerships_projection (
   id UUID PRIMARY KEY,
   partner_org_id UUID NOT NULL REFERENCES organizations_projection(id),
-  partner_org_name TEXT NOT NULL,
+  partner_org_name TEXT NOT NULL,                                              -- denormalized (CQRS); hydrated from org.updated handler
   provider_org_id UUID NOT NULL REFERENCES organizations_projection(id),
-  provider_org_name TEXT NOT NULL,
+  provider_org_name TEXT NOT NULL,                                             -- denormalized (CQRS); hydrated from org.updated handler
   partnership_type TEXT NOT NULL CHECK (partnership_type IN ('standard', 'white_label')),
+  contract_number TEXT,                                                        -- Phase 0.4: audit field
   contract_start_date DATE NOT NULL,
-  contract_end_date DATE,  -- NULL = ongoing
-  status TEXT NOT NULL CHECK (status IN ('active', 'expired', 'terminated')),
-  revenue_share_percentage DECIMAL(5,2) NOT NULL,
-  support_level TEXT NOT NULL CHECK (support_level IN ('tier1', 'tier1_tier2', 'full')),
+  contract_end_date DATE,                                                      -- NULL = ongoing/evergreen
+  revenue_share_percentage DECIMAL(5,2),
+  support_level TEXT CHECK (support_level IN ('tier1', 'tier1_tier2', 'full')),
   terms JSONB NOT NULL DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active'
+       CHECK (status IN ('active', 'expired', 'terminated', 'suspended')),     -- Phase 0.4: 4-value superset (was 3-value)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  terminated_at TIMESTAMPTZ,                                                   -- Phase 0.4: termination audit
+  terminated_by UUID,
+  termination_reason TEXT,
+  suspended_at TIMESTAMPTZ,                                                    -- Phase 0.4: suspension audit
+  suspended_by UUID,
+  suspension_reason TEXT,
   UNIQUE (partner_org_id, provider_org_id)
 );
 
-COMMENT ON TABLE var_partnerships_projection IS 'CQRS projection: VAR partnership contracts (subset of provider partner relationships)';
+COMMENT ON TABLE var_partnerships_projection IS 'CQRS projection: VAR partnership contracts (subset of provider partner relationships). Fed by var_partnership.* event family per Phase 0.4 Decision C.3.';
 ```
 
-**court_authorizations_projection** (Court order tracking):
+**Event family** (Phase 0.4 — Decision C.3 in [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md)):
+
+| event_type | Handler action |
+|---|---|
+| `var_partnership.created` | INSERT row |
+| `var_partnership.updated` | UPDATE non-immutable fields; sync denormalized names from `org.updated` events |
+| `var_partnership.terminated` | status='terminated' + audit columns |
+| `var_partnership.suspended` | status='suspended' + audit columns |
+| `var_partnership.reactivated` | status='active'; clear suspension fields |
+| `var_partnership.expired` | status='expired'; emitter shape decided in Phase 0.5 |
+
+New router `process_var_partnership_event` + dispatcher CASE branch ship in Phase 2.
+
+**court_authorizations_projection** (Court order tracking) — **Phase N — deferred per Phase 0.4 v1 scope decision**:
 
 ```sql
 CREATE TABLE court_authorizations_projection (
@@ -525,7 +525,7 @@ CREATE TABLE court_authorizations_projection (
 COMMENT ON TABLE court_authorizations_projection IS 'CQRS projection: Court system authorizations for youth case oversight';
 ```
 
-**agency_assignments_projection** (Social services assignments):
+**agency_assignments_projection** (Social services assignments) — **Phase N — deferred per Phase 0.4 v1 scope decision**:
 
 ```sql
 CREATE TABLE agency_assignments_projection (
@@ -551,7 +551,7 @@ CREATE TABLE agency_assignments_projection (
 COMMENT ON TABLE agency_assignments_projection IS 'CQRS projection: Social services agency case assignments';
 ```
 
-**family_consents_projection** (Family member consents):
+**family_consents_projection** (Family member consents) — **Phase N — deferred per Phase 0.4 v1 scope decision**:
 
 ```sql
 CREATE TABLE family_consents_projection (
@@ -814,7 +814,7 @@ CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 
 ---
 
-**Document Version:** 2.3
-**Last Updated:** 2026-05-13
+**Document Version:** 2.4
+**Last Updated:** 2026-05-26
 **Status:** Foundation Implemented | Type-Specific Features Planned
 **Owner:** A4C Architecture Team
