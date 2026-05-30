@@ -21,12 +21,12 @@
 - [x] Row-count probe on dev: `SELECT COUNT(*) FROM public.cross_tenant_access_grants_projection;` returns 0 — **PASS** (2026-05-29; see § Stage B probe results)
 - [x] Schema non-collision probe: `permission_implications.propagate_through_grants` does NOT exist on dev — **PASS**
 - [x] 10-RPC two-step-pattern verification (step 7 scope): re-grep each canonical body file for `get_permission_scope`; all 10 still on legacy pattern — **PASS**
-- [ ] Auth-hook baseline-latency capture: `EXPLAIN ANALYZE` p50/p95 over 100 invocations of `compute_effective_permissions(<user>, <org>)` against dev — record for Stage E delta comparison **(HELD — requires representative user/org IDs; awaiting user direction)**
+- [x] Auth-hook baseline-latency capture: p50/p95 over 100 invocations of `compute_effective_permissions(<user>, <org>)` against dev — **PASS** (2026-05-30; representative user `61cbb03f-…0821` / org `2d0829ae-…c172` — single-org with 2 distinct roles; 15 permission rows returned per call). Results: **mean 0.543 ms · p50 0.222 ms · p95 0.267 ms · p99 0.636 ms · min 0.175 ms · max 32.668 ms · n=100 (61 distinct timings — per-row LATERAL forced via `CASE WHEN i.n > 0 THEN <uuid> ELSE NULL END` to defeat scalar-subquery constant-folding)**. Max is a cold-start outlier (first invocation); steady-state p95 0.267 ms gives Phase 1's CTE expansion comfortable headroom. Stage E re-measure target: keep p95 within ~2× baseline (~0.5 ms) or document deltas.
 - [x] `claims_version` JWT distribution probe: all extant dev sessions at v4 (not v3 or NULL) — **PASS-WITH-INTERPRETATION** (all `auth.users.raw_app_meta_data->>'claims_version'` are NULL because the hook does not persist `claims_version` to that column; codebase audit confirms only 2 emit sites — both baseline_v4 and `20260226002002` — set it to literal `4`. No drift. Step 3's bump to 5 lands alongside a single prior shape.)
 - [x] RPC count re-verification (step 11 scope): net-of-DROPs count = 104; any post-2026-05-26 new `api.*` RPCs identified + matrix-classified BEFORE migration drafts — **PASS** (zero new `api.*` CREATE statements since 2026-05-26 on either branch ancestry or `main`; matrix doc requires no pre-Phase-1 backfill of new entries)
 - [ ] Five-tier JWT consumer audit complete; breaking tiers identified (architect 2026-05-29 confirmed Frontend / EF / Workflows tiers all duplicate-safe today)
 - [x] Concurrency check: no in-flight PR on `main` touching `compute_effective_permissions` — **PASS** (1 open PR — #45 `refactor(users)` — 0 Phase-1-surface lines across `compute_effective_permissions`, `custom_access_token_hook`, `get_permission_scope`, `has_effective_permission`, `cross_tenant_access_grants*`, `permission_implications`, `grant_role_templates`)
-- [ ] Baseline build green: `frontend` + `workflows` build against current generated types **(HELD — awaiting user direction; no probe-side blockers)**
+- [x] Baseline build green: `frontend` + `workflows` typecheck against current generated types — **PASS** (2026-05-30; both `tsc --noEmit` exit 0 on HEAD `0d91e11c`)
 
 ### Stage B probe results (2026-05-29)
 
@@ -82,29 +82,59 @@ Live `pg_proc` count on dev shows **170 distinct function names / 172 total over
 - **C-legacy: 0** ✅ — no new operational tripwires; step 7 scope remains exactly the 10 known RPCs.
 - **A / A-variant: 0** ✅ — no new Phase 3 refactor targets.
 
-**Per-bucket deltas to the matrix doc**:
-| Bucket | Pre | Post | Δ |
+**Per-bucket deltas to the matrix doc** (post-Stage-R; the Stage R-6 fold-in 2026-05-30 reshuffles within D / D-variant / E — see § Stage R-6 below for post-fold-in numbers):
+| Bucket | Pre (matrix 2026-05-26) | Post Stage R (matrix L46-57 2026-05-29) | Δ |
 |---|---:|---:|---:|
 | A / A-variant | 1+1 | 1+1 | 0 |
-| B | 15 | 51 | +36 net (+41 missing-72, -5 stale schedule) |
-| C | 3 | 20 | +17 |
+| B | 15 | 56 | +41 net (+41 missing-72; B was undercounted pre-R from missing-72) |
+| C | 4 | 21 | +17 |
 | C-legacy | 10 | 10 | 0 |
-| D | 34 | 36 | +2 net (+4 missing-72, -2 stale schedule) |
+| D | 34 | 38 | +4 net (+4 missing-72: `check_field_definitions_exist`, `deactivate_all_field_definitions`, `get_organization_details`, `list_schedule_templates`; -2 stale: `get_schedule_by_id`, `list_user_schedules`) |
 | D-variant | 1 | 5 | +4 |
-| E | 38 | 44 | +6 |
+| E | 38 | 37 | -1 net (+6 missing-72; -7 stale) |
 | E-variant | 1 | 1 | 0 |
-| **Total** | 104 | 169 (live: 170 — 1-row residual) | +65 |
+| **Total** | 105 (matrix L63 = "104 stated / 105 actual"; hand-curated 104 was 1-row undercount) | 170 | +65 (per set-diff: +72 missing -7 stale) |
+
+> N2 fold-in 2026-05-30: prior table version showed "Total | 104 | 169 | +65" with a 1-row residual annotation. The matrix's master per-RPC table sums cleanly to 170; the 169 was a stale arithmetic artifact. Corrected here to mirror the matrix doc as sole source of truth.
 
 **Artifacts produced**:
-- `matrix-reconciliation-inventory.md` (439+ lines) — full pg_proc dump + set diff + R-2 classification work-product
-- `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md` — master table now 170 rows; per-bucket counts updated; Phase 4 RLS audit list expanded to 41 RPCs; new "Stage R reconciliation 2026-05-29 — structural notes" subsection in § Edge cases documenting the B-vs-C path-source discriminator, the `update_organization` vestigial-variable pattern, the schedule template family COALESCE hybrid pattern, the `safety_net_deactivate_organization` service-role-only pattern, and the `deactivate_user` E-classification matching `delete_user`.
+- `matrix-reconciliation-inventory.md` (508+ lines after R-6 fold-in) — full pg_proc dump + set diff + R-2 classification work-product + Stage R-6 reclassification section
+- `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md` — master table now 170 rows; per-bucket counts updated post-R-6 (D=36, D-variant=1, E=43); Phase 4 RLS audit list now 37 RPCs after R-6 F1+F2 moves; new "Stage R reconciliation 2026-05-29 — structural notes" subsection in § Edge cases documenting the B-vs-C path-source discriminator, the `update_organization` vestigial-variable pattern, the schedule template family COALESCE hybrid pattern (re-worded in R-6 F4 for consultant-callability accuracy), the `safety_net_deactivate_organization` service-role-only pattern, and the `deactivate_user` E-classification matching `delete_user`.
 
 **Step 11 scope expansion implication**: step 11 originally drafted as "backfill on all 104 RPCs"; now backfills **on all ~170 RPCs**. Migration size grows from ~104 `COMMENT ON FUNCTION` statements to ~170. Still single-transactional; no risk; pre-merge architect review accounts for the larger surface. Step 11 drafting unblocked.
 
+#### Stage R-6 architect re-review (2026-05-30) — APPROVE WITH IN-PR FIXES; all 6 findings folded in
+
+Spawned `software-architect-dbc` 2026-05-30 to re-review the post-Stage-R matrix doc + inventory work-product (per Stage R-6 plan recommendation: catch missing-72 R-2 miscategorizations at the cheap stage before Stage C migration drafting). Verdict: **APPROVE WITH IN-PR FIXES** (4 must-fix F1-F4 + 2 nits N1-N2). All 6 findings folded into the matrix doc + inventory + this tasks.md on the same branch, same day (2026-05-30).
+
+**Critical zero-claims independently verified** (load-bearing for Phase 1 scope correctness):
+- **C-legacy zero-from-missing-72** ✅ — independent grep of `get_permission_scope` callers across all active migrations reduces to exactly the 10 known C-legacy RPCs (architect verified at the SQL grep level). Step 7 normalization scope stays at 10; no hidden caller will break when DISTINCT ON is tightened.
+- **A / A-variant zero-from-missing-72** ✅ — independent grep of `p_org_id = get_current_org_id()` strict-A discriminator returns only the 2 known entries (`list_users` strict-A, `list_invitations` A-variant). No new Phase 3 refactor target surfaced by reconciliation.
+
+**Findings folded** (each links to its specific edit; matrix doc commit will follow this tasks.md update):
+
+| # | Severity | Summary | Fold-in |
+|---|---|---|---|
+| F1 | must-fix | `check_field_definitions_exist` + `deactivate_all_field_definitions` were D but `GRANT EXECUTE ... TO service_role` only (no `authenticated` grant) — structurally identical to `safety_net_deactivate_organization` E `[service-role-only]` | Matrix per-RPC table + per-bucket count table + Phase 4 RLS audit list + inventory R-6 reclassification section all updated D→E `[service-role-only]` |
+| F2 | must-fix | 4 org-lifecycle RPCs (`deactivate_organization`, `delete_organization`, `reactivate_organization`, `retry_deletion_workflow`) were D-variant but `has_platform_privilege()` early-return is ONLY enforcement (RLS not load-bearing) — structurally identical to existing E `[admin-only]` siblings (`retry_failed_event`, `dismiss_failed_event`) | Matrix per-RPC table + per-bucket count table + Phase 4 RLS audit list all updated D-variant→E `[admin-only]` |
+| F3 | must-fix | `get_organization_details` + `list_schedule_templates` are SECURITY DEFINER (bypasses caller-RLS); guard column "RLS on underlying projection" was misleading | Matrix guard column rewritten to "none (SECURITY DEFINER bypasses caller-RLS); RLS on `<table>` is informational only"; Phase 4 sub-audit subsection extended from `check_user_org_membership`-only to a 3-RPC definer-bypasses-RLS cluster with per-RPC decisions; possible follow-up card flagged (`dev/active/security-audit-definer-bypass-rls/`) |
+| F4 | must-fix | Schedule-template family consultant-callability claim was too optimistic — hard-coded `organization_id = v_org_id` validation against `get_current_org_id()` blocks grant-targeted calls even when perm-check succeeds | Structural-notes bullet at matrix § Edge cases rewritten with the correct framing; Phase 2+ parameterization called out as the consultant variant requirement |
+| N1 | nit | Variant-rows note example imbalance after F2 collapsed D-variant from 5 to 1 | Variant-rows note paragraph expanded with 3 balanced examples (A-variant `list_invitations`, D-variant `get_user_addresses_for_org`, E-variant `list_user_organizations`) |
+| N2 | nit | tasks.md L96 Pre→Post→Δ table showed "Total | 104 | 169 (live: 170 — 1-row residual) | +65" | Corrected: pre-count was matrix's "104 stated / 105 actual" undercount; post-count cleanly 170; rebalanced per-bucket column to match matrix as sole source of truth |
+
+**Stage C readiness assessment** (architect verdict): **YES** after F1-F4 + N1-N2 folded — matrix doc is load-bearing enough for Stage C migration drafting to proceed.
+
+- Step 7 normalization scope (10 C-legacy) — independently verified; ships with correct set
+- Step 11 backfill scope (~170 RPCs) — F1+F2 reshuffle ~6 RPCs between D/D-variant/E but do not change *which* RPCs need tags; complexity unchanged
+- Phase 3 refactor scope (A + A-variant = 2 RPCs) — independently verified; unchanged
+- Phase 4 RLS audit scope — F1+F2 reduce from 43 → 37 RPCs (correct shrink: 6 RPCs that don't belong in a per-table RLS audit moved to E)
+
+The F3 pre-existing security gap (definer-bypasses-RLS on `get_organization_details` + `list_schedule_templates`) is documented for Phase 4 sub-audit; not blocking Phase 1.
+
 #### Held items
 
-- **Auth-hook baseline-latency capture** — requires representative single-org user/org IDs from dev. Holding per user direction.
-- **Baseline build green** — `frontend` + `workflows` builds against current generated types. Holding per user direction; no probe-side blockers identified.
+- ~~**Auth-hook baseline-latency capture**~~ — **RESOLVED 2026-05-30**: representative single-org user `61cbb03f-…0821` / org `2d0829ae-…c172` picked from dev (top of the role-richness-sorted single-org candidate list; 2 distinct roles, 15 permission rows from `compute_effective_permissions`). 100-invocation latency capture via Mgmt API SQL endpoint with per-row LATERAL + `CASE WHEN i.n > 0 THEN <uuid> ELSE NULL END` to defeat scalar-subquery constant-folding (first attempt collapsed all 100 timings to one value). Steady-state: **p50 0.222 ms / p95 0.267 ms / p99 0.636 ms** (mean 0.543, min 0.175, max 32.668 — cold-start outlier; 61 distinct timings over 100 runs). Stage E re-measure target: p95 within ~2× baseline (~0.5 ms) or document the delta.
+- ~~**Baseline build green**~~ — **RESOLVED 2026-05-30**: both `frontend` and `workflows` `tsc --noEmit` exit 0 against current generated types on HEAD `0d91e11c`. Stage E regen-induced breakage will be attributable to this PR alone.
 
 ## Stage C — Migration drafting (the 15 manifest steps)
 
@@ -168,10 +198,6 @@ Each checkbox = one manifest step. Refer to ADR § Consequences → Phase 1 migr
 
 ## Current Status
 
-**Stage**: B (pre-flight probes) — closing. Stage R (matrix-doc reconciliation) **complete 2026-05-29**; remaining Stage B items: auth-hook baseline-latency + baseline-build-greens (both user-held).
-**Status**: Card seeded 2026-05-28. Architect review of plan.md 2026-05-29 returned APPROVE WITH IN-PR FIXES (4 must-fix F1-F6 + 4 nits N1-N4) — all findings folded in same-day. **Stage B pre-flight probes ran 2026-05-29 — all 6 user-requested probes PASS**. **Stage R matrix-doc reconciliation completed 2026-05-29**: 72 missing-from-matrix user-facing CRUD RPCs classified (B=41 / C=17 / D=4 / D-variant=4 / E=6; zero new C-legacy or A); 7 stale-in-matrix `*_user_schedule` entries removed; matrix doc + Phase 4 audit list + edge cases section all updated; full work-product persisted in `matrix-reconciliation-inventory.md`. Step 11 scope expanded from 104 → 170 RPCs (still single-transactional). Architect re-review of updated matrix pending (Stage R-6). NO migration SQL drafted yet.
-**Next action**: User decision —
-  (a) execute Stage R-6 architect re-review of the updated matrix doc (per plan recommendation to catch miscategorizations at the cheap stage);
-  (b) capture auth-hook baseline-latency (requires representative dev user/org IDs);
-  (c) run the held baseline-build-green checks (`frontend` + `workflows` typecheck against current generated types);
-  (d) advance to Stage C drafting once (a)+(b)+(c) addressed.
+**Stage**: B (pre-flight probes) — **CLOSED 2026-05-30**. All 9 pre-flight items pass; both held items resolved.
+**Status**: Card seeded 2026-05-28. Architect review of plan.md 2026-05-29 returned APPROVE WITH IN-PR FIXES (4 must-fix F1-F6 + 4 nits N1-N4) — all findings folded in same-day. **Stage B pre-flight probes ran 2026-05-29 — all 6 user-requested probes PASS**. **Stage R matrix-doc reconciliation completed 2026-05-29**: 72 missing-from-matrix user-facing CRUD RPCs classified; 7 stale-in-matrix entries removed; matrix doc now 170 rows. **Stage R-6 architect re-review completed 2026-05-30**: APPROVE WITH IN-PR FIXES (4 must-fix F1-F4 + 2 nits N1-N2); all 6 findings folded same-day. C-legacy zero-claim and A/A-variant zero-claim both independently verified by architect at the SQL grep level — Phase 1 step 7 (10-RPC normalization) and Phase 3 (2-RPC refactor) scopes confirmed correct. **Auth-hook baseline-latency captured 2026-05-30**: p50 0.222 ms / p95 0.267 ms / p99 0.636 ms (n=100; representative user 61cbb03f-…0821 / org 2d0829ae-…c172). **Baseline build green confirmed 2026-05-30**: both `frontend` and `workflows` `tsc --noEmit` exit 0. NO migration SQL drafted yet.
+**Next action**: Advance to Stage C — migration drafting (the 15 manifest steps). Recommended sub-ordering for the single transactional migration: Step 1 (`compute_effective_permissions` CTE + asymmetric DISTINCT ON) → Step 2 (`permission_implications.propagate_through_grants` column) → Step 3 (`custom_access_token_hook` rebase + `claims_version` bump to 5) → Step 4 (`sync_accessible_organizations_from_grants` function + trigger) → Step 5 (one-time backfill DO-block) → Step 6 (composite partial index) → Step 7 (10 C-legacy RPC normalizations per plan.md constraint #7 / F2 ordering) → Step 8 (M3 re-tag with N1-RESOLVED-REJECTED preservation per Stage D § 142) → Step 9 (CHECK constraint) → Step 10 (`access_grant.policy_override_applied` handler + perm-defined events) → Step 11 (170-RPC `@a4c-bucket` backfill — Stage R reconciliation expanded scope) → Step 12 (codegen) → Step 13 (CI workflow) → Step 14 (`authorization_reference` column + handler extension) → Step 15 (`grant_role_templates` table + seed).

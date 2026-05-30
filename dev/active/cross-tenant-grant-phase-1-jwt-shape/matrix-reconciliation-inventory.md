@@ -353,6 +353,19 @@ The auto-classifier v4 output (preserved in § Auto-classification table v4 belo
 
 Post-override bucket distribution: **B=41 / C=17 / D=4 / D-variant=4 / E=6** (sum=72, matches missing-from-matrix). This is the distribution applied to the matrix doc's master table.
 
+### Stage R-6 architect re-review fold-in 2026-05-30 — F1+F2 reclassification
+
+The R-6 architect re-review on 2026-05-30 (verdict APPROVE WITH IN-PR FIXES; full text in tasks.md § Stage R-6) raised two must-fix reclassification findings on the missing-72 bucketing. Both folded into the matrix doc same-day on this branch. The post-fold-in re-distribution of the missing-72:
+
+- **F1**: `check_field_definitions_exist` + `deactivate_all_field_definitions` moved D→E `[service-role-only]`. Their only enforcement is `GRANT EXECUTE ... TO service_role` (no `authenticated` grant); RLS is not load-bearing. Structurally identical to `safety_net_deactivate_organization` which the earlier override correctly classified E.
+- **F2**: 4 organization-lifecycle RPCs (`deactivate_organization`, `delete_organization`, `reactivate_organization`, `retry_deletion_workflow`) moved D-variant→E `[admin-only]`. Their `has_platform_privilege()` early-return is the ONLY enforcement; RLS contributes nothing. Structurally identical to existing `retry_failed_event` / `dismiss_failed_event` which the original matrix correctly classified E.
+
+**Post-R-6 missing-72 distribution**: **B=41 / C=17 / D=2 / D-variant=0 / E=12** (sum=72, unchanged).
+
+The matrix doc's per-bucket count table reflects the corresponding overall shifts: D reads 34→32 (F1 −2); D-variant total 5→1 (F2 −4 writes; only `get_user_addresses_for_org` remains); E reads 22→24 (F1 +2), E writes 15→19 (F2 +4); E total 37→43. Phase 4 RLS audit target list shrinks from 43 → 37 RPCs.
+
+The R-2 override table above is preserved verbatim as the original audit trail of the missing-72 first-pass classification work. The R-6 fold-in is a separate reclassification round applied on top.
+
 ### R-3 audit findings (re-audit of pre-existing 104 entries against current canonical bodies)
 
 R-3 ran 2026-05-29; methodology: re-grep `get_permission_scope` across all migrations + cross-reference matrix's existing C-legacy entries against actual canonical bodies + verify no new migrations post-2026-05-26 modified pre-existing matrix entries.
