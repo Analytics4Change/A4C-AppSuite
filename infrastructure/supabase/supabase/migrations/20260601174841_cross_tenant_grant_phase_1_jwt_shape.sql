@@ -14,7 +14,10 @@
 --   [x] Step 1  — compute_effective_permissions extension (grant_derived_perms
 --                  CTE + asymmetric DISTINCT ON + implication flag gating)
 --   [x] Step 3  — custom_access_token_hook rebase + claims_version=5
---   [ ] Step 4  — sync_accessible_organizations_from_grants function + trigger
+--   [x] Step 4  — sync_accessible_organizations_from_grants function + trigger
+--                  (+ shared helper recompute_user_accessible_organizations,
+--                   + modified existing sync_accessible_organizations for
+--                   UNION-canonical invariant)
 --   [ ] Step 5  — one-time backfill DO-block
 --   [ ] Step 6  — composite partial index on cross_tenant_access_grants_projection
 --   [ ] Step 7  — 10 C-legacy RPC normalizations
@@ -591,5 +594,279 @@ COMMENT ON FUNCTION public.custom_access_token_hook(jsonb) IS
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 4-15 pending)
+-- Step 4 — accessible_organizations sync (UNION-canonical: user_orgs + grants)
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 4: a new trigger function
+-- `sync_accessible_organizations_from_grants` plus its AFTER INSERT/UPDATE/
+-- DELETE trigger on `cross_tenant_access_grants_projection`. Predicate:
+-- `status='active' AND (expires_at IS NULL OR expires_at > now())`. Expiration
+-- is event-driven via `access_grant.expired` (scheduled workflow), not lazy —
+-- the trigger fires when status flips, not when the timestamp passes.
+--
+-- The DBC contract at plan.md L102-112 requires `public.users.
+-- accessible_organizations` be recomputed as the UNION of:
+--   (a) orgs sourced from `user_organizations_projection`, AND
+--   (b) `provider_org_id`s from active in-window grant rows.
+--
+-- And the contract's invariant L111 says: "Idempotent: rerun on identical
+-- projection state yields identical accessible_organizations".
+--
+-- ARCHITECTURAL GAP IN THE SPEC (drafter's note 2026-06-01):
+-- The existing `public.sync_accessible_organizations` trigger
+-- (baseline_v4:11767-11790, on `user_organizations_projection`) currently
+-- OVERWRITES `accessible_organizations` with `user_organizations_projection`
+-- contents — it does NOT UNION-merge with prior values. Pre-Phase-1 that was
+-- correct (grant set was empty). Post-Phase-1 it would erase grant-sourced
+-- orgs the next time `user_organizations_projection` changes for a user —
+-- violating the L111 idempotency invariant.
+--
+-- The DBC at L107 references "the existing sync_accessible_organizations
+-- trigger" providing source (a), but does not address the inverse: that the
+-- existing trigger erases grant-sourced orgs. The architecturally correct fix
+-- is to make BOTH triggers compute the same canonical UNION. We extract a
+-- shared helper `public.recompute_user_accessible_organizations(p_user_id)`
+-- and rewrite both trigger bodies to call it. This expands Step 4's footprint
+-- slightly beyond the ADR minimum (adds a helper + rewrites an existing
+-- trigger body) but preserves the load-bearing idempotency invariant under
+-- any DML sequence.
+--
+-- The existing `trg_sync_accessible_orgs` trigger on
+-- `user_organizations_projection` (baseline_v4:14864) is preserved verbatim
+-- because triggers reference functions by name (regprocedure); CREATE OR
+-- REPLACE FUNCTION updates the body in-place without re-binding the trigger.
+
+-- -----------------------------------------------------------------------------
+-- Step 4a — Shared helper: recompute_user_accessible_organizations(p_user_id)
+-- -----------------------------------------------------------------------------
+--
+-- Recomputes `public.users.accessible_organizations` for a single user as the
+-- canonical UNION of:
+--   (a) `user_organizations_projection.org_id` rows for the user (membership),
+--   (b) `cross_tenant_access_grants_projection.provider_org_id` for active
+--       in-window grants addressing the user (user-specific via
+--       `consultant_user_id = p_user_id`, or org-wide via
+--       `consultant_user_id IS NULL AND consultant_org_id = home_org`).
+--
+-- Idempotent: re-running on identical projection state yields identical output.
+-- Skip-safe for soft-deleted users (deleted_at filter on the UPDATE target).
+--
+-- SECURITY DEFINER preserves the existing trigger's caller-independence —
+-- the helper updates `public.users` from any DML context regardless of RLS.
+
+CREATE OR REPLACE FUNCTION public.recompute_user_accessible_organizations(
+  p_user_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_home_org_id uuid;
+BEGIN
+  -- Resolve the user's home org for the org-wide grant branch. NULL when the
+  -- user row is missing or soft-deleted; the org-wide branch then never matches
+  -- (consultant_org_id = NULL is NULL/false), correctly excluding such users.
+  SELECT u.current_organization_id
+  INTO v_home_org_id
+  FROM public.users u
+  WHERE u.id = p_user_id
+    AND u.deleted_at IS NULL;
+
+  UPDATE public.users
+  SET
+    accessible_organizations = ARRAY(
+      SELECT DISTINCT org_id
+      FROM (
+        -- (a) Membership via user_organizations_projection
+        SELECT uop.org_id
+        FROM public.user_organizations_projection uop
+        WHERE uop.user_id = p_user_id
+
+        UNION ALL
+
+        -- (b) Active in-window grants addressing this user (either shape)
+        SELECT g.provider_org_id
+        FROM public.cross_tenant_access_grants_projection g
+        WHERE g.status = 'active'
+          AND (g.expires_at IS NULL OR g.expires_at > now())
+          AND (
+            g.consultant_user_id = p_user_id
+            OR (
+              g.consultant_user_id IS NULL
+              AND g.consultant_org_id = v_home_org_id
+            )
+          )
+      ) sources
+    ),
+    updated_at = now()
+  WHERE id = p_user_id
+    AND deleted_at IS NULL;
+END;
+$$;
+
+ALTER FUNCTION public.recompute_user_accessible_organizations(uuid) OWNER TO postgres;
+
+COMMENT ON FUNCTION public.recompute_user_accessible_organizations(uuid) IS
+  'Recomputes public.users.accessible_organizations for a single user as the '
+  'canonical UNION of user_organizations_projection (membership) + active in-window '
+  'rows in cross_tenant_access_grants_projection (grants). Called by both the '
+  'sync_accessible_organizations trigger (on user_organizations_projection) and the '
+  'sync_accessible_organizations_from_grants trigger (on cross_tenant_access_grants_projection); '
+  'both triggers maintain the same UNION invariant per plan.md L107-112 DBC. '
+  'Idempotent: re-running on identical projection state yields identical output. '
+  'Soft-deleted users are skipped (deleted_at filter). '
+  'Phase 1 of cross-tenant-access-grant-rollout — step 4a.';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 4b — Modify existing sync_accessible_organizations to call the helper
+-- -----------------------------------------------------------------------------
+--
+-- BEHAVIOR DELTA (this rewrites baseline_v4:11767-11790):
+--   - Before: overwrote `accessible_organizations` with `user_organizations_projection`
+--     contents only.
+--   - After:  delegates to the shared helper, which UNION-merges with active
+--     in-window grant rows. Under zero-grant state (today), output is identical
+--     to pre-Phase-1 behavior — the UNION arm for (b) contributes nothing.
+--
+-- The existing trigger `trg_sync_accessible_orgs` (baseline_v4:14864) is
+-- preserved verbatim and continues to fire on user_organizations_projection
+-- INSERT/UPDATE/DELETE.
+--
+-- Backward compatibility: pre-Phase-1 callers of this trigger (event handlers
+-- that update user_organizations_projection) see no observable behavior change
+-- until grants exist. Post-Phase-1, the trigger correctly preserves grant-
+-- sourced orgs that the previous overwrite would have erased.
+
+CREATE OR REPLACE FUNCTION public.sync_accessible_organizations()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  target_user_id uuid;
+BEGIN
+  target_user_id := COALESCE(NEW.user_id, OLD.user_id);
+  PERFORM public.recompute_user_accessible_organizations(target_user_id);
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+COMMENT ON FUNCTION public.sync_accessible_organizations() IS
+  'Trigger function: keeps users.accessible_organizations in sync with '
+  'user_organizations_projection (membership) UNION cross_tenant_access_grants_projection '
+  '(active in-window grants), via shared helper recompute_user_accessible_organizations. '
+  'Phase 1 of cross-tenant-access-grant-rollout: body delegates to helper for UNION-canonical '
+  'invariant (prior body overwrote with user_organizations_projection only).';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 4c — New sync_accessible_organizations_from_grants trigger function
+-- -----------------------------------------------------------------------------
+--
+-- Fires on `cross_tenant_access_grants_projection` INSERT/UPDATE/DELETE. For
+-- each affected user, recomputes `accessible_organizations` via the shared
+-- helper.
+--
+-- Affected user enumeration:
+--   - INSERT: NEW.consultant_user_id (user-specific) OR all users whose
+--     current_organization_id = NEW.consultant_org_id (org-wide).
+--   - UPDATE: UNION of NEW-affected and OLD-affected users. Status flip
+--     ('active' → 'revoked') is the common case — both sides resolve to
+--     the same user(s) but recomputation reflects the new world.
+--   - DELETE: OLD.consultant_user_id (user-specific) OR all users whose
+--     current_organization_id = OLD.consultant_org_id (org-wide).
+--
+-- Performance note: org-wide grant changes recompute for every user in the
+-- consultant org. For consultant orgs with N users, a single grant row change
+-- triggers N helper invocations. This is a write-side cost paid only at grant
+-- creation/revocation (rare), not at JWT issuance. Acceptable for the typical
+-- consultant org size (5-50 users).
+--
+-- Filtering: the helper itself filters grants by status='active' AND
+-- (expires_at IS NULL OR expires_at > now()), so this trigger does NOT need to
+-- pre-filter — passing an already-revoked or expired grant just means the
+-- helper's UNION arm (b) excludes it. The recomputation is still correct.
+
+CREATE OR REPLACE FUNCTION public.sync_accessible_organizations_from_grants()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_user_ids uuid[] := ARRAY[]::uuid[];
+  v_user_id uuid;
+BEGIN
+  -- Collect affected user IDs from the post-DML row (INSERT, UPDATE).
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    IF NEW.consultant_user_id IS NOT NULL THEN
+      v_user_ids := v_user_ids || NEW.consultant_user_id;
+    ELSE
+      -- Org-wide grant: all users whose home org = NEW.consultant_org_id.
+      v_user_ids := v_user_ids || ARRAY(
+        SELECT u.id
+        FROM public.users u
+        WHERE u.current_organization_id = NEW.consultant_org_id
+          AND u.deleted_at IS NULL
+      );
+    END IF;
+  END IF;
+
+  -- Collect affected user IDs from the pre-DML row (UPDATE, DELETE).
+  -- Necessary because UPDATEs can change consultant_user_id / consultant_org_id
+  -- (rare but possible per Phase 2 schema), and DELETEs erase the affected set.
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    IF OLD.consultant_user_id IS NOT NULL THEN
+      v_user_ids := v_user_ids || OLD.consultant_user_id;
+    ELSE
+      v_user_ids := v_user_ids || ARRAY(
+        SELECT u.id
+        FROM public.users u
+        WHERE u.current_organization_id = OLD.consultant_org_id
+          AND u.deleted_at IS NULL
+      );
+    END IF;
+  END IF;
+
+  -- Recompute for each unique affected user.
+  FOR v_user_id IN SELECT DISTINCT uid FROM unnest(v_user_ids) AS uid LOOP
+    IF v_user_id IS NOT NULL THEN
+      PERFORM public.recompute_user_accessible_organizations(v_user_id);
+    END IF;
+  END LOOP;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+ALTER FUNCTION public.sync_accessible_organizations_from_grants() OWNER TO postgres;
+
+COMMENT ON FUNCTION public.sync_accessible_organizations_from_grants() IS
+  'Trigger function: on INSERT/UPDATE/DELETE of cross_tenant_access_grants_projection '
+  'rows, enumerates affected user(s) (user-specific via consultant_user_id, or '
+  'org-wide via consultant_org_id) and calls recompute_user_accessible_organizations '
+  'for each. UNION-canonical with the existing sync_accessible_organizations trigger '
+  'on user_organizations_projection — both maintain users.accessible_organizations as '
+  'the UNION of membership + active in-window grants. '
+  'Phase 1 of cross-tenant-access-grant-rollout — step 4c.';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 4d — Trigger binding on cross_tenant_access_grants_projection
+-- -----------------------------------------------------------------------------
+--
+-- AFTER INSERT/UPDATE/DELETE per the DBC pre-condition (DML-row trigger, not
+-- statement-level). Idempotent under re-CREATE via OR REPLACE (PG 14+).
+
+CREATE OR REPLACE TRIGGER trg_sync_accessible_orgs_from_grants
+  AFTER INSERT OR UPDATE OR DELETE ON public.cross_tenant_access_grants_projection
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_accessible_organizations_from_grants();
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 5-15 pending)
 -- =============================================================================
