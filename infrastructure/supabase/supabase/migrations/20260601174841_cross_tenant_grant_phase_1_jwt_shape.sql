@@ -942,13 +942,36 @@ CREATE OR REPLACE TRIGGER trg_sync_accessible_orgs_from_grants
 --
 -- The user-selection SELECT must STILL apply the M1 fix in its own WHERE
 -- clause because it filters BEFORE delegating to the helper. The org-wide
--- match uses `consultant_org_id = ANY(u.accessible_organizations)` for the
--- same reason — and at backfill time `accessible_organizations` is in its
--- pre-Phase-1 state (UOP-only, per the original sync_accessible_organizations
--- trigger overwrite behavior), so the predicate is structurally equivalent to
--- "is U a UOP-member of consultant_org" at that point. After Step 4's body
--- rewrite takes effect, future user_organizations_projection changes
--- correctly maintain the UNION via the helper.
+-- match uses the canonical `accessible_organizations @> ARRAY[<org_id>]`
+-- containment form (GIN-indexable via `idx_users_accessible_orgs_gin`) — at
+-- backfill time `accessible_organizations` is in its pre-Phase-1 state
+-- (UOP-only, per the original sync_accessible_organizations trigger overwrite
+-- behavior), so the predicate is structurally equivalent to "is U a UOP-member
+-- of consultant_org" at that point. After Step 4's body rewrite takes effect,
+-- future user_organizations_projection changes correctly maintain the UNION
+-- via the helper.
+--
+-- Why the pre-Phase-1 state assumption holds inside the migration (N1 fold-in
+-- 2026-06-01 step-5+6 architect review): Steps 1-4 execute zero DML on
+-- `user_organizations_projection` or `cross_tenant_access_grants_projection`.
+-- Step 4's `CREATE OR REPLACE FUNCTION sync_accessible_organizations()`
+-- rewrites the function body via DDL (takes effect immediately for subsequent
+-- statements), but the trigger that binds the function only fires on
+-- INSERT/UPDATE/DELETE of user_organizations_projection — and no such DML runs
+-- between Step 4's rewrite landing and Step 5's DO-block executing. The
+-- rewritten body becomes effective only for future writes after deploy. This
+-- transactional design is load-bearing — inserting any UOP DML between Step 4
+-- and Step 5 would invalidate the pre-Phase-1 state assumption.
+--
+-- F2 invariant (step-5+6 architect review 2026-06-01): the user-selection
+-- WHERE clause below MUST match the affected-user enumeration in Step 4c's
+-- `sync_accessible_organizations_from_grants` trigger function (L835-880)
+-- VERBATIM in structure. Step 5 (one-shot backfill) and Step 4c (live trigger)
+-- are the two sites that resolve `org-wide-grant → eligible-users`. If their
+-- predicates drift, future maintenance could leave the projection in a state
+-- where the backfill says user U should have provider_org P but the trigger
+-- fires and disagrees. Drift-detection: re-grep both sites whenever either is
+-- modified.
 --
 -- Idempotency: the helper is idempotent (re-running on identical projection
 -- state yields identical output); the SELECT is set-based (uses DISTINCT).
@@ -966,7 +989,33 @@ DO $$
 DECLARE
   v_user_id            uuid;
   v_recomputed_count   integer := 0;
+  v_eligible_count     integer;
 BEGIN
+  -- Pre-loop count for deploy-time observability (N3 fold-in 2026-06-01).
+  -- Operators see "about to recompute N user(s)" before the LOOP runs;
+  -- catches off-by-N bugs in the predicate during Stage E smoke.
+  -- Precedent: `20260424182345_add_missing_user_lifecycle_handlers_*` uses
+  -- the count-first pattern.
+  SELECT COUNT(DISTINCT u.id)
+  INTO v_eligible_count
+  FROM public.users u
+  JOIN public.cross_tenant_access_grants_projection g
+    ON (
+      g.consultant_user_id = u.id
+      OR (
+        g.consultant_user_id IS NULL
+        AND u.accessible_organizations @> ARRAY[g.consultant_org_id]::uuid[]
+      )
+    )
+  WHERE g.status = 'active'
+    AND (g.expires_at IS NULL OR g.expires_at > now())
+    AND u.deleted_at IS NULL;
+
+  RAISE NOTICE
+    'Phase 1 Step 5 backfill: about to recompute accessible_organizations '
+    'for % user(s) with active in-window grants...',
+    v_eligible_count;
+
   FOR v_user_id IN (
     SELECT DISTINCT u.id
     FROM public.users u
@@ -975,14 +1024,20 @@ BEGIN
         -- User-specific grant addressing
         g.consultant_user_id = u.id
         OR
-        -- Org-wide grant addressing (M1: accessible_organizations as
-        -- canonical membership oracle, NOT current_organization_id).
-        -- At backfill time accessible_organizations is UOP-only per the
-        -- pre-rewrite sync_accessible_organizations trigger semantics,
-        -- so this correctly identifies UOP-members of consultant_org.
+        -- Org-wide grant addressing — canonical `@>` containment form per
+        -- infrastructure/supabase/CLAUDE.md § accessible_organizations is the
+        -- canonical membership oracle. GIN-indexable via
+        -- idx_users_accessible_orgs_gin (created PR #66). F1 fix 2026-06-01
+        -- step-5+6 architect review: PRIOR DRAFT used `consultant_org_id =
+        -- ANY(u.accessible_organizations)` — the codified anti-pattern that
+        -- cannot use GIN `array_ops`. Same drift class as M1; rewrite to the
+        -- containment form mirrors Step 4c's trigger predicate verbatim.
+        -- At backfill time, accessible_organizations is UOP-only per the
+        -- pre-rewrite sync_accessible_organizations trigger semantics, so
+        -- this correctly identifies UOP-members of consultant_org.
         (
           g.consultant_user_id IS NULL
-          AND g.consultant_org_id = ANY(u.accessible_organizations)
+          AND u.accessible_organizations @> ARRAY[g.consultant_org_id]::uuid[]
         )
       )
     WHERE g.status = 'active'
@@ -995,8 +1050,9 @@ BEGIN
 
   RAISE NOTICE
     'Phase 1 Step 5 backfill: recomputed accessible_organizations for % '
-    'user(s) with active in-window grants.',
-    v_recomputed_count;
+    'user(s) (eligible count was %; mismatch indicates predicate drift).',
+    v_recomputed_count,
+    v_eligible_count;
 END $$;
 
 
@@ -1038,12 +1094,25 @@ END $$;
 --     AND g.status = 'active'
 --     AND (g.expires_at IS NULL OR g.expires_at > now())
 --
--- Neither existing index serves this efficiently:
+-- Neither existing index serves this with a single index scan. PostgreSQL's
+-- planner would bitmap-AND `idx_access_grants_consultant_user` against
+-- `idx_access_grants_status`, which is materially slower than the new partial
+-- composite (N2 fold-in 2026-06-01 step-5+6 architect review):
 --   - idx_access_grants_consultant_user finds user matches but requires reading
---     all matching rows + filtering by status (potentially many revoked/expired
---     rows for the same user over their grant lifetime).
---   - idx_access_grants_status finds all status='active' rows but does NOT
---     leading-column on consultant_user_id; lookups by user become inefficient.
+--     ALL such rows (including historically revoked/expired grants for the same
+--     user over their grant lifetime), then filtering by status in the bitmap
+--     stage.
+--   - idx_access_grants_status finds all status='active' rows globally
+--     (potentially large in steady state) but does NOT leading-column on
+--     consultant_user_id; lookups by user require reading the full active set.
+--   - Bitmap-AND of the two index reads + intersection + heap-fetch the
+--     intersection. Steady-state cost: O(|user's grant lifetime|) +
+--     O(|all active grants|) index page reads, vs O(|user's active grants|)
+--     for the new partial composite.
+-- Auth-hook latency matters disproportionately per ADR § Performance and
+-- JWT-size considerations (hook runs on every token refresh; amortization
+-- across hot path is poor). Concrete EXPLAIN ANALYZE evidence for the new
+-- partial vs. bitmap-AND alternative TBD in Phase 1 UAT (per ADR L586).
 --
 -- The new partial index leading-columns on consultant_user_id AND pre-filters
 -- status='active' via the partial predicate. Auth-hook lookup becomes:
