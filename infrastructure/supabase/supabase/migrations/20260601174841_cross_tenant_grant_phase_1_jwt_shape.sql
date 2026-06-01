@@ -22,7 +22,7 @@
 --   [x] Step 6  — composite partial index on cross_tenant_access_grants_projection
 --   [x] Step 7  — 10 C-legacy RPC normalizations (must-pair with Step 1)
 --   [x] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
---   [ ] Step 9  — authorization_type CHECK constraint
+--   [x] Step 9  — authorization_type CHECK constraint (5 values)
 --   [ ] Step 10 — access_grant.policy_override_applied handler + perm-defined events
 --   [ ] Step 11 — 170-RPC @a4c-bucket tag backfill
 --   [ ] Step 14 — authorization_reference column + CHECK + index + handler ext
@@ -3016,5 +3016,60 @@ END $$;
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 9-15 pending)
+-- Step 9 — authorization_type CHECK constraint (5-value enumeration)
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 9: close the schema-open hole on
+-- `cross_tenant_access_grants_projection.authorization_type`. The projection
+-- COMMENT (baseline_v4:12516) already declares the 5-value enumeration
+-- (`var_contract`, `court_order`, `family_participation`,
+-- `social_services_assignment`, `emergency_access`) but no CHECK constraint
+-- enforces it. Phase 1 adds the constraint so handlers and emit RPCs cannot
+-- write invalid values silently.
+--
+-- Three sources previously disagreed (per plan.md § Documentation
+-- reconciliation):
+--   - Projection COMMENT — 5 values (correct)
+--   - provider-partners-architecture.md L324 — was 4 values; updated to 5
+--     in PR #68 F1 fix
+--   - Schema CHECK — ABSENT (added by Step 9)
+--
+-- After Step 9 lands all three are in sync.
+--
+-- Pre-flight context (Stage B probe 2026-05-29): row count = 0 on dev → the
+-- ALTER TABLE ADD CONSTRAINT validates a zero-row set instantly. Phase 2+
+-- prod deployment timing: if real grants exist at deploy time and any carry
+-- a non-enumerated `authorization_type`, the ALTER will FAIL — by design,
+-- catches schema-open-hole exploitation before it propagates.
+--
+-- Idempotent: DROP CONSTRAINT IF EXISTS + ADD CONSTRAINT. The constraint
+-- name matches the codebase convention `<table>_<column>_check` (mirrors
+-- the existing `cross_tenant_access_grants_projection_status_check` at
+-- baseline_v4:12485 and `_scope_check` at L12484).
+
+ALTER TABLE public.cross_tenant_access_grants_projection
+  DROP CONSTRAINT IF EXISTS cross_tenant_access_grants_projection_authorization_type_check;
+
+ALTER TABLE public.cross_tenant_access_grants_projection
+  ADD CONSTRAINT cross_tenant_access_grants_projection_authorization_type_check
+  CHECK (authorization_type IN (
+    'var_contract',
+    'court_order',
+    'family_participation',
+    'social_services_assignment',
+    'emergency_access'
+  ));
+
+COMMENT ON CONSTRAINT cross_tenant_access_grants_projection_authorization_type_check
+  ON public.cross_tenant_access_grants_projection IS
+  'Enforces the 5-value enumeration on authorization_type: var_contract, '
+  'court_order, family_participation, social_services_assignment, '
+  'emergency_access. Closes the schema-open hole that previously allowed '
+  'silent invalid writes. The projection COMMENT (baseline_v4:12516) and '
+  'provider-partners-architecture.md L324 are kept in sync with this '
+  'enumeration (Phase 1 step 9 of cross-tenant-access-grant-rollout).';
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 10-15 pending)
 -- =============================================================================
