@@ -18,7 +18,7 @@
 --                  (+ shared helper recompute_user_accessible_organizations,
 --                   + modified existing sync_accessible_organizations for
 --                   UNION-canonical invariant)
---   [ ] Step 5  — one-time backfill DO-block
+--   [x] Step 5  — one-time backfill DO-block (helper-based; carries M1)
 --   [ ] Step 6  — composite partial index on cross_tenant_access_grants_projection
 --   [ ] Step 7  — 10 C-legacy RPC normalizations
 --   [ ] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
@@ -914,5 +914,92 @@ CREATE OR REPLACE TRIGGER trg_sync_accessible_orgs_from_grants
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 5-15 pending)
+-- Step 5 — One-time backfill of accessible_organizations from existing grants
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 5: a DO-block within this transactional
+-- migration that walks existing active in-window grants and recomputes
+-- `users.accessible_organizations` for each affected user.
+--
+-- Drafter's note 2026-06-01: the ADR sketch (L505-528) does the UNION inline
+-- with a hand-written `accessible_organizations || r.grant_orgs` join. This
+-- draft uses the Step 4a helper (`recompute_user_accessible_organizations`)
+-- instead. Three benefits:
+--
+--   1. M1 fix carried forward automatically. The helper uses the canonical
+--      `accessible_organizations @>` membership oracle for org-wide grants
+--      (NOT the active-session pointer `current_organization_id`). The ADR
+--      sketch's `g.consultant_org_id = u.current_organization_id` would re-
+--      introduce the M1 defect; this draft avoids that by routing through
+--      the helper (architect explicitly flagged in the Step 3+4 review).
+--   2. S2 fix carried forward automatically. The helper's UPDATE uses
+--      `ORDER BY org_id` for deterministic array output (DBC L111
+--      idempotency at array-equality level).
+--   3. Single source of truth. Per the CLAUDE.md § accessible_organizations
+--      canonical membership oracle convention codified in the Step 3+4 N1
+--      fold-in: "Never write users.accessible_organizations directly — route
+--      through the helper". This backfill obeys that rule.
+--
+-- The user-selection SELECT must STILL apply the M1 fix in its own WHERE
+-- clause because it filters BEFORE delegating to the helper. The org-wide
+-- match uses `consultant_org_id = ANY(u.accessible_organizations)` for the
+-- same reason — and at backfill time `accessible_organizations` is in its
+-- pre-Phase-1 state (UOP-only, per the original sync_accessible_organizations
+-- trigger overwrite behavior), so the predicate is structurally equivalent to
+-- "is U a UOP-member of consultant_org" at that point. After Step 4's body
+-- rewrite takes effect, future user_organizations_projection changes
+-- correctly maintain the UNION via the helper.
+--
+-- Idempotency: the helper is idempotent (re-running on identical projection
+-- state yields identical output); the SELECT is set-based (uses DISTINCT).
+-- Re-running this DO-block on the same input state yields identical result.
+--
+-- Pre-flight context (Stage B probe 2026-05-29): `cross_tenant_access_grants_
+-- projection` row count on dev = 0. The backfill loop iterates zero times on
+-- dev today — a no-op. Will populate when the projection has real grants
+-- (Phase 2+ on prod, or seeded test data on dev for Stage E smoke).
+--
+-- Deploy-time observability: RAISE NOTICE at the end emits the recomputed
+-- user count to the migration log for ops visibility.
+
+DO $$
+DECLARE
+  v_user_id            uuid;
+  v_recomputed_count   integer := 0;
+BEGIN
+  FOR v_user_id IN (
+    SELECT DISTINCT u.id
+    FROM public.users u
+    JOIN public.cross_tenant_access_grants_projection g
+      ON (
+        -- User-specific grant addressing
+        g.consultant_user_id = u.id
+        OR
+        -- Org-wide grant addressing (M1: accessible_organizations as
+        -- canonical membership oracle, NOT current_organization_id).
+        -- At backfill time accessible_organizations is UOP-only per the
+        -- pre-rewrite sync_accessible_organizations trigger semantics,
+        -- so this correctly identifies UOP-members of consultant_org.
+        (
+          g.consultant_user_id IS NULL
+          AND g.consultant_org_id = ANY(u.accessible_organizations)
+        )
+      )
+    WHERE g.status = 'active'
+      AND (g.expires_at IS NULL OR g.expires_at > now())
+      AND u.deleted_at IS NULL
+  ) LOOP
+    PERFORM public.recompute_user_accessible_organizations(v_user_id);
+    v_recomputed_count := v_recomputed_count + 1;
+  END LOOP;
+
+  RAISE NOTICE
+    'Phase 1 Step 5 backfill: recomputed accessible_organizations for % '
+    'user(s) with active in-window grants.',
+    v_recomputed_count;
+END $$;
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 6-15 pending)
 -- =============================================================================
