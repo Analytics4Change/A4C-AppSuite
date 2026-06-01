@@ -20,7 +20,7 @@
 --                   UNION-canonical invariant)
 --   [x] Step 5  — one-time backfill DO-block (helper-based; carries M1)
 --   [x] Step 6  — composite partial index on cross_tenant_access_grants_projection
---   [ ] Step 7  — 10 C-legacy RPC normalizations
+--   [x] Step 7  — 10 C-legacy RPC normalizations (must-pair with Step 1)
 --   [ ] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
 --   [ ] Step 9  — authorization_type CHECK constraint
 --   [ ] Step 10 — access_grant.policy_override_applied handler + perm-defined events
@@ -1161,5 +1161,1547 @@ COMMENT ON INDEX public.idx_access_grants_consultant_user_status_partial IS
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 7-15 pending)
+-- Step 7 — 10 C-legacy RPC normalizations (operational-tripwire must-pair set)
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 7 + plan.md constraint #7 (F2 fold-in):
+-- normalize 10 RPCs that use the legacy two-step `get_permission_scope +
+-- manual @>` pattern to single `has_effective_permission(perm, path)` calls.
+--
+-- WHY THIS MUST SHIP IN THE SAME TRANSACTION AS STEP 1:
+-- Step 1 tightens `compute_effective_permissions`'s outer DISTINCT ON from
+-- `(permission_name)` to `(permission_name, scope_path)`. Under multi-entry-
+-- per-permission shape, `get_permission_scope(perm)` (LIMIT 1) returns an
+-- arbitrary winner from the user's matching scope entries. The legacy
+-- two-step `v_user_scope @> p_scope_path` check then breaks intermittently
+-- for multi-scope users — depending on the LIMIT-1 pick.
+--
+-- Replacing the two-step pattern with `has_effective_permission(perm, path)`
+-- (an EXISTS over `effective_permissions` JWT claim) closes the tripwire:
+-- the check correctly ORs across ALL matching entries, forward-compatible
+-- with multi-scope grants under Phase 1.
+--
+-- ORDERING (per plan.md constraint #7 / F2 ordering):
+--   7.1-7.5  5 OU mutators (create, update, delete, deactivate, reactivate)
+--   7.6-7.7  2 role-management mutations (bulk_assign_role, sync_role_assignments)
+--   7.8-7.10 3 OU readers (get_organization_unit_by_id, _descendants, _units)
+--
+-- SHAPE PRESERVATION:
+-- Each RPC's signature, return shape, envelope (success/error), error codes,
+-- event emission, and Pattern A v2 readback are preserved verbatim. The only
+-- change is the permission gate. Signatures unchanged → OID-keyed
+-- COMMENT ON FUNCTION + @a4c-rpc-shape tags are preserved by CREATE OR REPLACE
+-- (defensively re-issued in Step 8 anyway per the M3 DROP+CREATE re-tag rule).
+--
+-- NORMALIZATION PATTERNS:
+-- For RPCs with `p_unit_id` lookup, the permission predicate is FOLDED INTO
+-- the entity-fetch query — preserves the NOT_FOUND-for-both-cases envelope
+-- semantic (does not leak existence vs permission-denied to the caller):
+--
+--   SELECT * INTO v_existing
+--   FROM organization_units_projection ou
+--   WHERE ou.id = p_unit_id
+--     AND ou.deleted_at IS NULL
+--     AND public.has_effective_permission('organization.<verb>_ou', ou.path);
+--
+--   IF v_existing IS NULL THEN
+--     RETURN <NOT_FOUND envelope>;
+--   END IF;
+--
+-- For RPCs with `p_scope_path` parameter (role mutations + sister RPCs from
+-- PR #67), the permission check is up-front:
+--
+--   IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
+--     RAISE EXCEPTION 'Missing permission: ...' USING ERRCODE = 'insufficient_privilege';
+--   END IF;
+--
+-- For `create_organization_unit` (no p_unit_id; takes optional p_parent_id),
+-- parent's path is resolved first, then permission checked at parent's path.
+-- When p_parent_id IS NULL, the user's current_org_id (active session) is the
+-- disambiguator for which root to create under — the PRIOR draft used
+-- `subpath(v_scope_path, 0, 2)` to derive root from the permission scope,
+-- which is incompatible with multi-scope grants (the LIMIT-1 pick could
+-- be any of several roots the user has create_ou at).
+--
+-- For OU readers without an entity-id input (get_organization_units), the
+-- WHERE predicate uses `has_effective_permission` per row. This is one
+-- function call per result row; acceptable for typical OU tree sizes
+-- (tens of OUs, not thousands). The EXISTS-based check is cheaper than
+-- the two-step's per-row ltree containment.
+--
+-- DECLARE delta: `v_scope_path extensions.ltree;` (or `LTREE`) declarations
+-- are REMOVED from each function since the variable is no longer used.
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.1 — api.create_organization_unit
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.create_organization_unit(
+  p_parent_id    uuid DEFAULT NULL,
+  p_name         text DEFAULT NULL,
+  p_display_name text DEFAULT NULL,
+  p_timezone     text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $_$
+DECLARE
+  v_parent_path     ltree;
+  v_parent_timezone text;
+  v_root_org_id     uuid;
+  v_new_path        ltree;
+  v_new_id          uuid;
+  v_slug            text;
+  v_event_id        uuid;
+  v_stream_version  integer;
+  v_result          record;
+  v_processing_error text;
+  v_current_org_id  uuid;
+BEGIN
+  -- Validate required fields
+  IF p_name IS NULL OR trim(p_name) = '' THEN
+    RAISE EXCEPTION 'Name is required'
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  -- Resolve the parent path FIRST. When p_parent_id IS NULL, disambiguate via
+  -- the user's active org (get_current_org_id) — under multi-scope grants the
+  -- user could have organization.create_ou at multiple distinct roots, and
+  -- the active-session pointer is the canonical disambiguator. Permission is
+  -- then checked at the resolved parent path.
+  IF p_parent_id IS NULL THEN
+    v_current_org_id := public.get_current_org_id();
+    IF v_current_org_id IS NULL THEN
+      RAISE EXCEPTION 'No active organization context'
+        USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+
+    SELECT o.id, o.path, o.timezone
+    INTO v_root_org_id, v_parent_path, v_parent_timezone
+    FROM public.organizations_projection o
+    WHERE o.id = v_current_org_id
+      AND o.deleted_at IS NULL;
+
+    IF v_root_org_id IS NULL THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'Root organization not found',
+        'errorDetails', jsonb_build_object(
+          'code', 'NOT_FOUND',
+          'message', 'Could not find root organization for active session'
+        )
+      );
+    END IF;
+  ELSE
+    -- p_parent_id provided: look up the parent (org or sub-OU). The two
+    -- SELECTs probe organizations_projection then organization_units_projection.
+    SELECT o.path, o.timezone INTO v_parent_path, v_parent_timezone
+    FROM public.organizations_projection o
+    WHERE o.id = p_parent_id
+      AND o.deleted_at IS NULL;
+
+    IF v_parent_path IS NULL THEN
+      SELECT ou.path, ou.timezone INTO v_parent_path, v_parent_timezone
+      FROM public.organization_units_projection ou
+      WHERE ou.id = p_parent_id
+        AND ou.deleted_at IS NULL;
+    END IF;
+
+    IF v_parent_path IS NULL THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'Parent organization not found or not accessible',
+        'errorDetails', jsonb_build_object(
+          'code', 'NOT_FOUND',
+          'message', 'Parent organization not found'
+        )
+      );
+    END IF;
+
+    -- Resolve root org for the parent path (used as `organization_id` in event).
+    SELECT o.id INTO v_root_org_id
+    FROM public.organizations_projection o
+    WHERE o.path = subpath(v_parent_path, 0, 1)
+      AND o.deleted_at IS NULL;
+
+    IF v_root_org_id IS NULL THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'Root organization not found',
+        'errorDetails', jsonb_build_object(
+          'code', 'NOT_FOUND',
+          'message', 'Could not resolve root org for parent path'
+        )
+      );
+    END IF;
+
+    -- Inactive-parent guard preserved verbatim.
+    IF EXISTS (
+      SELECT 1 FROM public.organization_units_projection
+      WHERE path = v_parent_path AND is_active = false AND deleted_at IS NULL
+    ) THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'Cannot create sub-unit under inactive parent',
+        'errorDetails', jsonb_build_object(
+          'code', 'PARENT_INACTIVE',
+          'message', 'Reactivate the parent organization unit first'
+        )
+      );
+    END IF;
+  END IF;
+
+  -- Permission gate at the resolved parent path. has_effective_permission is
+  -- forward-compatible with multi-scope grants (EXISTS over JWT claim entries).
+  IF NOT public.has_effective_permission('organization.create_ou', v_parent_path) THEN
+    -- NOT_FOUND-style envelope (not RAISE EXCEPTION) preserves the prior
+    -- two-step behavior of returning a not-found envelope when the parent
+    -- was outside scope. Convention matches the entity-fetch-with-permission
+    -- pattern used in update/delete/deactivate/reactivate.
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Parent organization not found or not accessible',
+      'errorDetails', jsonb_build_object(
+        'code', 'NOT_FOUND',
+        'message', 'Parent organization not found or outside your permission scope'
+      )
+    );
+  END IF;
+
+  -- Generate slug from name
+  v_slug := lower(regexp_replace(trim(p_name), '[^a-zA-Z0-9]+', '_', 'g'));
+  v_slug := regexp_replace(v_slug, '^_+|_+$', '', 'g');
+
+  -- Generate new path
+  v_new_path := v_parent_path || v_slug::ltree;
+
+  -- Check for duplicate path
+  IF EXISTS (
+    SELECT 1 FROM public.organizations_projection WHERE path = v_new_path AND deleted_at IS NULL
+    UNION ALL
+    SELECT 1 FROM public.organization_units_projection WHERE path = v_new_path AND deleted_at IS NULL
+  ) THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'An organizational unit with this name already exists under the same parent',
+      'errorDetails', jsonb_build_object(
+        'code', 'DUPLICATE_NAME',
+        'message', format('Unit "%s" already exists under this parent', p_name)
+      )
+    );
+  END IF;
+
+  v_new_id := gen_random_uuid();
+  v_event_id := gen_random_uuid();
+  v_stream_version := 1;
+
+  INSERT INTO public.domain_events (
+    id, stream_id, stream_type, stream_version,
+    event_type, event_data, event_metadata
+  ) VALUES (
+    v_event_id,
+    v_new_id,
+    'organization_unit',
+    v_stream_version,
+    'organization_unit.created',
+    jsonb_build_object(
+      'organization_unit_id', v_new_id,
+      'name', trim(p_name),
+      'display_name', COALESCE(trim(p_display_name), trim(p_name)),
+      'slug', v_slug,
+      'path', v_new_path::text,
+      'parent_path', v_parent_path::text,
+      'timezone', COALESCE(p_timezone, v_parent_timezone, 'America/Denver'),
+      'organization_id', v_root_org_id,
+      'is_active', true
+    ),
+    jsonb_build_object(
+      'user_id', public.get_current_user_id(),
+      'source', 'api.create_organization_unit',
+      'timestamp', now()
+    )
+  );
+
+  SELECT * INTO v_result
+  FROM public.organization_units_projection
+  WHERE id = v_new_id;
+
+  IF NOT FOUND THEN
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events
+    WHERE stream_id = v_new_id
+      AND event_type = 'organization_unit.created'
+    ORDER BY sequence_number DESC
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'unit', jsonb_build_object(
+      'id', v_result.id,
+      'name', v_result.name,
+      'displayName', v_result.display_name,
+      'path', v_result.path::text,
+      'parentPath', v_result.parent_path::text,
+      'timeZone', v_result.timezone,
+      'isActive', v_result.is_active,
+      'isRootOrganization', false,
+      'createdAt', v_result.created_at,
+      'updatedAt', v_result.updated_at
+    )
+  );
+END;
+$_$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.2 — api.update_organization_unit
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.update_organization_unit(
+  p_unit_id      uuid,
+  p_name         text DEFAULT NULL,
+  p_display_name text DEFAULT NULL,
+  p_timezone     text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_existing         record;
+  v_event_id         uuid;
+  v_stream_version   integer;
+  v_updated_fields   text[];
+  v_previous_values  jsonb;
+  v_result           record;
+  v_processing_error text;
+BEGIN
+  -- Fetch the OU with permission predicate folded into the WHERE clause.
+  -- Preserves the NOT_FOUND-for-both-cases envelope (does not leak existence
+  -- vs permission-denied).
+  SELECT * INTO v_existing
+  FROM public.organization_units_projection ou
+  WHERE ou.id = p_unit_id
+    AND ou.deleted_at IS NULL
+    AND public.has_effective_permission('organization.update_ou', ou.path);
+
+  IF v_existing IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Organizational unit not found',
+      'errorDetails', jsonb_build_object(
+        'code', 'NOT_FOUND',
+        'message', 'Unit not found or outside your scope. Note: Root organizations use different update path.'
+      )
+    );
+  END IF;
+
+  v_updated_fields := ARRAY[]::text[];
+  v_previous_values := '{}'::jsonb;
+
+  IF p_name IS NOT NULL AND p_name != v_existing.name THEN
+    v_updated_fields := array_append(v_updated_fields, 'name');
+    v_previous_values := v_previous_values || jsonb_build_object('name', v_existing.name);
+  END IF;
+
+  IF p_display_name IS NOT NULL AND p_display_name != v_existing.display_name THEN
+    v_updated_fields := array_append(v_updated_fields, 'display_name');
+    v_previous_values := v_previous_values || jsonb_build_object('display_name', v_existing.display_name);
+  END IF;
+
+  IF p_timezone IS NOT NULL AND p_timezone != v_existing.timezone THEN
+    v_updated_fields := array_append(v_updated_fields, 'timezone');
+    v_previous_values := v_previous_values || jsonb_build_object('timezone', v_existing.timezone);
+  END IF;
+
+  IF array_length(v_updated_fields, 1) IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'unit', jsonb_build_object(
+        'id', v_existing.id,
+        'name', v_existing.name,
+        'displayName', v_existing.display_name,
+        'path', v_existing.path::text,
+        'parentPath', v_existing.parent_path::text,
+        'timeZone', v_existing.timezone,
+        'isActive', v_existing.is_active,
+        'isRootOrganization', false,
+        'createdAt', v_existing.created_at,
+        'updatedAt', v_existing.updated_at
+      )
+    );
+  END IF;
+
+  v_event_id := gen_random_uuid();
+
+  SELECT COALESCE(MAX(stream_version), 0) + 1 INTO v_stream_version
+  FROM public.domain_events
+  WHERE stream_id = p_unit_id AND stream_type = 'organization_unit';
+
+  INSERT INTO public.domain_events (
+    id, stream_id, stream_type, stream_version,
+    event_type, event_data, event_metadata
+  ) VALUES (
+    v_event_id,
+    p_unit_id,
+    'organization_unit',
+    v_stream_version,
+    'organization_unit.updated',
+    jsonb_build_object(
+      'organization_unit_id', p_unit_id,
+      'name', COALESCE(p_name, v_existing.name),
+      'display_name', COALESCE(p_display_name, v_existing.display_name),
+      'timezone', COALESCE(p_timezone, v_existing.timezone),
+      'updatable_fields', to_jsonb(v_updated_fields),
+      'previous_values', v_previous_values
+    ),
+    jsonb_build_object(
+      'user_id', public.get_current_user_id(),
+      'source', 'api.update_organization_unit',
+      'timestamp', now()
+    )
+  );
+
+  SELECT * INTO v_result
+  FROM public.organization_units_projection
+  WHERE id = p_unit_id;
+
+  IF NOT FOUND THEN
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  -- Pattern A v2 race-safe check
+  SELECT processing_error INTO v_processing_error
+  FROM public.domain_events WHERE id = v_event_id;
+  IF v_processing_error IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Event processing failed: ' || v_processing_error,
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'unit', jsonb_build_object(
+      'id', v_result.id,
+      'name', v_result.name,
+      'displayName', v_result.display_name,
+      'path', v_result.path::text,
+      'parentPath', v_result.parent_path::text,
+      'timeZone', v_result.timezone,
+      'isActive', v_result.is_active,
+      'isRootOrganization', false,
+      'createdAt', v_result.created_at,
+      'updatedAt', v_result.updated_at
+    )
+  );
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.3 — api.delete_organization_unit
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.delete_organization_unit(p_unit_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_existing         record;
+  v_child_count      integer;
+  v_role_count       integer;
+  v_event_id         uuid;
+  v_stream_version   integer;
+  v_result           record;
+  v_processing_error text;
+BEGIN
+  SELECT * INTO v_existing
+  FROM public.organization_units_projection ou
+  WHERE ou.id = p_unit_id
+    AND ou.deleted_at IS NULL
+    AND public.has_effective_permission('organization.delete_ou', ou.path);
+
+  IF v_existing IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Organizational unit not found',
+      'errorDetails', jsonb_build_object(
+        'code', 'NOT_FOUND',
+        'message', 'Unit not found or outside your scope. Root organizations cannot be deleted via this function.'
+      )
+    );
+  END IF;
+
+  -- Check for active children
+  SELECT COUNT(*) INTO v_child_count
+  FROM public.organization_units_projection
+  WHERE parent_path = v_existing.path
+    AND deleted_at IS NULL;
+
+  IF v_child_count > 0 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', format('Cannot delete: %s child unit(s) exist', v_child_count),
+      'errorDetails', jsonb_build_object(
+        'code', 'HAS_CHILDREN',
+        'count', v_child_count,
+        'message', format('This unit has %s child unit(s). Delete or move them first.', v_child_count)
+      )
+    );
+  END IF;
+
+  -- Check for role assignments at or below this OU's scope
+  SELECT COUNT(*) INTO v_role_count
+  FROM public.user_roles_projection ur
+  WHERE ur.scope_path IS NOT NULL
+    AND ur.scope_path <@ v_existing.path;
+
+  IF v_role_count > 0 THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', format('Cannot delete: %s role assignment(s) reference this unit', v_role_count),
+      'errorDetails', jsonb_build_object(
+        'code', 'HAS_ROLES',
+        'count', v_role_count,
+        'message', format('This unit has %s role assignment(s). Reassign them first.', v_role_count)
+      )
+    );
+  END IF;
+
+  v_event_id := gen_random_uuid();
+
+  SELECT COALESCE(MAX(stream_version), 0) + 1 INTO v_stream_version
+  FROM public.domain_events
+  WHERE stream_id = p_unit_id AND stream_type = 'organization_unit';
+
+  INSERT INTO public.domain_events (
+    id, stream_id, stream_type, stream_version,
+    event_type, event_data, event_metadata
+  ) VALUES (
+    v_event_id,
+    p_unit_id,
+    'organization_unit',
+    v_stream_version,
+    'organization_unit.deleted',
+    jsonb_build_object(
+      'organization_unit_id', p_unit_id,
+      'deleted_path', v_existing.path::text,
+      'had_role_references', false,
+      'deletion_type', 'soft_delete'
+    ),
+    jsonb_build_object(
+      'user_id', public.get_current_user_id(),
+      'source', 'api.delete_organization_unit',
+      'timestamp', now()
+    )
+  );
+
+  SELECT * INTO v_result
+  FROM public.organization_units_projection
+  WHERE id = p_unit_id
+    AND deleted_at IS NOT NULL;
+
+  IF NOT FOUND THEN
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events
+    WHERE stream_id = p_unit_id
+      AND event_type = 'organization_unit.deleted'
+    ORDER BY sequence_number DESC
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'unit', jsonb_build_object(
+      'id', v_result.id,
+      'name', v_result.name,
+      'displayName', v_result.display_name,
+      'path', v_result.path::text,
+      'parentPath', v_result.parent_path::text,
+      'timeZone', v_result.timezone,
+      'isActive', v_result.is_active,
+      'deletedAt', v_result.deleted_at,
+      'isRootOrganization', false,
+      'createdAt', v_result.created_at,
+      'updatedAt', v_result.updated_at
+    )
+  );
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.4 — api.deactivate_organization_unit
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.deactivate_organization_unit(p_unit_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_existing             record;
+  v_event_id             uuid;
+  v_stream_version       integer;
+  v_result               record;
+  v_affected_descendants jsonb;
+  v_descendant_count     integer;
+  v_processing_error     text;
+BEGIN
+  SELECT * INTO v_existing
+  FROM public.organization_units_projection ou
+  WHERE ou.id = p_unit_id
+    AND ou.deleted_at IS NULL
+    AND public.has_effective_permission('organization.update_ou', ou.path);
+
+  IF v_existing IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Organizational unit not found',
+      'errorDetails', jsonb_build_object(
+        'code', 'NOT_FOUND',
+        'message', 'Unit not found or outside your scope. Root organizations cannot be deactivated via this function.'
+      )
+    );
+  END IF;
+
+  IF v_existing.is_active = false THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'unit', jsonb_build_object(
+        'id', v_existing.id,
+        'name', v_existing.name,
+        'displayName', v_existing.display_name,
+        'path', v_existing.path::text,
+        'parentPath', v_existing.parent_path::text,
+        'timeZone', v_existing.timezone,
+        'isActive', false,
+        'isRootOrganization', false,
+        'createdAt', v_existing.created_at,
+        'updatedAt', v_existing.updated_at
+      ),
+      'message', 'Organization unit is already deactivated'
+    );
+  END IF;
+
+  SELECT
+    COALESCE(jsonb_agg(jsonb_build_object(
+      'id', ou.id,
+      'path', ou.path::text,
+      'name', ou.name
+    )), '[]'::jsonb),
+    COUNT(*)::integer
+  INTO v_affected_descendants, v_descendant_count
+  FROM public.organization_units_projection ou
+  WHERE ou.path <@ v_existing.path
+    AND ou.id != p_unit_id
+    AND ou.is_active = true
+    AND ou.deleted_at IS NULL;
+
+  v_event_id := gen_random_uuid();
+
+  SELECT COALESCE(MAX(stream_version), 0) + 1 INTO v_stream_version
+  FROM public.domain_events
+  WHERE stream_id = p_unit_id AND stream_type = 'organization_unit';
+
+  INSERT INTO public.domain_events (
+    id, stream_id, stream_type, stream_version,
+    event_type, event_data, event_metadata
+  ) VALUES (
+    v_event_id,
+    p_unit_id,
+    'organization_unit',
+    v_stream_version,
+    'organization_unit.deactivated',
+    jsonb_build_object(
+      'organization_unit_id', p_unit_id,
+      'path', v_existing.path::text,
+      'cascade_effect', 'role_assignment_blocked',
+      'affected_descendants', v_affected_descendants,
+      'descendant_count', v_descendant_count
+    ),
+    jsonb_build_object(
+      'user_id', public.get_current_user_id(),
+      'source', 'api.deactivate_organization_unit',
+      'timestamp', now()
+    )
+  );
+
+  SELECT * INTO v_result
+  FROM public.organization_units_projection
+  WHERE id = p_unit_id;
+
+  IF NOT FOUND THEN
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events
+    WHERE stream_id = p_unit_id
+      AND event_type = 'organization_unit.deactivated'
+    ORDER BY sequence_number DESC
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'unit', jsonb_build_object(
+      'id', v_result.id,
+      'name', v_result.name,
+      'displayName', v_result.display_name,
+      'path', v_result.path::text,
+      'parentPath', v_result.parent_path::text,
+      'timeZone', v_result.timezone,
+      'isActive', v_result.is_active,
+      'isRootOrganization', false,
+      'createdAt', v_result.created_at,
+      'updatedAt', v_result.updated_at
+    ),
+    'cascadedDeactivations', v_descendant_count
+  );
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.5 — api.reactivate_organization_unit
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.reactivate_organization_unit(p_unit_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_existing               record;
+  v_event_id               uuid;
+  v_stream_version         integer;
+  v_result                 record;
+  v_inactive_ancestor_path ltree;
+  v_affected_descendants   jsonb;
+  v_descendant_count       integer;
+  v_processing_error       text;
+BEGIN
+  SELECT * INTO v_existing
+  FROM public.organization_units_projection ou
+  WHERE ou.id = p_unit_id
+    AND ou.deleted_at IS NULL
+    AND public.has_effective_permission('organization.update_ou', ou.path);
+
+  IF v_existing IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Organizational unit not found',
+      'errorDetails', jsonb_build_object(
+        'code', 'NOT_FOUND',
+        'message', 'Unit not found or outside your scope'
+      )
+    );
+  END IF;
+
+  IF v_existing.is_active = true THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'unit', jsonb_build_object(
+        'id', v_existing.id,
+        'name', v_existing.name,
+        'displayName', v_existing.display_name,
+        'path', v_existing.path::text,
+        'parentPath', v_existing.parent_path::text,
+        'timeZone', v_existing.timezone,
+        'isActive', true,
+        'isRootOrganization', false,
+        'createdAt', v_existing.created_at,
+        'updatedAt', v_existing.updated_at
+      ),
+      'message', 'Organization unit is already active'
+    );
+  END IF;
+
+  SELECT ou.path INTO v_inactive_ancestor_path
+  FROM public.organization_units_projection ou
+  WHERE v_existing.path <@ ou.path
+    AND ou.path != v_existing.path
+    AND ou.is_active = false
+    AND ou.deleted_at IS NULL
+  ORDER BY ou.depth DESC
+  LIMIT 1;
+
+  IF v_inactive_ancestor_path IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Cannot reactivate while parent is inactive',
+      'errorDetails', jsonb_build_object(
+        'code', 'PARENT_INACTIVE',
+        'message', format('Reactivate ancestor %s first', v_inactive_ancestor_path::text)
+      )
+    );
+  END IF;
+
+  SELECT
+    COALESCE(jsonb_agg(jsonb_build_object(
+      'id', ou.id,
+      'path', ou.path::text,
+      'name', ou.name
+    )), '[]'::jsonb),
+    COUNT(*)::integer
+  INTO v_affected_descendants, v_descendant_count
+  FROM public.organization_units_projection ou
+  WHERE ou.path <@ v_existing.path
+    AND ou.id != p_unit_id
+    AND ou.is_active = false
+    AND ou.deleted_at IS NULL;
+
+  v_event_id := gen_random_uuid();
+
+  SELECT COALESCE(MAX(stream_version), 0) + 1 INTO v_stream_version
+  FROM public.domain_events
+  WHERE stream_id = p_unit_id AND stream_type = 'organization_unit';
+
+  INSERT INTO public.domain_events (
+    id, stream_id, stream_type, stream_version,
+    event_type, event_data, event_metadata
+  ) VALUES (
+    v_event_id,
+    p_unit_id,
+    'organization_unit',
+    v_stream_version,
+    'organization_unit.reactivated',
+    jsonb_build_object(
+      'organization_unit_id', p_unit_id,
+      'path', v_existing.path::text,
+      'affected_descendants', v_affected_descendants,
+      'descendant_count', v_descendant_count
+    ),
+    jsonb_build_object(
+      'user_id', public.get_current_user_id(),
+      'source', 'api.reactivate_organization_unit',
+      'timestamp', now()
+    )
+  );
+
+  SELECT * INTO v_result
+  FROM public.organization_units_projection
+  WHERE id = p_unit_id;
+
+  IF NOT FOUND THEN
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events
+    WHERE stream_id = p_unit_id
+      AND event_type = 'organization_unit.reactivated'
+    ORDER BY sequence_number DESC
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'unit', jsonb_build_object(
+      'id', v_result.id,
+      'name', v_result.name,
+      'displayName', v_result.display_name,
+      'path', v_result.path::text,
+      'parentPath', v_result.parent_path::text,
+      'timeZone', v_result.timezone,
+      'isActive', v_result.is_active,
+      'isRootOrganization', false,
+      'createdAt', v_result.created_at,
+      'updatedAt', v_result.updated_at
+    ),
+    'reactivatedDescendants', v_descendant_count
+  );
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.6 — api.bulk_assign_role
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.bulk_assign_role(
+  p_role_id        uuid,
+  p_user_ids       uuid[],
+  p_scope_path     ltree,
+  p_correlation_id uuid DEFAULT gen_random_uuid(),
+  p_reason         text DEFAULT 'Bulk role assignment'
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_org_id         uuid;
+  v_role_name      text;
+  v_user_id        uuid;
+  v_user_index     integer := 0;
+  v_total_users    integer;
+  v_successful     uuid[] := ARRAY[]::uuid[];
+  v_failed         jsonb := '[]'::jsonb;
+  v_event_data     jsonb;
+  v_event_metadata jsonb;
+  v_assigned_by    uuid;
+BEGIN
+  v_assigned_by := auth.uid();
+
+  IF v_assigned_by IS NULL THEN
+    RAISE EXCEPTION 'Authentication required'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Permission gate via has_effective_permission (EXISTS over JWT
+  -- effective_permissions entries). Forward-compatible with multi-scope
+  -- grants under Phase 1 tightened DISTINCT ON.
+  IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
+    RAISE EXCEPTION 'Missing permission: user.role_assign at requested scope'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT r.name INTO v_role_name
+  FROM public.roles_projection r
+  WHERE r.id = p_role_id
+    AND r.deleted_at IS NULL;
+
+  IF v_role_name IS NULL THEN
+    RAISE EXCEPTION 'Role not found'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  SELECT o.id INTO v_org_id
+  FROM public.organizations_projection o
+  WHERE o.path = subpath(p_scope_path, 0, 1)
+    AND o.deleted_at IS NULL;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Organization not found for scope path'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  v_total_users := array_length(p_user_ids, 1);
+
+  IF v_total_users IS NULL OR v_total_users = 0 THEN
+    RETURN jsonb_build_object(
+      'successful', '[]'::jsonb,
+      'failed', '[]'::jsonb,
+      'totalRequested', 0,
+      'totalSucceeded', 0,
+      'totalFailed', 0,
+      'correlationId', p_correlation_id
+    );
+  END IF;
+
+  FOREACH v_user_id IN ARRAY p_user_ids LOOP
+    v_user_index := v_user_index + 1;
+
+    BEGIN
+      -- Membership check uses accessible_organizations @> canonical oracle
+      -- (PR #66 / PR #67 convention codified in CLAUDE.md).
+      IF NOT EXISTS (
+        SELECT 1 FROM public.users u
+        WHERE u.id = v_user_id
+          AND u.accessible_organizations @> ARRAY[v_org_id]::uuid[]
+          AND u.deleted_at IS NULL
+      ) THEN
+        RAISE EXCEPTION 'User not found or not in organization';
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM public.users u
+        WHERE u.id = v_user_id
+          AND u.is_active = true
+      ) THEN
+        RAISE EXCEPTION 'User is not active';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM public.user_roles_projection ur
+        WHERE ur.user_id = v_user_id
+          AND ur.role_id = p_role_id
+          AND ur.scope_path = p_scope_path
+      ) THEN
+        RAISE EXCEPTION 'User already has this role at this scope';
+      END IF;
+
+      v_event_data := jsonb_build_object(
+        'role_id', p_role_id,
+        'role_name', v_role_name,
+        'org_id', v_org_id,
+        'scope_path', p_scope_path::text,
+        'assigned_by', v_assigned_by
+      );
+
+      v_event_metadata := jsonb_build_object(
+        'timestamp', NOW()::text,
+        'correlation_id', p_correlation_id,
+        'user_id', v_assigned_by::text,
+        'reason', p_reason,
+        'source', 'api',
+        'tags', to_jsonb(ARRAY['bulk-assignment']::text[]),
+        'bulk_operation', true,
+        'bulk_operation_id', p_correlation_id::text,
+        'user_index', v_user_index,
+        'total_users', v_total_users
+      );
+
+      PERFORM api.emit_domain_event(
+        v_user_id,
+        'user',
+        'user.role.assigned',
+        v_event_data,
+        v_event_metadata
+      );
+
+      v_successful := array_append(v_successful, v_user_id);
+
+    EXCEPTION WHEN OTHERS THEN
+      v_failed := v_failed || jsonb_build_object(
+        'userId', v_user_id,
+        'reason', SQLERRM,
+        'sqlstate', SQLSTATE
+      );
+    END;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'successful', to_jsonb(v_successful),
+    'failed', v_failed,
+    'totalRequested', v_total_users,
+    'totalSucceeded', array_length(v_successful, 1),
+    'totalFailed', jsonb_array_length(v_failed),
+    'correlationId', p_correlation_id
+  );
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.7 — api.sync_role_assignments
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.sync_role_assignments(
+  p_role_id              uuid,
+  p_user_ids_to_add      uuid[],
+  p_user_ids_to_remove   uuid[],
+  p_scope_path           ltree,
+  p_correlation_id       uuid DEFAULT gen_random_uuid(),
+  p_reason               text DEFAULT 'Role assignment update'
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_org_id             uuid;
+  v_role_name          text;
+  v_user_id            uuid;
+  v_acting_user        uuid;
+  v_event_data         jsonb;
+  v_event_metadata     jsonb;
+  v_added_successful   uuid[] := ARRAY[]::uuid[];
+  v_added_failed       jsonb := '[]'::jsonb;
+  v_removed_successful uuid[] := ARRAY[]::uuid[];
+  v_removed_failed     jsonb := '[]'::jsonb;
+  v_total_operations   integer;
+  v_current_index      integer := 0;
+BEGIN
+  v_acting_user := auth.uid();
+
+  IF v_acting_user IS NULL THEN
+    RAISE EXCEPTION 'Authentication required'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
+    RAISE EXCEPTION 'Missing permission: user.role_assign at requested scope'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT r.name INTO v_role_name
+  FROM public.roles_projection r
+  WHERE r.id = p_role_id
+    AND r.deleted_at IS NULL;
+
+  IF v_role_name IS NULL THEN
+    RAISE EXCEPTION 'Role not found'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  SELECT o.id INTO v_org_id
+  FROM public.organizations_projection o
+  WHERE o.path = subpath(p_scope_path, 0, 1)
+    AND o.deleted_at IS NULL;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Organization not found for scope path'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  v_total_operations := COALESCE(array_length(p_user_ids_to_add, 1), 0)
+                      + COALESCE(array_length(p_user_ids_to_remove, 1), 0);
+
+  IF v_total_operations = 0 THEN
+    RETURN jsonb_build_object(
+      'added', jsonb_build_object('successful', '[]'::jsonb, 'failed', '[]'::jsonb),
+      'removed', jsonb_build_object('successful', '[]'::jsonb, 'failed', '[]'::jsonb),
+      'correlationId', p_correlation_id
+    );
+  END IF;
+
+  IF p_user_ids_to_add IS NOT NULL THEN
+    FOREACH v_user_id IN ARRAY p_user_ids_to_add LOOP
+      v_current_index := v_current_index + 1;
+
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = v_user_id
+            AND u.accessible_organizations @> ARRAY[v_org_id]::uuid[]
+            AND u.deleted_at IS NULL
+        ) THEN
+          RAISE EXCEPTION 'User not found or not in organization';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = v_user_id
+            AND u.is_active = true
+        ) THEN
+          RAISE EXCEPTION 'User is not active';
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM public.user_roles_projection ur
+          WHERE ur.user_id = v_user_id
+            AND ur.role_id = p_role_id
+            AND ur.scope_path = p_scope_path
+        ) THEN
+          RAISE EXCEPTION 'User already has this role at this scope';
+        END IF;
+
+        v_event_data := jsonb_build_object(
+          'role_id', p_role_id,
+          'role_name', v_role_name,
+          'org_id', v_org_id,
+          'scope_path', p_scope_path::text,
+          'assigned_by', v_acting_user
+        );
+
+        v_event_metadata := jsonb_build_object(
+          'timestamp', NOW()::text,
+          'correlation_id', p_correlation_id,
+          'user_id', v_acting_user::text,
+          'reason', p_reason,
+          'source', 'api',
+          'tags', to_jsonb(ARRAY['role-management', 'assignment']::text[]),
+          'bulk_operation', true,
+          'bulk_operation_id', p_correlation_id::text,
+          'operation_index', v_current_index,
+          'total_operations', v_total_operations
+        );
+
+        PERFORM api.emit_domain_event(
+          v_user_id,
+          'user',
+          'user.role.assigned',
+          v_event_data,
+          v_event_metadata
+        );
+
+        v_added_successful := array_append(v_added_successful, v_user_id);
+
+      EXCEPTION WHEN OTHERS THEN
+        v_added_failed := v_added_failed || jsonb_build_object(
+          'userId', v_user_id,
+          'reason', SQLERRM,
+          'sqlstate', SQLSTATE
+        );
+      END;
+    END LOOP;
+  END IF;
+
+  IF p_user_ids_to_remove IS NOT NULL THEN
+    FOREACH v_user_id IN ARRAY p_user_ids_to_remove LOOP
+      v_current_index := v_current_index + 1;
+
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = v_user_id
+            AND u.accessible_organizations @> ARRAY[v_org_id]::uuid[]
+            AND u.deleted_at IS NULL
+        ) THEN
+          RAISE EXCEPTION 'User not found or not in organization';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM public.user_roles_projection ur
+          WHERE ur.user_id = v_user_id
+            AND ur.role_id = p_role_id
+            AND ur.scope_path = p_scope_path
+        ) THEN
+          RAISE EXCEPTION 'User does not have this role at this scope';
+        END IF;
+
+        v_event_data := jsonb_build_object(
+          'role_id', p_role_id,
+          'role_name', v_role_name,
+          'org_id', v_org_id,
+          'scope_path', p_scope_path::text,
+          'removed_by', v_acting_user
+        );
+
+        v_event_metadata := jsonb_build_object(
+          'timestamp', NOW()::text,
+          'correlation_id', p_correlation_id,
+          'user_id', v_acting_user::text,
+          'reason', p_reason,
+          'source', 'api',
+          'tags', to_jsonb(ARRAY['role-management', 'removal']::text[]),
+          'bulk_operation', true,
+          'bulk_operation_id', p_correlation_id::text,
+          'operation_index', v_current_index,
+          'total_operations', v_total_operations
+        );
+
+        PERFORM api.emit_domain_event(
+          v_user_id,
+          'user',
+          'user.role.revoked',
+          v_event_data,
+          v_event_metadata
+        );
+
+        v_removed_successful := array_append(v_removed_successful, v_user_id);
+
+      EXCEPTION WHEN OTHERS THEN
+        v_removed_failed := v_removed_failed || jsonb_build_object(
+          'userId', v_user_id,
+          'reason', SQLERRM,
+          'sqlstate', SQLSTATE
+        );
+      END;
+    END LOOP;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'added', jsonb_build_object(
+      'successful', to_jsonb(v_added_successful),
+      'failed', v_added_failed
+    ),
+    'removed', jsonb_build_object(
+      'successful', to_jsonb(v_removed_successful),
+      'failed', v_removed_failed
+    ),
+    'correlationId', p_correlation_id
+  );
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.8 — api.get_organization_unit_by_id
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.get_organization_unit_by_id(p_unit_id uuid)
+RETURNS TABLE(
+  id                  uuid,
+  name                text,
+  display_name        text,
+  path                text,
+  parent_path         text,
+  parent_id           uuid,
+  timezone            text,
+  is_active           boolean,
+  child_count         bigint,
+  is_root_organization boolean,
+  created_at          timestamp with time zone,
+  updated_at          timestamp with time zone
+)
+LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+BEGIN
+  -- Root organization branch (depth=1). Permission check folded into WHERE.
+  RETURN QUERY
+  SELECT
+    o.id,
+    o.name,
+    o.display_name,
+    o.path::text,
+    o.parent_path::text,
+    NULL::uuid AS parent_id,
+    o.timezone,
+    o.is_active,
+    (SELECT COUNT(*) FROM public.organization_units_projection c
+       WHERE c.parent_path = o.path AND c.deleted_at IS NULL) AS child_count,
+    true AS is_root_organization,
+    o.created_at,
+    o.updated_at
+  FROM public.organizations_projection o
+  WHERE o.id = p_unit_id
+    AND extensions.nlevel(o.path) = 1
+    AND o.deleted_at IS NULL
+    AND public.has_effective_permission('organization.view_ou', o.path)
+  LIMIT 1;
+
+  IF FOUND THEN
+    RETURN;
+  END IF;
+
+  -- Sub-OU branch (depth>1). Permission check folded into WHERE.
+  RETURN QUERY
+  SELECT
+    ou.id,
+    ou.name,
+    ou.display_name,
+    ou.path::text,
+    ou.parent_path::text,
+    (
+      SELECT COALESCE(
+        (SELECT p.id FROM public.organization_units_projection p WHERE p.path = ou.parent_path LIMIT 1),
+        (SELECT o.id FROM public.organizations_projection o WHERE o.path = ou.parent_path LIMIT 1)
+      )
+    ) AS parent_id,
+    ou.timezone,
+    ou.is_active,
+    (SELECT COUNT(*) FROM public.organization_units_projection c
+       WHERE c.parent_path = ou.path AND c.deleted_at IS NULL) AS child_count,
+    false AS is_root_organization,
+    ou.created_at,
+    ou.updated_at
+  FROM public.organization_units_projection ou
+  WHERE ou.id = p_unit_id
+    AND ou.deleted_at IS NULL
+    AND public.has_effective_permission('organization.view_ou', ou.path)
+  LIMIT 1;
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.9 — api.get_organization_unit_descendants
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.get_organization_unit_descendants(p_unit_id uuid)
+RETURNS TABLE(
+  id                   uuid,
+  name                 text,
+  display_name         text,
+  path                 text,
+  parent_path          text,
+  parent_id            uuid,
+  timezone             text,
+  is_active            boolean,
+  child_count          bigint,
+  is_root_organization boolean,
+  created_at           timestamp with time zone,
+  updated_at           timestamp with time zone
+)
+LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+  v_unit_path ltree;
+BEGIN
+  -- Find the unit's path (root org or sub-OU) WITH permission check folded
+  -- into the WHERE clause. Returns NULL (and empty result set) if the unit
+  -- doesn't exist or is outside the user's permission scope.
+  SELECT o.path INTO v_unit_path
+  FROM public.organizations_projection o
+  WHERE o.id = p_unit_id
+    AND o.deleted_at IS NULL
+    AND public.has_effective_permission('organization.view_ou', o.path);
+
+  IF v_unit_path IS NULL THEN
+    SELECT ou.path INTO v_unit_path
+    FROM public.organization_units_projection ou
+    WHERE ou.id = p_unit_id
+      AND ou.deleted_at IS NULL
+      AND public.has_effective_permission('organization.view_ou', ou.path);
+  END IF;
+
+  IF v_unit_path IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Descendants — per-row permission check correctly handles multi-scope
+  -- grants where the user may have view_ou at some descendants but not others.
+  RETURN QUERY
+  SELECT
+    ou.id,
+    ou.name,
+    ou.display_name,
+    ou.path::text,
+    ou.parent_path::text,
+    (
+      SELECT COALESCE(
+        (SELECT p.id FROM public.organization_units_projection p WHERE p.path = ou.parent_path LIMIT 1),
+        (SELECT o.id FROM public.organizations_projection o WHERE o.path = ou.parent_path LIMIT 1)
+      )
+    ) AS parent_id,
+    ou.timezone,
+    ou.is_active,
+    (SELECT COUNT(*) FROM public.organization_units_projection c
+       WHERE c.parent_path = ou.path AND c.deleted_at IS NULL) AS child_count,
+    false AS is_root_organization,
+    ou.created_at,
+    ou.updated_at
+  FROM public.organization_units_projection ou
+  WHERE v_unit_path @> ou.path
+    AND ou.path != v_unit_path
+    AND ou.deleted_at IS NULL
+    AND public.has_effective_permission('organization.view_ou', ou.path)
+  ORDER BY ou.path ASC;
+END;
+$$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 7.10 — api.get_organization_units
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.get_organization_units(
+  p_status      text DEFAULT 'all',
+  p_search_term text DEFAULT NULL
+) RETURNS TABLE(
+  id                   uuid,
+  name                 text,
+  display_name         text,
+  path                 text,
+  parent_path          text,
+  parent_id            uuid,
+  timezone             text,
+  is_active            boolean,
+  child_count          bigint,
+  is_root_organization boolean,
+  created_at           timestamp with time zone,
+  updated_at           timestamp with time zone
+)
+LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+BEGIN
+  -- Return all OUs the user has organization.view_ou permission for. Per-row
+  -- has_effective_permission correctly handles multi-scope grants.
+  RETURN QUERY
+  WITH all_units AS (
+    -- Root organizations (depth=1)
+    SELECT
+      o.id,
+      o.name,
+      o.display_name,
+      o.path,
+      o.parent_path,
+      o.timezone,
+      o.is_active,
+      true AS is_root_org,
+      o.created_at,
+      o.updated_at
+    FROM public.organizations_projection o
+    WHERE extensions.nlevel(o.path) = 1
+      AND o.deleted_at IS NULL
+      AND public.has_effective_permission('organization.view_ou', o.path)
+    UNION ALL
+    -- Sub-organizations (depth>1)
+    SELECT
+      ou.id,
+      ou.name,
+      ou.display_name,
+      ou.path,
+      ou.parent_path,
+      ou.timezone,
+      ou.is_active,
+      false AS is_root_org,
+      ou.created_at,
+      ou.updated_at
+    FROM public.organization_units_projection ou
+    WHERE ou.deleted_at IS NULL
+      AND public.has_effective_permission('organization.view_ou', ou.path)
+  ),
+  unit_children AS (
+    SELECT
+      oup.parent_path AS pp,
+      COUNT(*) as cnt
+    FROM public.organization_units_projection oup
+    WHERE oup.deleted_at IS NULL
+    GROUP BY oup.parent_path
+  )
+  SELECT
+    u.id,
+    u.name,
+    u.display_name,
+    u.path::text,
+    u.parent_path::text,
+    (
+      SELECT COALESCE(
+        (SELECT p.id FROM public.organization_units_projection p WHERE p.path = u.parent_path LIMIT 1),
+        (SELECT o.id FROM public.organizations_projection o WHERE o.path = u.parent_path LIMIT 1)
+      )
+    ) AS parent_id,
+    u.timezone,
+    u.is_active,
+    COALESCE(uc.cnt, 0) AS child_count,
+    u.is_root_org AS is_root_organization,
+    u.created_at,
+    u.updated_at
+  FROM all_units u
+  LEFT JOIN unit_children uc ON uc.pp = u.path
+  WHERE (p_status = 'all'
+         OR (p_status = 'active' AND u.is_active = true)
+         OR (p_status = 'inactive' AND u.is_active = false))
+    AND (p_search_term IS NULL
+         OR u.name ILIKE '%' || p_search_term || '%'
+         OR u.display_name ILIKE '%' || p_search_term || '%')
+  ORDER BY u.path ASC;
+END;
+$$;
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 8-15 pending)
 -- =============================================================================
