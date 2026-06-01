@@ -33,11 +33,18 @@
 -- =============================================================================
 
 -- Migration-session search_path — mandatory under the PR #67 codified rule for
--- any migration that uses extension-typed parameters or return types. Step 1's
--- compute_effective_permissions has `RETURNS TABLE(... ltree)`; function-
--- attribute `SET search_path` applies INSIDE the body but NOT during CREATE-
--- time signature parsing. Without this, the migration fails with
--- `type "ltree" does not exist (SQLSTATE 42704)` on first push.
+-- any migration that uses extension-typed parameters or return types in
+-- function signatures. Function-attribute `SET search_path` applies INSIDE the
+-- body but NOT during CREATE-time signature parsing.
+--
+-- Step 1 alone is strictly defensive here — its `compute_effective_permissions`
+-- has `ltree` only in `RETURNS TABLE(... ltree)` (not in parameters), which
+-- PostgreSQL parses with the per-function `SET search_path` already in effect
+-- (verified in PR #67 close-out). However, Step 7 normalizes 10 C-legacy RPCs
+-- with `p_scope_path ltree` parameter signatures — those WILL fail without the
+-- session-level SET. Keeping it at the top of the file is correct (the
+-- migration accumulates; removing-then-re-adding is churn). N1 fold-in from
+-- 2026-06-01 step-1+2 architect review.
 -- See infrastructure/supabase/CLAUDE.md § Migration-session SET search_path.
 SET search_path = public, extensions, pg_temp;
 
@@ -112,10 +119,17 @@ COMMENT ON COLUMN public.permission_implications.propagate_through_grants IS
 -- DBC contract: see dev/active/cross-tenant-grant-phase-1-jwt-shape/plan.md
 -- § Function contracts (DBC) → `compute_effective_permissions(...)` — extended.
 --
--- Containment verification (architect 2026-05-29):
---   - Only caller: public.custom_access_token_hook
+-- Containment verification (architect 2026-05-29; re-verified 2026-06-01 per
+-- step-1+2 architect review F2 fold-in):
+--   - Only PL/pgSQL caller: public.custom_access_token_hook
+--     (sole call site: `20260226002002_organization_manage_page_phase1.sql:168`)
 --   - Zero supabase.rpc('compute_effective_permissions', ...) call sites in
 --     frontend/, workflows/, edge functions, or backend API
+--   - TypeScript type surface: `frontend/src/types/database.types.ts:4683` and
+--     `workflows/src/types/database.types.ts:4683` (signature unchanged →
+--     regen optional but recommended per Definition of Done; the row-shape
+--     contract changes — multi-entry-per-permission — even though the column
+--     types do not, so downstream callers should re-read documentation)
 --   - Indirect consumers (JWT readers) covered by the five-tier audit:
 --     PL/pgSQL helpers (has_*, get_permission_scope), frontend, edge functions,
 --     workflows, RLS policy bodies — all duplicate-safe today (confirmed by
@@ -137,12 +151,17 @@ AS $$
 
 WITH
 -- Pre-resolve the caller user's home org once. Used by the org-wide grant
--- branch below. NULL when the user row is missing (deleted account, edge case);
+-- branch below. Returns zero rows when the user is missing or soft-deleted;
 -- the org-wide branch then never matches because `org_id = NULL` is NULL/false.
+-- The `deleted_at IS NULL` filter is defensive (N2 fold-in 2026-06-01 — the
+-- JWT hook only fires for live login today so the gap is academic, but
+-- hardens against future paths that call compute_effective_permissions outside
+-- custom_access_token_hook).
 user_home_org AS (
   SELECT u.current_organization_id AS home_org_id
   FROM public.users u
   WHERE u.id = p_user_id
+    AND u.deleted_at IS NULL
 ),
 
 -- Role-source explicit permissions for the requested active org (or org-
@@ -213,9 +232,15 @@ grant_derived_perms AS (
 ),
 
 -- Combined permission set with implications applied.
--- Four UNION arms (UNION dedupes identical (name, id, path) tuples for free):
 --
---   1. Role-source explicit (widest per perm name)
+-- Four UNION arms; UNION dedupes by ALL projected columns. We project only
+-- `(permission_name, scope_path)` — NOT `permission_id` — so the dedupe is
+-- defensively robust against a future non-unique `permissions_projection.name`
+-- (today the column is uniquely-named per the seed contract, but the function
+-- should not rely on that out-of-band invariant). F1 fold-in from Stage R-6
+-- step-1+2 architect review 2026-06-01.
+--
+--   1. Role-source explicit (widest per perm name via inner widest_explicit_role)
 --   2. Role-source implications (inheriting the role's widest scope) —
 --      UNCONDITIONAL; preserves existing behavior. The default FALSE on
 --      permission_implications.propagate_through_grants does NOT gate this
@@ -226,24 +251,24 @@ grant_derived_perms AS (
 --      implication-widening for grant-derived permissions (HIPAA least-
 --      authority). Each implication row opts in explicitly.
 with_implications AS (
-  SELECT permission_name, permission_id, scope_path
+  SELECT permission_name, scope_path
   FROM widest_explicit_role
 
   UNION
 
-  SELECT p2.name, p2.id, we.scope_path
+  SELECT p2.name, we.scope_path
   FROM widest_explicit_role we
   JOIN public.permission_implications pi ON pi.permission_id = we.permission_id
   JOIN public.permissions_projection p2 ON p2.id = pi.implies_permission_id
 
   UNION
 
-  SELECT permission_name, permission_id, scope_path
+  SELECT permission_name, scope_path
   FROM grant_derived_perms
 
   UNION
 
-  SELECT p2.name, p2.id, gd.scope_path
+  SELECT p2.name, gd.scope_path
   FROM grant_derived_perms gd
   JOIN public.permission_implications pi ON pi.permission_id = gd.permission_id
   JOIN public.permissions_projection p2 ON p2.id = pi.implies_permission_id
@@ -257,17 +282,23 @@ with_implications AS (
 -- enabling consultant grants to coexist with home-org role assignments at
 -- different scopes for the same permission.
 --
+-- Plain `SELECT DISTINCT` (rather than `DISTINCT ON (...) ORDER BY ...`) is
+-- used because both projected columns participate in the dedupe; `DISTINCT`
+-- on (name, scope) is exactly the contract the DBC specifies, and avoids
+-- the subtle reliance on `permission_id` being uniquely keyed by name that
+-- `DISTINCT ON` + arbitrary-tiebreak would otherwise carry (F1 fold-in
+-- 2026-06-01).
+--
 -- Source-tier (role vs grant) is intentionally NOT emitted: the function
 -- contract returns (permission_name, effective_scope) only, and downstream
 -- JWT consumers tolerate the multi-entry shape via EXISTS/`.some()` checks.
 -- See ADR § Non-negotiable invariant: `permissions jsonb` shape and
 -- § JWT consumer audit for the duplicate-safe verification across all 5 tiers.
 final_effective AS (
-  SELECT DISTINCT ON (permission_name, scope_path)
+  SELECT DISTINCT
     permission_name,
     scope_path AS effective_scope
   FROM with_implications
-  ORDER BY permission_name, scope_path
 )
 
 SELECT * FROM final_effective;
