@@ -153,15 +153,17 @@ SET search_path TO 'public', 'extensions'
 AS $$
 
 WITH
--- Pre-resolve the caller user's home org once. Used by the org-wide grant
--- branch below. Returns zero rows when the user is missing or soft-deleted;
--- the org-wide branch then never matches because `org_id = NULL` is NULL/false.
--- The `deleted_at IS NULL` filter is defensive (N2 fold-in 2026-06-01 — the
--- JWT hook only fires for live login today so the gap is academic, but
--- hardens against future paths that call compute_effective_permissions outside
--- custom_access_token_hook).
-user_home_org AS (
-  SELECT u.current_organization_id AS home_org_id
+-- Pre-resolve the caller user's accessible organizations array once. Used by
+-- the org-wide grant branch below as the canonical membership oracle per
+-- PR #66/#67 (post-fold-in M1 fix 2026-06-01: PRIOR DRAFT used
+-- `users.current_organization_id` which is the active-session pointer, NOT a
+-- membership oracle — a user switched to a different org via switch_organization
+-- would be silently excluded from org-wide grants targeting their home org).
+-- Returns zero rows when the user is missing or soft-deleted; the org-wide
+-- branch then never matches (the ANY against NULL is NULL/false).
+-- The `deleted_at IS NULL` filter remains from the prior N2 fold-in.
+user_accessible_orgs AS (
+  SELECT u.accessible_organizations AS accessible_orgs
   FROM public.users u
   WHERE u.id = p_user_id
     AND u.deleted_at IS NULL
@@ -229,7 +231,9 @@ grant_derived_perms AS (
       g.consultant_user_id = p_user_id
       OR (
         g.consultant_user_id IS NULL
-        AND g.consultant_org_id = (SELECT home_org_id FROM user_home_org)
+        AND g.consultant_org_id = ANY(
+          (SELECT accessible_orgs FROM user_accessible_orgs)
+        )
       )
     )
 ),
@@ -561,15 +565,20 @@ EXCEPTION
       SQLERRM,
       SQLSTATE;
 
+    -- N3 fold-in 2026-06-01: claims_version placed FIRST so a downstream
+    -- consumer that truncates oversized claim payloads (some JWT verifiers
+    -- enforce a max-size after which the tail is dropped) still receives the
+    -- version marker. claims_error (SQLERRM, unbounded length) is placed
+    -- LAST. Defensive against a future truncation regression.
     RETURN jsonb_build_object(
       'claims',
       COALESCE(event->'claims', '{}'::jsonb) || jsonb_build_object(
+        'claims_version', 5,  -- Phase 1: bumped 4 → 5
         'org_id', NULL,
         'org_type', NULL,
         'effective_permissions', '[]'::jsonb,
         'access_blocked', false,
-        'claims_error', SQLERRM,
-        'claims_version', 5  -- Phase 1: bumped 4 → 5
+        'claims_error', SQLERRM
       )
     );
 END;
@@ -586,7 +595,19 @@ COMMENT ON FUNCTION public.custom_access_token_hook(jsonb) IS
   'EXISTS-style checks; never materialize claims into a `{perm: scope}` map. '
   'v5 changes from v4: claims_version bumped 4 → 5 (uniform across all four emit '
   'branches: happy-path, access-date access_blocked, org-deactivated access_blocked, '
-  'EXCEPTION). Body otherwise unchanged from 20260226002002_organization_manage_page_phase1.sql '
+  'EXCEPTION). '
+  'Per-branch claim shape (preserved from v4; the S1 fold-in 2026-06-01 explicitly '
+  'documented rather than normalized): the happy-path branch emits ALL of org_id, '
+  'org_type, access_blocked:false, claims_version, effective_permissions, '
+  'current_org_unit_id, current_org_unit_path. The two access_blocked branches emit '
+  'a MINIMAL claim set: org_id, org_type:NULL, effective_permissions:[]::jsonb, '
+  'access_blocked:true, access_block_reason, claims_version — they OMIT '
+  'current_org_unit_id/current_org_unit_path because OU context is irrelevant when '
+  'access is denied. The EXCEPTION branch emits claims_version, org_id:NULL, '
+  'org_type:NULL, effective_permissions:[]::jsonb, access_blocked:false, '
+  'claims_error:SQLERRM. Consumers MUST check access_blocked / claims_error before '
+  'accessing OU fields; relying on universal field presence violates the v5 contract. '
+  'Body otherwise unchanged from 20260226002002_organization_manage_page_phase1.sql '
   '(org-is-active gate, access_blocked branch shape, and exception branch all preserved). '
   'Reads compute_effective_permissions(v_user_id, v_org_id) which under Phase 1 emits '
   'grant-derived permissions alongside role-derived ones (see Step 1 in this migration). '
@@ -662,13 +683,23 @@ SECURITY DEFINER
 SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $$
 DECLARE
-  v_home_org_id uuid;
+  v_accessible_orgs uuid[];
 BEGIN
-  -- Resolve the user's home org for the org-wide grant branch. NULL when the
-  -- user row is missing or soft-deleted; the org-wide branch then never matches
-  -- (consultant_org_id = NULL is NULL/false), correctly excluding such users.
-  SELECT u.current_organization_id
-  INTO v_home_org_id
+  -- Snapshot the user's accessible_organizations as the canonical membership
+  -- oracle for org-wide grant matching (M1 fix 2026-06-01: PRIOR DRAFT used
+  -- `current_organization_id` — the active-session pointer, NOT a membership
+  -- oracle; a user switched to a different org via switch_organization would
+  -- have been silently excluded from org-wide grants targeting their home org).
+  -- Returns NULL when the user row is missing or soft-deleted; the org-wide
+  -- branch then never matches (ANY against NULL is NULL/false), correctly
+  -- excluding such users.
+  --
+  -- Cyclicity note: this snapshots `accessible_organizations` BEFORE the
+  -- UPDATE below recomputes it. The recomputation reads `user_organizations_
+  -- projection` and `cross_tenant_access_grants_projection` directly (NOT
+  -- `accessible_organizations`), so the post-UPDATE state is canonical.
+  SELECT u.accessible_organizations
+  INTO v_accessible_orgs
   FROM public.users u
   WHERE u.id = p_user_id
     AND u.deleted_at IS NULL;
@@ -676,6 +707,12 @@ BEGIN
   UPDATE public.users
   SET
     accessible_organizations = ARRAY(
+      -- ORDER BY org_id makes the output array deterministic, satisfying the
+      -- DBC L111 idempotency invariant at array-equality (not just set-equality)
+      -- (S2 fix 2026-06-01). Baseline used `array_agg(uop.org_id ORDER BY
+      -- uop.created_at)` but that key is unsuitable post-Phase-1 because the
+      -- UNION combines two source tables; ORDER BY org_id is the cleanest
+      -- deterministic key for the UNIONed set.
       SELECT DISTINCT org_id
       FROM (
         -- (a) Membership via user_organizations_projection
@@ -685,7 +722,9 @@ BEGIN
 
         UNION ALL
 
-        -- (b) Active in-window grants addressing this user (either shape)
+        -- (b) Active in-window grants addressing this user (either shape).
+        --     Org-wide grants use accessible_organizations as the membership
+        --     oracle (M1 fix 2026-06-01).
         SELECT g.provider_org_id
         FROM public.cross_tenant_access_grants_projection g
         WHERE g.status = 'active'
@@ -694,10 +733,11 @@ BEGIN
             g.consultant_user_id = p_user_id
             OR (
               g.consultant_user_id IS NULL
-              AND g.consultant_org_id = v_home_org_id
+              AND g.consultant_org_id = ANY(v_accessible_orgs)
             )
           )
       ) sources
+      ORDER BY org_id
     ),
     updated_at = now()
   WHERE id = p_user_id
@@ -770,14 +810,16 @@ COMMENT ON FUNCTION public.sync_accessible_organizations() IS
 -- each affected user, recomputes `accessible_organizations` via the shared
 -- helper.
 --
--- Affected user enumeration:
+-- Affected user enumeration (M1 fix 2026-06-01: org-wide branch uses the
+-- canonical membership oracle accessible_organizations @> [...], NOT the
+-- active-session pointer current_organization_id):
 --   - INSERT: NEW.consultant_user_id (user-specific) OR all users whose
---     current_organization_id = NEW.consultant_org_id (org-wide).
+--     accessible_organizations @> [NEW.consultant_org_id] (org-wide).
 --   - UPDATE: UNION of NEW-affected and OLD-affected users. Status flip
 --     ('active' → 'revoked') is the common case — both sides resolve to
 --     the same user(s) but recomputation reflects the new world.
 --   - DELETE: OLD.consultant_user_id (user-specific) OR all users whose
---     current_organization_id = OLD.consultant_org_id (org-wide).
+--     accessible_organizations @> [OLD.consultant_org_id] (org-wide).
 --
 -- Performance note: org-wide grant changes recompute for every user in the
 -- consultant org. For consultant orgs with N users, a single grant row change
@@ -805,11 +847,15 @@ BEGIN
     IF NEW.consultant_user_id IS NOT NULL THEN
       v_user_ids := v_user_ids || NEW.consultant_user_id;
     ELSE
-      -- Org-wide grant: all users whose home org = NEW.consultant_org_id.
+      -- Org-wide grant: all users who are members of NEW.consultant_org_id
+      -- per the canonical membership oracle (M1 fix 2026-06-01: PRIOR DRAFT
+      -- used `current_organization_id` which is the active-session pointer,
+      -- not membership; a user switched to a different org would have been
+      -- silently excluded). GIN-indexed via idx_users_accessible_orgs_gin.
       v_user_ids := v_user_ids || ARRAY(
         SELECT u.id
         FROM public.users u
-        WHERE u.current_organization_id = NEW.consultant_org_id
+        WHERE u.accessible_organizations @> ARRAY[NEW.consultant_org_id]::uuid[]
           AND u.deleted_at IS NULL
       );
     END IF;
@@ -825,7 +871,7 @@ BEGIN
       v_user_ids := v_user_ids || ARRAY(
         SELECT u.id
         FROM public.users u
-        WHERE u.current_organization_id = OLD.consultant_org_id
+        WHERE u.accessible_organizations @> ARRAY[OLD.consultant_org_id]::uuid[]
           AND u.deleted_at IS NULL
       );
     END IF;
