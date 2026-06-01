@@ -1225,9 +1225,14 @@ COMMENT ON INDEX public.idx_access_grants_consultant_user_status_partial IS
 --
 -- For OU readers without an entity-id input (get_organization_units), the
 -- WHERE predicate uses `has_effective_permission` per row. This is one
--- function call per result row; acceptable for typical OU tree sizes
--- (tens of OUs, not thousands). The EXISTS-based check is cheaper than
--- the two-step's per-row ltree containment.
+-- function call per result row, bounded by JWT entry count (~40-60 elements);
+-- each row pays a deterministic small EXISTS cost. Acceptable for typical OU
+-- tree sizes (tens of OUs, not thousands). F6 fold-in 2026-06-01 architect
+-- review: prior draft claimed this was "cheaper than the two-step's per-row
+-- ltree containment" which is not strictly true (the two-step had
+-- v_user_scope pre-resolved at function entry; the new pattern iterates JWT
+-- per row). The correct framing is bounded-cost-per-row + correctness under
+-- multi-scope, not cheaper.
 --
 -- DECLARE delta: `v_scope_path extensions.ltree;` (or `LTREE`) declarations
 -- are REMOVED from each function since the variable is no longer used.
@@ -1270,6 +1275,18 @@ BEGIN
   -- user could have organization.create_ou at multiple distinct roots, and
   -- the active-session pointer is the canonical disambiguator. Permission is
   -- then checked at the resolved parent path.
+  --
+  -- N1 fold-in 2026-06-01 architect review: partner consultants with
+  -- multi-scope create_ou (e.g., home + grant target) MUST explicitly pass
+  -- p_parent_id to create under a non-active-session root; the NULL-parent
+  -- path always uses the active session as the deterministic disambiguator.
+  -- This is intentional — implicit-root creation is for the org-owner case,
+  -- not the consultant-acting-on-grant case.
+  --
+  -- N3 note 2026-06-01: when v_current_org_id IS NULL (no active session),
+  -- the function raises with ERRCODE 'invalid_parameter_value' (vs the prior
+  -- body's 'insufficient_privilege'). This is a new error branch; the prior
+  -- body would have reached this path only via get_permission_scope=NULL.
   IF p_parent_id IS NULL THEN
     v_current_org_id := public.get_current_org_id();
     IF v_current_org_id IS NULL THEN
@@ -1427,17 +1444,33 @@ BEGIN
   FROM public.organization_units_projection
   WHERE id = v_new_id;
 
+  -- F4 fold-in 2026-06-01 architect review: canonical Pattern A v2
+  -- form WHERE id = v_event_id (replaces legacy stream_id+event_type+ORDER BY
+  -- LIMIT 1 form which had concurrency-race exposure under retry storms).
   IF NOT FOUND THEN
     SELECT processing_error INTO v_processing_error
     FROM public.domain_events
-    WHERE stream_id = v_new_id
-      AND event_type = 'organization_unit.created'
-    ORDER BY sequence_number DESC
-    LIMIT 1;
+    WHERE id = v_event_id;
 
     RETURN jsonb_build_object(
       'success', false,
       'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  -- F5 fold-in 2026-06-01 architect review: Pattern A v2 race-safe second
+  -- check (handler-mid-update silent-failure protection). Required by
+  -- CLAUDE.md § Pattern A v2 canonical form.
+  SELECT processing_error INTO v_processing_error
+  FROM public.domain_events WHERE id = v_event_id;
+  IF v_processing_error IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Event processing failed: ' || v_processing_error,
       'errorDetails', jsonb_build_object(
         'code', 'PROCESSING_ERROR',
         'message', 'The event was recorded but the handler failed. Check domain_events for details.'
@@ -1726,17 +1759,29 @@ BEGIN
   WHERE id = p_unit_id
     AND deleted_at IS NOT NULL;
 
+  -- F4 fold-in: canonical Pattern A v2 form WHERE id = v_event_id.
   IF NOT FOUND THEN
     SELECT processing_error INTO v_processing_error
     FROM public.domain_events
-    WHERE stream_id = p_unit_id
-      AND event_type = 'organization_unit.deleted'
-    ORDER BY sequence_number DESC
-    LIMIT 1;
+    WHERE id = v_event_id;
 
     RETURN jsonb_build_object(
       'success', false,
       'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  -- F5 fold-in: Pattern A v2 race-safe second check.
+  SELECT processing_error INTO v_processing_error
+  FROM public.domain_events WHERE id = v_event_id;
+  IF v_processing_error IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Event processing failed: ' || v_processing_error,
       'errorDetails', jsonb_build_object(
         'code', 'PROCESSING_ERROR',
         'message', 'The event was recorded but the handler failed. Check domain_events for details.'
@@ -1865,17 +1910,29 @@ BEGIN
   FROM public.organization_units_projection
   WHERE id = p_unit_id;
 
+  -- F4 fold-in: canonical Pattern A v2 form WHERE id = v_event_id.
   IF NOT FOUND THEN
     SELECT processing_error INTO v_processing_error
     FROM public.domain_events
-    WHERE stream_id = p_unit_id
-      AND event_type = 'organization_unit.deactivated'
-    ORDER BY sequence_number DESC
-    LIMIT 1;
+    WHERE id = v_event_id;
 
     RETURN jsonb_build_object(
       'success', false,
       'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  -- F5 fold-in: Pattern A v2 race-safe second check.
+  SELECT processing_error INTO v_processing_error
+  FROM public.domain_events WHERE id = v_event_id;
+  IF v_processing_error IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Event processing failed: ' || v_processing_error,
       'errorDetails', jsonb_build_object(
         'code', 'PROCESSING_ERROR',
         'message', 'The event was recorded but the handler failed. Check domain_events for details.'
@@ -2024,17 +2081,29 @@ BEGIN
   FROM public.organization_units_projection
   WHERE id = p_unit_id;
 
+  -- F4 fold-in: canonical Pattern A v2 form WHERE id = v_event_id.
   IF NOT FOUND THEN
     SELECT processing_error INTO v_processing_error
     FROM public.domain_events
-    WHERE stream_id = p_unit_id
-      AND event_type = 'organization_unit.reactivated'
-    ORDER BY sequence_number DESC
-    LIMIT 1;
+    WHERE id = v_event_id;
 
     RETURN jsonb_build_object(
       'success', false,
       'error', COALESCE(v_processing_error, 'Projection not found after event processing'),
+      'errorDetails', jsonb_build_object(
+        'code', 'PROCESSING_ERROR',
+        'message', 'The event was recorded but the handler failed. Check domain_events for details.'
+      )
+    );
+  END IF;
+
+  -- F5 fold-in: Pattern A v2 race-safe second check.
+  SELECT processing_error INTO v_processing_error
+  FROM public.domain_events WHERE id = v_event_id;
+  IF v_processing_error IS NOT NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Event processing failed: ' || v_processing_error,
       'errorDetails', jsonb_build_object(
         'code', 'PROCESSING_ERROR',
         'message', 'The event was recorded but the handler failed. Check domain_events for details.'
@@ -2056,7 +2125,11 @@ BEGIN
       'createdAt', v_result.created_at,
       'updatedAt', v_result.updated_at
     ),
-    'reactivatedDescendants', v_descendant_count
+    -- F1 fold-in 2026-06-01 architect review: preserved baseline key
+    -- `cascadedReactivations` (symmetric with deactivate's `cascadedDeactivations`).
+    -- Prior draft used `reactivatedDescendants` which would silently break
+    -- frontend code paths reading `result.cascadedReactivations`.
+    'cascadedReactivations', v_descendant_count
   );
 END;
 $$;
@@ -2095,11 +2168,22 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
-  -- Permission gate via has_effective_permission (EXISTS over JWT
-  -- effective_permissions entries). Forward-compatible with multi-scope
-  -- grants under Phase 1 tightened DISTINCT ON.
+  -- Permission gate — F2 fold-in 2026-06-01 architect review:
+  -- Preserves the two-branch error-shape contract of the prior body. The
+  -- first branch catches "missing permission entirely" and the second catches
+  -- "permission exists but not at this scope". Frontend error-discrimination
+  -- relies on these distinct error strings; collapsing them into a single
+  -- gate would break the UX of distinguishing "you have user.role_assign
+  -- somewhere else, just not here" from "you don't have user.role_assign
+  -- at all". has_effective_permission is forward-compatible with multi-scope
+  -- grants under Phase 1's tightened DISTINCT ON.
+  IF NOT public.has_permission('user.role_assign') THEN
+    RAISE EXCEPTION 'Missing permission: user.role_assign'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
   IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
-    RAISE EXCEPTION 'Missing permission: user.role_assign at requested scope'
+    RAISE EXCEPTION 'Requested scope is outside your permission scope'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
@@ -2256,8 +2340,14 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
+  -- Permission gate — same two-branch shape as bulk_assign_role (F2 fold-in).
+  IF NOT public.has_permission('user.role_assign') THEN
+    RAISE EXCEPTION 'Missing permission: user.role_assign'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
   IF NOT public.has_effective_permission('user.role_assign', p_scope_path) THEN
-    RAISE EXCEPTION 'Missing permission: user.role_assign at requested scope'
+    RAISE EXCEPTION 'Requested scope is outside your permission scope'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
@@ -2466,7 +2556,19 @@ LANGUAGE plpgsql
 SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $$
 BEGIN
-  -- Root organization branch (depth=1). Permission check folded into WHERE.
+  -- Up-front zero-permission gate (F3 fold-in 2026-06-01 architect review):
+  -- preserves the prior body's RAISE EXCEPTION behavior for the
+  -- zero-permission case. Without this, a user with NO view_ou would receive
+  -- an empty result set instead of the documented insufficient_privilege
+  -- exception — a HTTP-200-empty-vs-HTTP-403 contract shift that frontend
+  -- error handling can't catch.
+  IF NOT public.has_permission('organization.view_ou') THEN
+    RAISE EXCEPTION 'Missing permission: organization.view_ou'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Root organization branch (depth=1). Per-row scoped permission check in
+  -- WHERE handles multi-scope grants correctly.
   RETURN QUERY
   SELECT
     o.id,
@@ -2484,7 +2586,7 @@ BEGIN
     o.updated_at
   FROM public.organizations_projection o
   WHERE o.id = p_unit_id
-    AND extensions.nlevel(o.path) = 1
+    AND nlevel(o.path) = 1
     AND o.deleted_at IS NULL
     AND public.has_effective_permission('organization.view_ou', o.path)
   LIMIT 1;
@@ -2548,6 +2650,12 @@ AS $$
 DECLARE
   v_unit_path ltree;
 BEGIN
+  -- Up-front zero-permission gate (F3 fold-in 2026-06-01 architect review).
+  IF NOT public.has_permission('organization.view_ou') THEN
+    RAISE EXCEPTION 'Missing permission: organization.view_ou'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
   -- Find the unit's path (root org or sub-OU) WITH permission check folded
   -- into the WHERE clause. Returns NULL (and empty result set) if the unit
   -- doesn't exist or is outside the user's permission scope.
@@ -2626,6 +2734,12 @@ LANGUAGE plpgsql
 SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $$
 BEGIN
+  -- Up-front zero-permission gate (F3 fold-in 2026-06-01 architect review).
+  IF NOT public.has_permission('organization.view_ou') THEN
+    RAISE EXCEPTION 'Missing permission: organization.view_ou - user not associated with organization'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
   -- Return all OUs the user has organization.view_ou permission for. Per-row
   -- has_effective_permission correctly handles multi-scope grants.
   RETURN QUERY
@@ -2643,7 +2757,7 @@ BEGIN
       o.created_at,
       o.updated_at
     FROM public.organizations_projection o
-    WHERE extensions.nlevel(o.path) = 1
+    WHERE nlevel(o.path) = 1
       AND o.deleted_at IS NULL
       AND public.has_effective_permission('organization.view_ou', o.path)
     UNION ALL
