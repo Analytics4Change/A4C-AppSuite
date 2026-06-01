@@ -21,7 +21,7 @@
 --   [x] Step 5  — one-time backfill DO-block (helper-based; carries M1)
 --   [x] Step 6  — composite partial index on cross_tenant_access_grants_projection
 --   [x] Step 7  — 10 C-legacy RPC normalizations (must-pair with Step 1)
---   [ ] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
+--   [x] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
 --   [ ] Step 9  — authorization_type CHECK constraint
 --   [ ] Step 10 — access_grant.policy_override_applied handler + perm-defined events
 --   [ ] Step 11 — 170-RPC @a4c-bucket tag backfill
@@ -2817,5 +2817,204 @@ $$;
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 8-15 pending)
+-- Step 8 — M3 RPC Shape Registry re-tag (Step 7's 10 RPCs) + assertion
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 8: re-issue `COMMENT ON FUNCTION ... '...
+-- @a4c-rpc-shape: envelope|read ...'` for ALL 10 C-legacy RPCs normalized in
+-- Step 7. Plus a SQL-level assertion that every api.* function carries a
+-- shape tag (the equivalent of `UncategorizedRpcs = never` in the frontend
+-- codegen, enforced at deploy time).
+--
+-- Why re-issue defensively under CREATE OR REPLACE FUNCTION:
+-- CREATE OR REPLACE with the SAME signature preserves the OID-keyed COMMENT.
+-- All 10 Step 7 RPCs keep the same signatures, so the existing M3 tags from
+-- `20260430172625_backfill_rpc_shape_comments.sql` SHOULD already be intact.
+-- However, the M3 DROP+CREATE re-tag rule mandates defensive re-emission
+-- (`infrastructure/supabase/CLAUDE.md` § RPC Shape Registry). Re-emitting
+-- explicitly here also documents the per-RPC shape decision INLINE with the
+-- normalization for future readers — they don't have to grep across the M3
+-- backfill DO block + body-introspection rule to know which tag each RPC
+-- carries.
+--
+-- Shape classification (body introspection per `20260430172625_*.sql:77-83`):
+--   `envelope` IFF returns jsonb/json AND body contains `'success', true|false`
+--   `read` otherwise
+--
+-- All 5 OU mutators (7.1-7.5) return jsonb with Pattern A v2 envelope
+-- `RETURN jsonb_build_object('success', true|false, ...)` shape → envelope.
+-- The 2 role mutations (7.6-7.7) return custom-shape jsonb without a
+-- top-level `success` discriminator (`{successful, failed, totalRequested,
+-- ...}` and `{added: {...}, removed: {...}}` respectively) → read. The 3
+-- OU readers (7.8-7.10) return TABLE() → read.
+--
+-- The 2 role mutations being tagged `read` despite their semantic operation
+-- being state-mutation is the N1-RESOLVED-REJECTED outcome (2026-05-30):
+-- the M3 tag is a WIRE-SHAPE contract for compile-time frontend helper
+-- narrowing, NOT a state-mutation marker. SupabaseRoleService consumes both
+-- via `apiRpc<T>` (read helper); promoting to `envelope` would break that.
+-- See Stage D § N1 entry in tasks.md.
+
+-- -----------------------------------------------------------------------------
+-- Step 8.1-8.5 — 5 OU mutators (envelope)
+-- -----------------------------------------------------------------------------
+
+COMMENT ON FUNCTION api.create_organization_unit(uuid, text, text, text) IS
+$cmt$Create a new organization unit under p_parent_id (or under the user's
+active org root when p_parent_id IS NULL). Emits organization_unit.created
+domain event; reads back the projection (Pattern A v2). Phase 1 (Step 7.1):
+normalized from two-step get_permission_scope + manual @> to single
+has_effective_permission(perm, path) call at the resolved parent path.
+
+@a4c-rpc-shape: envelope$cmt$;
+
+COMMENT ON FUNCTION api.update_organization_unit(uuid, text, text, text) IS
+$cmt$Update an organization unit (name, display_name, timezone). Emits
+organization_unit.updated; reads back the projection (Pattern A v2 with
+both IF NOT FOUND and processing_error checks). Phase 1 (Step 7.2):
+normalized to has_effective_permission folded into entity-fetch WHERE,
+preserving NOT_FOUND-for-both-cases envelope semantics.
+
+@a4c-rpc-shape: envelope$cmt$;
+
+COMMENT ON FUNCTION api.delete_organization_unit(uuid) IS
+$cmt$Soft-delete an organization unit (rejects when children or role
+assignments exist). Emits organization_unit.deleted; reads back the
+projection (Pattern A v2). Phase 1 (Step 7.3): normalized to
+has_effective_permission folded into entity-fetch WHERE.
+
+@a4c-rpc-shape: envelope$cmt$;
+
+COMMENT ON FUNCTION api.deactivate_organization_unit(uuid) IS
+$cmt$Deactivate an organization unit with cascade-effect-tracking for
+descendants. Emits organization_unit.deactivated; reads back the projection
+(Pattern A v2). Phase 1 (Step 7.4): normalized to has_effective_permission
+folded into entity-fetch WHERE.
+
+@a4c-rpc-shape: envelope$cmt$;
+
+COMMENT ON FUNCTION api.reactivate_organization_unit(uuid) IS
+$cmt$Reactivate an organization unit with parent-active validation and
+cascade-effect tracking. Returns `cascadedReactivations` (symmetric with
+deactivate's `cascadedDeactivations`). Emits organization_unit.reactivated;
+reads back the projection (Pattern A v2). Phase 1 (Step 7.5): normalized to
+has_effective_permission folded into entity-fetch WHERE.
+
+@a4c-rpc-shape: envelope$cmt$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 8.6-8.7 — 2 role mutations (read — wire-shape; not state-mutation)
+-- -----------------------------------------------------------------------------
+
+COMMENT ON FUNCTION api.bulk_assign_role(uuid, uuid[], ltree, uuid, text) IS
+$cmt$Assign multiple users to a role at a given scope path in a single
+operation. Returns `{successful, failed, totalRequested, totalSucceeded,
+totalFailed, correlationId}` (no top-level success discriminator). Phase 1
+(Step 7.6): normalized to two-branch has_permission + has_effective_permission
+gate (preserves the prior body's distinct error strings for frontend
+discrimination). Inner FOREACH membership check updated from
+current_organization_id to canonical accessible_organizations @> (PR #67
+convention). Consumed via apiRpc<T> (read helper) by SupabaseRoleService.
+
+@a4c-rpc-shape: read$cmt$;
+
+COMMENT ON FUNCTION api.sync_role_assignments(uuid, uuid[], uuid[], ltree, uuid, text) IS
+$cmt$Sync role membership at a scope: assign to one set of users, revoke
+from another, in a single operation. Returns `{added: {successful, failed},
+removed: {successful, failed}, correlationId}` (no top-level success
+discriminator). Phase 1 (Step 7.7): same normalization as bulk_assign_role.
+Consumed via apiRpc<T> (read helper) by SupabaseRoleService.
+
+@a4c-rpc-shape: read$cmt$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 8.8-8.10 — 3 OU readers (read)
+-- -----------------------------------------------------------------------------
+
+COMMENT ON FUNCTION api.get_organization_unit_by_id(uuid) IS
+$cmt$Get a single organization unit (root org or sub-OU) by ID. Returns
+empty result set when the user lacks view_ou permission at the OU's scope.
+Up-front has_permission gate raises insufficient_privilege for zero-
+permission callers. Phase 1 (Step 7.8): normalized to per-row
+has_effective_permission folded into WHERE clause; up-front
+has_permission gate restored (F3 fold-in 2026-06-01 — without it,
+zero-permission users got empty result instead of HTTP 403).
+
+@a4c-rpc-shape: read$cmt$;
+
+COMMENT ON FUNCTION api.get_organization_unit_descendants(uuid) IS
+$cmt$Get all descendants of an organizational unit (org or sub-OU).
+Per-row has_effective_permission filtering correctly handles multi-scope
+grants where the user may have view_ou at some descendants but not others.
+Up-front has_permission gate raises insufficient_privilege for zero-
+permission callers. Phase 1 (Step 7.9): same F3 fold-in as Step 7.8.
+
+@a4c-rpc-shape: read$cmt$;
+
+COMMENT ON FUNCTION api.get_organization_units(text, text) IS
+$cmt$List all organization units the caller has view_ou permission for,
+filtered by status and optional search term. Per-row
+has_effective_permission filtering for multi-scope grant correctness.
+Up-front has_permission gate raises insufficient_privilege for zero-
+permission callers. Phase 1 (Step 7.10): same F3 fold-in as Steps 7.8/7.9.
+
+@a4c-rpc-shape: read$cmt$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 8 assertion — every api.* function carries an @a4c-rpc-shape tag
+-- -----------------------------------------------------------------------------
+--
+-- SQL-level enforcement of the frontend codegen's `UncategorizedRpcs = never`
+-- invariant. If any api.* function lacks `@a4c-rpc-shape: envelope|read` in
+-- its COMMENT ON FUNCTION, the migration RAISE EXCEPTIONs immediately —
+-- preventing a deploy of untagged RPCs that would break compile-time helper
+-- narrowing.
+--
+-- Idempotent: re-run on the same state produces the same outcome (either
+-- success or the same failure). Catches:
+--   - New api.* functions added without a tag.
+--   - DROP+CREATE migrations that dropped the OID-keyed comment without
+--     re-issuing the tag.
+--   - The 10 Step 7 RPCs above if any of the COMMENT ON FUNCTION statements
+--     failed silently (e.g., signature drift).
+
+DO $$
+DECLARE
+  v_untagged_count integer;
+  v_first_untagged text;
+  v_untagged_list  text;
+BEGIN
+  SELECT
+    COUNT(*),
+    MIN(p.proname),
+    string_agg(p.proname, ', ' ORDER BY p.proname)
+  INTO v_untagged_count, v_first_untagged, v_untagged_list
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  LEFT JOIN pg_description d ON d.objoid = p.oid AND d.objsubid = 0
+  WHERE n.nspname = 'api'
+    AND p.prokind = 'f'
+    AND (
+      d.description IS NULL
+      OR d.description !~ '@a4c-rpc-shape:\s*(envelope|read)\b'
+    );
+
+  IF v_untagged_count > 0 THEN
+    RAISE EXCEPTION
+      'Phase 1 Step 8 assertion failed: % api.* function(s) lack @a4c-rpc-shape '
+      'tag. First untagged: api.%. Full list: %. Add COMMENT ON FUNCTION ... '
+      'IS ''... @a4c-rpc-shape: envelope|read ...'' for each untagged RPC.',
+      v_untagged_count, v_first_untagged, v_untagged_list
+      USING ERRCODE = 'P9001';
+  END IF;
+
+  RAISE NOTICE 'Phase 1 Step 8 assertion: all api.* functions carry @a4c-rpc-shape tag (UncategorizedRpcs = never)';
+END $$;
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 9-15 pending)
 -- =============================================================================
