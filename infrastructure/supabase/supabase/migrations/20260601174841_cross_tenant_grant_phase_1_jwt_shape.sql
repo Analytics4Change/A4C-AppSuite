@@ -19,7 +19,7 @@
 --                   + modified existing sync_accessible_organizations for
 --                   UNION-canonical invariant)
 --   [x] Step 5  — one-time backfill DO-block (helper-based; carries M1)
---   [ ] Step 6  — composite partial index on cross_tenant_access_grants_projection
+--   [x] Step 6  — composite partial index on cross_tenant_access_grants_projection
 --   [ ] Step 7  — 10 C-legacy RPC normalizations
 --   [ ] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
 --   [ ] Step 9  — authorization_type CHECK constraint
@@ -1001,5 +1001,96 @@ END $$;
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 6-15 pending)
+-- Step 6 — Composite partial index closing the auth-hook query gap
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 6 + plan.md N1 fold-in (both indexes stay):
+--
+--   `CREATE INDEX idx_access_grants_consultant_user_status_partial
+--    ON public.cross_tenant_access_grants_projection (consultant_user_id, status)
+--    WHERE status='active';`
+--
+-- Existing index landscape (baseline_v4:14095-14131):
+--   - idx_access_grants_authorization_type — by authorization_type
+--   - idx_access_grants_consultant_org      — by consultant_org_id (full)
+--   - idx_access_grants_consultant_user     — partial on (consultant_user_id)
+--                                             WHERE consultant_user_id IS NOT NULL
+--                                             [serves user-keyed lookups; does NOT
+--                                              encode status filter]
+--   - idx_access_grants_expires             — partial on (expires_at, status)
+--                                             WHERE expires_at IS NOT NULL
+--                                             AND status IN ('active','suspended')
+--   - idx_access_grants_granted_by          — by (granted_by, granted_at)
+--   - idx_access_grants_lookup              — partial on (consultant_org_id,
+--                                             provider_org_id, status)
+--                                             WHERE status='active' [serves the
+--                                             org+provider pair lookup; does NOT
+--                                             leading-column on consultant_user_id]
+--   - idx_access_grants_provider_org        — by provider_org_id (full)
+--   - idx_access_grants_scope               — by scope (full)
+--   - idx_access_grants_status              — by status (full)
+--   - idx_access_grants_suspended           — partial on (expected_resolution_date)
+--                                             WHERE status='suspended'
+--
+-- The auth-hook's user-specific query in Step 1's compute_effective_permissions:
+--
+--   WHERE g.consultant_user_id = p_user_id
+--     AND g.status = 'active'
+--     AND (g.expires_at IS NULL OR g.expires_at > now())
+--
+-- Neither existing index serves this efficiently:
+--   - idx_access_grants_consultant_user finds user matches but requires reading
+--     all matching rows + filtering by status (potentially many revoked/expired
+--     rows for the same user over their grant lifetime).
+--   - idx_access_grants_status finds all status='active' rows but does NOT
+--     leading-column on consultant_user_id; lookups by user become inefficient.
+--
+-- The new partial index leading-columns on consultant_user_id AND pre-filters
+-- status='active' via the partial predicate. Auth-hook lookup becomes:
+--   1. Index scan on (consultant_user_id=p_user_id) — pre-filtered to active rows
+--   2. Heap fetch for permissions jsonb + expires_at filter
+--
+-- The `status` column is included in the index key (not just the partial
+-- predicate) per the ADR's spec. Technically redundant given the partial WHERE
+-- (every indexed row has status='active'), but: (a) matches the ADR-specified
+-- shape verbatim, (b) enables index-only scans for future queries that need to
+-- check status without heap fetch, (c) negligible storage cost (one short-text
+-- column per active row).
+--
+-- Per plan.md N1: BOTH indexes stay (existing idx_access_grants_consultant_user
+-- serves user-keyed lookups regardless of status; this new index serves the
+-- auth-hook's (consultant_user_id, status='active') access pattern). They are
+-- not redundant — the partial-WHERE predicates are different and address
+-- different query shapes.
+--
+-- Org-wide query (consultant_user_id IS NULL AND consultant_org_id = ANY(...))
+-- is served by the existing idx_access_grants_lookup (partial on
+-- consultant_org_id WHERE status='active') — no new index needed for that
+-- branch.
+--
+-- Idempotent: CREATE INDEX IF NOT EXISTS skips if already present.
+-- Note: regular CREATE INDEX (not CONCURRENTLY) because CONCURRENTLY cannot
+-- run within a transaction. Brief ACCESS EXCLUSIVE lock during creation;
+-- acceptable given the projection is currently small (Stage B probe 2026-05-29
+-- confirmed 0 rows on dev). Phase 2+ prod deployment timing is a future concern.
+
+CREATE INDEX IF NOT EXISTS idx_access_grants_consultant_user_status_partial
+  ON public.cross_tenant_access_grants_projection (consultant_user_id, status)
+  WHERE status = 'active';
+
+COMMENT ON INDEX public.idx_access_grants_consultant_user_status_partial IS
+  'Composite partial index closing the auth-hook query gap (Phase 1 step 6 of '
+  'cross-tenant-access-grant-rollout). Leading-columns on consultant_user_id '
+  'with status pre-filtered to ''active'' via partial predicate. Serves the '
+  'user-specific branch of compute_effective_permissions.grant_derived_perms '
+  '(WHERE g.consultant_user_id = p_user_id AND g.status = ''active''). '
+  'Complements (does not replace) idx_access_grants_consultant_user (partial '
+  'on consultant_user_id IS NOT NULL) which serves user-keyed lookups '
+  'irrespective of status. Org-wide queries (consultant_user_id IS NULL) '
+  'continue to use idx_access_grants_lookup on (consultant_org_id, '
+  'provider_org_id, status) WHERE status=''active''.';
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 7-15 pending)
 -- =============================================================================
