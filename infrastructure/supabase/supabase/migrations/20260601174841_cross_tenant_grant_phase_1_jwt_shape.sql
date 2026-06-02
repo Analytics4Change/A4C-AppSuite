@@ -3216,9 +3216,15 @@ BEGIN
     -- new permissions array. Pre-conditions enforced at handler entry per
     -- plan.md L114-126 DBC.
     WHEN 'access_grant.policy_override_applied' THEN
-      -- Pre-condition: event_data must carry a permissions array
-      IF p_event.event_data->'permissions' IS NULL THEN
-        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: permissions'
+      -- Pre-condition: event_data must carry a permissions JSONB ARRAY
+      -- (F4 fold-in 2026-06-02 architect review: prior draft only checked
+      -- IS NULL; a scalar or object would have silently corrupted the grant
+      -- row's permissions jsonb. The DBC pre-condition at plan.md L116-117
+      -- specifies "well-formed; same shape as cross_tenant_access_grants_
+      -- projection.permissions" which is a jsonb array. Enforce defensively.)
+      IF p_event.event_data->'permissions' IS NULL
+         OR jsonb_typeof(p_event.event_data->'permissions') <> 'array' THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing or non-array required field: permissions'
           USING ERRCODE = 'P9001';
       END IF;
 
@@ -3267,101 +3273,161 @@ COMMENT ON FUNCTION public.process_access_grant_event(record) IS
 -- Step 10.B — 7 permission.defined event emissions
 -- -----------------------------------------------------------------------------
 --
--- Pattern matches 20260430002824:46-54 (PR #43 permission-projection rollout):
--- emit permission.defined event via direct INSERT into domain_events; the
--- existing handle_permission_defined handler (baseline_v4:8711-8732) populates
--- permissions_projection via INSERT...ON CONFLICT (id) DO UPDATE.
+-- Pattern matches 20260430002824:46-54 (PR #43 permission-projection rollout)
+-- BUT WITH THE F2 FOLD-IN CORRECTION: idempotency is enforced via a
+-- pre-condition guard (IF NOT EXISTS check on permissions_projection) rather
+-- than the architecturally-dead `EXCEPTION WHEN unique_violation` pattern.
 --
--- Idempotency at emission: EXCEPTION WHEN unique_violation catches the case
--- where re-running this migration produces a new domain_events stream_id but
--- the handler's INSERT into permissions_projection trips the
--- permissions_projection_applet_action_key UNIQUE (applet, action) constraint
--- (baseline_v4:13976). The exception in the handler propagates back through
--- the BEFORE INSERT trigger; without the EXCEPTION WHEN unique_violation
--- around the INSERT-into-domain_events here, the migration would fail on
--- re-run. With it, re-runs are no-ops.
+-- F2 fold-in 2026-06-02 architect review — dead-code idempotency guard:
+-- The prior pattern wrapped each INSERT into domain_events with
+-- `EXCEPTION WHEN unique_violation THEN NULL`. This pattern is DEAD CODE in
+-- the current process_domain_event trigger architecture because
+-- process_domain_event's `BEGIN ... EXCEPTION WHEN OTHERS` wrapper
+-- (baseline_v4:10804-10809) catches the unique_violation raised by
+-- handle_permission_defined's INSERT into permissions_projection, writes it
+-- to processing_error, and the outer INSERT into domain_events SUCCEEDS. No
+-- exception escapes the trigger to the DO block. Re-running the migration
+-- silently creates N additional failed domain_events rows per emission, each
+-- visible in the admin dashboard — the OPPOSITE of the intended idempotent
+-- no-op. The PR #43 precedent has the same defect but ran once cleanly so
+-- no failed events ever materialized; Step 10 would multiply the blast radius
+-- 7x by inheriting the broken pattern.
+--
+-- Corrected idempotency form: precondition guard via IF NOT EXISTS on
+-- permissions_projection (the canonical source-of-truth for "is this
+-- permission seeded"). If the row exists, skip the emit entirely. If not,
+-- emit the event → handle_permission_defined INSERTs the row → idempotent
+-- across re-runs because re-runs find the row and skip.
 --
 -- Permission scope_type:
---   - grant.* permissions are platform-management actions. scope_type='global'
---     because grant lifecycle is administered at platform level, not at any
---     specific org's scope.
---   - partner.* permissions are scope-bound (apply to a specific grant target).
---     scope_type='resource' because the resource (grant) defines the scope.
+--   - permissions_projection_scope_type_check (baseline_v4:13237) enumerates
+--     only ('global', 'org'). 'resource' is NOT a valid value (CHECK violation
+--     would silently fail via the WHEN OTHERS path above).
+--   - grant.* permissions are platform-management actions →
+--     scope_type='global' (matches existing organization.create / .activate
+--     / .deactivate precedent in seeds/001-permissions-seed.sql L48-78).
+--   - partner.* permissions are org-bound: they apply at provider_org scope
+--     and are filtered at JWT issuance by the grant row's window. →
+--     scope_type='org' (matches client.* / medication.* precedent in seeds
+--     L157-239). F1 fold-in 2026-06-02 architect review: prior draft used
+--     'resource' which violates the CHECK.
 --
 -- requires_mfa:
---   - grant.revoke is destructive → requires_mfa=true (matches existing
---     destructive-action precedent like user.delete).
---   - grant.create, grant.view, and the 4 partner.* perms → requires_mfa=false.
+--   - grant.revoke is destructive AND cross-tenant (HIPAA-significant
+--     destructive grant ops). requires_mfa=true introduces a NEW PRECEDENT —
+--     no existing permission in the seed file sets requires_mfa=true. The
+--     gate is defensible on its own merits; documenting this as a new
+--     precedent (F3 fold-in 2026-06-02 architect review: prior draft falsely
+--     claimed user.delete sets requires_mfa=true; user.delete is actually
+--     false per seeds/001-permissions-seed.sql L385).
+--   - All other 6 perms → requires_mfa=false (matches the existing
+--     uniform-false convention across all seed entries).
+
+-- F2 fold-in 2026-06-02: precondition-guarded emits. Each DO block checks
+-- whether the (applet, action) row already exists in permissions_projection;
+-- if so, skip the emit (true idempotency). If not, emit → handle_permission_
+-- defined INSERTs the row. Re-runs are byte-correct no-ops.
 
 DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "grant", "action": "create", "description": "Create a new cross-tenant access grant (Phase 2+ emitter; gated for platform admins + future consultant-org admins)", "scope_type": "global", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.create for Phase 2+ emit RPC"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'grant' AND action = 'create'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "grant", "action": "create", "description": "Create a new cross-tenant access grant (Phase 2+ emitter; gated for platform admins + future consultant-org admins)", "scope_type": "global", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.create for Phase 2+ emit RPC"}'::jsonb
+    );
+  END IF;
 END $$;
 
 DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "grant", "action": "view", "description": "View cross-tenant access grant records and grant lifecycle history", "scope_type": "global", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.view"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'grant' AND action = 'view'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "grant", "action": "view", "description": "View cross-tenant access grant records and grant lifecycle history", "scope_type": "global", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.view"}'::jsonb
+    );
+  END IF;
 END $$;
 
 DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "grant", "action": "revoke", "description": "Revoke an active cross-tenant access grant (destructive; immediate effect on JWT issuance via compute_effective_permissions filter)", "scope_type": "global", "requires_mfa": true}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.revoke (MFA-required destructive action)"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'grant' AND action = 'revoke'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "grant", "action": "revoke", "description": "Revoke an active cross-tenant access grant (destructive; immediate effect on JWT issuance via compute_effective_permissions filter)", "scope_type": "global", "requires_mfa": true}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.revoke (NEW MFA precedent for HIPAA-significant cross-tenant destructive action)"}'::jsonb
+    );
+  END IF;
 END $$;
 
--- 4 partner.* permissions seeded by var_default template (Step 15)
+-- 4 partner.* permissions seeded by var_default template (Step 15).
+-- F1 fold-in 2026-06-02: scope_type='org' (was 'resource' — CHECK violation).
+-- partner.* perms are org-scoped (the grant's provider_org) and filtered at
+-- JWT issuance by the grant row's status='active' AND in-window window.
 DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "partner", "action": "view_analytics", "description": "View usage analytics data via VAR partnership grant (PHI-restricted by var_default terms)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_analytics (var_default template member)"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "partner", "action": "view_support_tickets", "description": "View provider org support tickets via VAR partnership grant (PHI-restricted)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_support_tickets (var_default template member)"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "partner", "action": "view_billing_reports", "description": "View provider org billing/usage reports via VAR partnership grant (PHI-restricted)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_billing_reports (var_default template member)"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'partner' AND action = 'view_analytics'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "partner", "action": "view_analytics", "description": "View usage analytics data via VAR partnership grant (PHI-restricted by var_default terms)", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_analytics (var_default template member)"}'::jsonb
+    );
+  END IF;
 END $$;
 
 DO $$ BEGIN
-  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
-  VALUES (
-    gen_random_uuid(), 'permission', 1, 'permission.defined',
-    '{"applet": "partner", "action": "export_reports", "description": "Export VAR partnership reports as files (analytics, support, billing — PHI-restricted)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
-    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.export_reports (var_default template member)"}'::jsonb
-  );
-EXCEPTION WHEN unique_violation THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'partner' AND action = 'view_support_tickets'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "partner", "action": "view_support_tickets", "description": "View provider org support tickets via VAR partnership grant (PHI-restricted)", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_support_tickets (var_default template member)"}'::jsonb
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'partner' AND action = 'view_billing_reports'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "partner", "action": "view_billing_reports", "description": "View provider org billing/usage reports via VAR partnership grant (PHI-restricted)", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_billing_reports (var_default template member)"}'::jsonb
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permissions_projection
+    WHERE applet = 'partner' AND action = 'export_reports'
+  ) THEN
+    INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+    VALUES (
+      gen_random_uuid(), 'permission', 1, 'permission.defined',
+      '{"applet": "partner", "action": "export_reports", "description": "Export VAR partnership reports as files (analytics, support, billing — PHI-restricted)", "scope_type": "org", "requires_mfa": false}'::jsonb,
+      '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.export_reports (var_default template member)"}'::jsonb
+    );
+  END IF;
 END $$;
 
 

@@ -87,8 +87,10 @@ BEGIN
     -- REPLACES (not merges) permissions jsonb. Pre-conditions enforced per
     -- plan.md L114-126 DBC.
     WHEN 'access_grant.policy_override_applied' THEN
-      IF p_event.event_data->'permissions' IS NULL THEN
-        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: permissions'
+      -- Pre-condition: event_data must carry a permissions JSONB ARRAY.
+      IF p_event.event_data->'permissions' IS NULL
+         OR jsonb_typeof(p_event.event_data->'permissions') <> 'array' THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing or non-array required field: permissions'
           USING ERRCODE = 'P9001';
       END IF;
 
