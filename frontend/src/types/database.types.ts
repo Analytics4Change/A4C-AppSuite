@@ -2829,6 +2829,7 @@ export type Database = {
       }
       cross_tenant_access_grants_projection: {
         Row: {
+          authorization_reference: string | null
           authorization_type: string
           consultant_org_id: string
           consultant_user_id: string | null
@@ -2858,6 +2859,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          authorization_reference?: string | null
           authorization_type: string
           consultant_org_id: string
           consultant_user_id?: string | null
@@ -2887,6 +2889,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          authorization_reference?: string | null
           authorization_type?: string
           consultant_org_id?: string
           consultant_user_id?: string | null
@@ -3105,6 +3108,42 @@ export type Database = {
           projection_tables?: string[] | null
           requires_approval?: boolean | null
           stream_type?: string
+        }
+        Relationships: []
+      }
+      grant_role_templates: {
+        Row: {
+          authorization_type: string
+          created_at: string
+          created_by: string | null
+          default_terms: Json
+          id: string
+          is_active: boolean
+          permission_name: string
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          authorization_type: string
+          created_at?: string
+          created_by?: string | null
+          default_terms?: Json
+          id?: string
+          is_active?: boolean
+          permission_name: string
+          template_name: string
+          updated_at?: string
+        }
+        Update: {
+          authorization_type?: string
+          created_at?: string
+          created_by?: string | null
+          default_terms?: Json
+          id?: string
+          is_active?: boolean
+          permission_name?: string
+          template_name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3616,16 +3655,19 @@ export type Database = {
           created_at: string | null
           implies_permission_id: string
           permission_id: string
+          propagate_through_grants: boolean
         }
         Insert: {
           created_at?: string | null
           implies_permission_id: string
           permission_id: string
+          propagate_through_grants?: boolean
         }
         Update: {
           created_at?: string | null
           implies_permission_id?: string
           permission_id?: string
+          propagate_through_grants?: boolean
         }
         Relationships: [
           {
@@ -5657,6 +5699,10 @@ export type Database = {
       }
       process_user_event: {
         Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
+      recompute_user_accessible_organizations: {
+        Args: { p_user_id: string }
         Returns: undefined
       }
       retry_failed_bootstrap: {
