@@ -26,7 +26,7 @@
 --   [x] Step 10 — access_grant.policy_override_applied handler + perm-defined events
 --   [x] Step 11 — 170-RPC @a4c-bucket/@a4c-consultant-callable/@a4c-phase-target backfill
 --   [x] Step 14 — authorization_reference column + CHECK + index + handler ext
---   [ ] Step 15 — grant_role_templates table + RLS + seed
+--   [x] Step 15 — grant_role_templates table + RLS + seed (var_default)
 --
 -- Step 12 (codegen) and Step 13 (CI workflow) ship as file additions, not SQL.
 --
@@ -4106,6 +4106,215 @@ COMMENT ON FUNCTION public.process_access_grant_event(record) IS
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Step 15 pending)
+-- Step 15 — grant_role_templates table + RLS + var_default template seed
 -- =============================================================================
--- (Steps 12-13 are file additions — codegen script + CI workflow — not SQL.)
+--
+-- Per ADR Phase 1 manifest step 15 (Phase 0.4 Decision C.2):
+-- (a) CREATE TABLE public.grant_role_templates (mirrors role_permission_templates
+--     structure with the addition of authorization_type + default_terms jsonb).
+-- (b) RLS policies mirroring role_permission_templates: public read,
+--     service_role read, super_admin-only write.
+-- (c) Two indexes per ADR spec:
+--       idx_grant_role_templates_active   (partial on is_active=true)
+--       idx_grant_role_templates_authtype (on authorization_type for type-keyed
+--                                          template lookups)
+-- (d) Seed `var_default` template: 4 rows × `partner.*` permissions ×
+--     {"phi_restricted": true} default_terms per ADR L247-250.
+--
+-- Authorization_type CHECK mirrors Step 9 (5-value enumeration). Constraint
+-- name `grant_role_templates_authorization_type_check` is 46 bytes (fits the
+-- NAMEDATALEN-1=63 limit cleanly).
+--
+-- Unique constraint on (template_name, authorization_type, permission_name)
+-- prevents duplicate template member entries. Mirrors
+-- `role_permission_templates_unique` (which keys on role_name, permission_name).
+--
+-- Permission name format: applet.action (e.g., partner.view_analytics) — same
+-- convention as role_permission_templates.permission_name. No FK to
+-- permissions_projection (the latter keys on UUID id, not text name); operator
+-- responsibility to ensure permission_name maps to a seeded permission. The 4
+-- partner.* permissions are seeded by Step 10's permission.defined events;
+-- they exist by the time Step 15's seed runs.
+--
+-- Pre-flight context (Stage B probe 2026-05-29): table does not yet exist on
+-- dev. CREATE TABLE IF NOT EXISTS is the canonical idempotent form. ON
+-- CONFLICT DO NOTHING on the unique constraint makes the seed re-run-safe.
+--
+-- Phase 2 reference flow: when the future emit RPC
+-- api.create_access_grant is invoked, it can look up the var_default template
+-- by (template_name='var_default', authorization_type='var_contract') to
+-- snapshot the 4 partner.* permission rows into the new grant's
+-- permissions jsonb. The default_terms jsonb is also snapshotted at grant
+-- creation time per Decision B hybrid-snapshot pattern (no live join at
+-- JWT issuance — see Step 1's compute_effective_permissions for the
+-- enforcement side).
+
+-- -----------------------------------------------------------------------------
+-- Step 15a — CREATE TABLE grant_role_templates
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.grant_role_templates (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  template_name       text NOT NULL,
+  authorization_type  text NOT NULL,
+  permission_name     text NOT NULL,
+  default_terms       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  is_active           boolean NOT NULL DEFAULT true,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now(),
+  created_by          uuid
+);
+
+ALTER TABLE public.grant_role_templates OWNER TO postgres;
+
+-- Authorization_type CHECK mirrors Step 9 (5-value enumeration). Constraint
+-- name is 46 bytes; fits NAMEDATALEN-1=63 cleanly.
+ALTER TABLE public.grant_role_templates
+  DROP CONSTRAINT IF EXISTS grant_role_templates_authorization_type_check;
+
+ALTER TABLE public.grant_role_templates
+  ADD CONSTRAINT grant_role_templates_authorization_type_check
+  CHECK (authorization_type IN (
+    'var_contract',
+    'court_order',
+    'family_participation',
+    'social_services_assignment',
+    'emergency_access'
+  ));
+
+-- Unique constraint prevents duplicate template member entries.
+ALTER TABLE public.grant_role_templates
+  DROP CONSTRAINT IF EXISTS grant_role_templates_unique;
+
+ALTER TABLE public.grant_role_templates
+  ADD CONSTRAINT grant_role_templates_unique
+  UNIQUE (template_name, authorization_type, permission_name);
+
+COMMENT ON TABLE public.grant_role_templates IS
+  'Per-authorization-type permission templates for cross-tenant access grants. '
+  'Phase 1 of cross-tenant-access-grant-rollout (step 15) seeds the var_default '
+  'template (4 partner.* permissions × {"phi_restricted": true} default_terms) '
+  'per Phase 0.4 Decision C.2. Phase 2+ emit RPC api.create_access_grant looks '
+  'up the appropriate template at grant creation time and snapshots both the '
+  'permission set AND the default_terms into the new grant row (hybrid-snapshot '
+  'pattern per Decision B). No live join at JWT issuance — '
+  'compute_effective_permissions reads the snapshotted permissions jsonb '
+  'directly. Platform owners can extend templates via SQL or future Admin UI.';
+
+COMMENT ON COLUMN public.grant_role_templates.template_name IS
+  'Template identifier (e.g., var_default). Used by Phase 2+ emit RPC to look '
+  'up the template member set at grant creation time.';
+
+COMMENT ON COLUMN public.grant_role_templates.authorization_type IS
+  'Must match one of the 5 enumerated authorization_type values that '
+  'cross_tenant_access_grants_projection.authorization_type accepts. CHECK '
+  'constraint mirrors Step 9.';
+
+COMMENT ON COLUMN public.grant_role_templates.permission_name IS
+  'Permission identifier in <applet>.<action> format (e.g., '
+  'partner.view_analytics). No FK to permissions_projection (the latter keys '
+  'on UUID, not text name); operator responsibility to ensure the name maps '
+  'to a seeded permission. The 4 partner.* perms used by var_default are '
+  'seeded by Step 10''s permission.defined events.';
+
+COMMENT ON COLUMN public.grant_role_templates.default_terms IS
+  'HIPAA-default terms snapshot at template level (e.g., {"phi_restricted": true}). '
+  'Phase 2 emit RPC copies this jsonb into cross_tenant_access_grants_projection.terms '
+  'at grant creation time per the hybrid-snapshot pattern (Decision B).';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 15b — Indexes
+-- -----------------------------------------------------------------------------
+
+CREATE INDEX IF NOT EXISTS idx_grant_role_templates_active
+  ON public.grant_role_templates (is_active)
+  WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_grant_role_templates_authtype
+  ON public.grant_role_templates (authorization_type);
+
+COMMENT ON INDEX public.idx_grant_role_templates_active IS
+  'Partial index on is_active=true for "find active templates" queries '
+  '(Phase 2+ template browser UI). Mirrors role_permission_templates pattern.';
+
+COMMENT ON INDEX public.idx_grant_role_templates_authtype IS
+  'Index on authorization_type for type-keyed template lookups (e.g., '
+  'Phase 2+ emit RPC: "find the template for var_contract grants"). Each '
+  'authorization_type may have multiple templates over time (e.g., '
+  'var_default + future var_enhanced); lookup expected to filter by '
+  '(authorization_type, template_name, is_active=true).';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 15c — RLS policies (mirror role_permission_templates)
+-- -----------------------------------------------------------------------------
+
+ALTER TABLE public.grant_role_templates ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS grant_role_templates_read ON public.grant_role_templates;
+DROP POLICY IF EXISTS grant_role_templates_service_role_select ON public.grant_role_templates;
+DROP POLICY IF EXISTS grant_role_templates_write ON public.grant_role_templates;
+
+-- Public read: templates are reference data, callable by any authenticated
+-- user (template content is not sensitive — it's the permission set that
+-- emergency_access/var_contract grants project into permissions jsonb).
+CREATE POLICY grant_role_templates_read
+  ON public.grant_role_templates
+  FOR SELECT
+  USING (true);
+
+-- Service role read (Edge Functions, Temporal workers).
+CREATE POLICY grant_role_templates_service_role_select
+  ON public.grant_role_templates
+  FOR SELECT
+  TO service_role
+  USING (true);
+
+-- Write: super_admin only via user_roles_projection check. Mirrors
+-- role_permission_templates_write verbatim.
+CREATE POLICY grant_role_templates_write
+  ON public.grant_role_templates
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.user_roles_projection ur
+      JOIN public.roles_projection r ON r.id = ur.role_id
+      WHERE ur.user_id = (SELECT auth.uid())
+        AND r.name = 'super_admin'
+    )
+  );
+
+
+-- -----------------------------------------------------------------------------
+-- Step 15d — var_default template seed (4 rows)
+-- -----------------------------------------------------------------------------
+--
+-- Per ADR L247-250 Decision C.2:
+--   ('var_default', 'var_contract', 'partner.view_analytics',       '{"phi_restricted": true}')
+--   ('var_default', 'var_contract', 'partner.view_support_tickets', '{"phi_restricted": true}')
+--   ('var_default', 'var_contract', 'partner.view_billing_reports', '{"phi_restricted": true}')
+--   ('var_default', 'var_contract', 'partner.export_reports',       '{"phi_restricted": true}')
+--
+-- Idempotent via ON CONFLICT (template_name, authorization_type,
+-- permission_name) DO NOTHING. Re-runs are no-ops (no updates either —
+-- conflict resolution is "ignore", matching the seeded-data semantic).
+--
+-- Phase 2+ extension: additional templates (var_enhanced, court_default,
+-- etc.) added in subsequent migrations via the same INSERT...ON CONFLICT
+-- pattern. The 4-row var_default seed here is the Phase 1 floor.
+
+INSERT INTO public.grant_role_templates
+  (template_name, authorization_type, permission_name, default_terms)
+VALUES
+  ('var_default', 'var_contract', 'partner.view_analytics',       '{"phi_restricted": true}'::jsonb),
+  ('var_default', 'var_contract', 'partner.view_support_tickets', '{"phi_restricted": true}'::jsonb),
+  ('var_default', 'var_contract', 'partner.view_billing_reports', '{"phi_restricted": true}'::jsonb),
+  ('var_default', 'var_contract', 'partner.export_reports',       '{"phi_restricted": true}'::jsonb)
+ON CONFLICT (template_name, authorization_type, permission_name) DO NOTHING;
+
+
+-- =============================================================================
+-- End of Phase 1 migration — all 15 manifest steps + 2 file-addition steps
+-- (12, 13) complete. Stage E smoke harness is the next gate before deploy.
+-- =============================================================================
