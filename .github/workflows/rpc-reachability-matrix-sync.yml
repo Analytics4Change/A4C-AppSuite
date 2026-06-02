@@ -1,0 +1,167 @@
+name: RPC Reachability Matrix Sync
+
+# Asserts that documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md
+# is in sync with the database state produced by applying the migration
+# directory to a clean local Supabase container. Two failure modes:
+#
+#   1. Untagged api.* RPCs — a migration added/changed an api.* function
+#      without the four required tags in `COMMENT ON FUNCTION`:
+#        @a4c-bucket, @a4c-consultant-callable, @a4c-phase-target
+#        (@a4c-consultant-callable-reason is optional but recommended).
+#   2. The committed matrix doc diverges from the generated output — a
+#      migration changed the api.* surface but the developer didn't run
+#      `npm run gen:rpc-reachability-matrix`.
+#
+# Both fail closed and tell the developer what to do. The generator script
+# at frontend/scripts/gen-rpc-reachability-matrix.cjs is idempotent.
+#
+# CI anchor: a fresh `supabase start` container seeded from the migrations
+# directory. Deterministic by design (does NOT consult a remote/dev DB).
+# Mirrors the M3 RPC Shape Registry sync workflow's pattern verbatim.
+#
+# Phase 1 step 13 of cross-tenant-access-grant-rollout.
+
+on:
+  pull_request:
+    paths:
+      - 'infrastructure/supabase/supabase/migrations/**'
+      - 'documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md'
+      - 'frontend/scripts/gen-rpc-reachability-matrix.cjs'
+      - '.github/workflows/rpc-reachability-matrix-sync.yml'
+
+jobs:
+  matrix-sync:
+    name: Verify reachability-matrix doc matches migration state
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+
+      # Same baseline-first staging pattern as rpc-registry-sync.yml.
+      # `supabase start` auto-applies any migrations in supabase/migrations/
+      # on first init AND requires the `api` schema to exist for PostgREST
+      # health checks to pass. Strategy: keep ONLY baseline_v4 in the dir
+      # during supabase start (it creates the `api` schema and the foundational
+      # structures), stage the rest aside. After start succeeds, restore the
+      # rest and apply via the phased manual flow below.
+      - name: Stage post-baseline migrations aside
+        working-directory: infrastructure/supabase
+        run: |
+          mkdir supabase/migrations.staged
+          for f in supabase/migrations/*.sql; do
+            base=$(basename "$f")
+            if [[ "$base" != "20260212010625_baseline_v4.sql" ]]; then
+              mv "$f" supabase/migrations.staged/
+            fi
+          done
+          ls supabase/migrations/
+
+      - name: Start local Supabase container
+        working-directory: infrastructure/supabase
+        run: |
+          supabase start
+          supabase status
+
+      - name: Restore staged migrations
+        working-directory: infrastructure/supabase
+        run: |
+          mv supabase/migrations.staged/*.sql supabase/migrations/
+          rmdir supabase/migrations.staged
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      # Same three-phase migration application as rpc-registry-sync.yml:
+      # baseline (already applied) → post-baseline through 20260506012315 →
+      # permissions seed → remaining migrations. The 20260506190626 migration's
+      # postcondition requires the permissions seed to have populated the
+      # projection. See rpc-registry-sync.yml's annotated comment block for
+      # the full rationale.
+      - name: Apply migrations and seed permissions in phased order
+        working-directory: infrastructure/supabase
+        env:
+          PGPASSWORD: postgres
+        run: |
+          PSQL_CMD="psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -v ON_ERROR_STOP=1"
+          BASELINE_TS="20260212010625"
+          BOUNDARY_TS="20260506012315"
+
+          echo "::group::Phase 1 - Post-baseline migrations through and including ${BOUNDARY_TS}"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            ts=${base%%_*}
+            if [[ "$ts" == "$BASELINE_TS" ]]; then
+              echo "Skipping $base (already applied by supabase start)"
+              continue
+            fi
+            if [[ "$ts" > "$BOUNDARY_TS" ]]; then
+              echo "Stopping at $base (will apply after seed)"
+              break
+            fi
+            echo "Applying $base"
+            ${PSQL_CMD} -f "$f"
+          done
+          echo "::endgroup::"
+
+          echo "::group::Phase 2 - Seed permissions (mirrors dev/prod post-baseline state)"
+          ${PSQL_CMD} -f sql/99-seeds/001-permissions-seed.sql
+          echo "::endgroup::"
+
+          echo "::group::Phase 3 - Apply remaining migrations after ${BOUNDARY_TS}"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            ts=${base%%_*}
+            if [[ "$ts" > "$BOUNDARY_TS" ]]; then
+              echo "Applying $base"
+              ${PSQL_CMD} -f "$f"
+            fi
+          done
+          echo "::endgroup::"
+
+          echo "::group::Phase 4 - Record applied migrations in supabase_migrations.schema_migrations"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base=$(basename "$f")
+            ts=${base%%_*}
+            ${PSQL_CMD} -c "INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('${ts}', '${base%.sql}') ON CONFLICT DO NOTHING;" 2>/dev/null || true
+          done
+          echo "::endgroup::"
+
+      - name: Regenerate matrix doc against local container
+        working-directory: frontend
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          npm ci --no-audit --no-fund
+          node scripts/gen-rpc-reachability-matrix.cjs
+
+      - name: Assert no diff in matrix doc
+        run: |
+          DOC_PATH="documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md"
+          if ! git diff --exit-code "$DOC_PATH"; then
+            echo "::error::${DOC_PATH} is out of sync with the migration state."
+            echo "::error::Run \`node frontend/scripts/gen-rpc-reachability-matrix.cjs\` locally and commit the result."
+            echo "::error::See documentation/architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md § Phase 1 step 12-13."
+            exit 1
+          fi
+          echo "OK: matrix doc matches migration state"
+
+      # No separate untagged-RPC assertion needed: gen-rpc-reachability-matrix.cjs
+      # itself exits non-zero on untagged functions (its `untagged` array check
+      # fails fast before writing). The regeneration step above will fail if
+      # any api.* function lacks the four required tags.
+
+      - name: Tear down container
+        if: always()
+        working-directory: infrastructure/supabase
+        run: supabase stop --no-backup || true
