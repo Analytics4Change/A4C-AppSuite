@@ -25,7 +25,7 @@
 --   [x] Step 9  — authorization_type CHECK constraint (5 values)
 --   [x] Step 10 — access_grant.policy_override_applied handler + perm-defined events
 --   [x] Step 11 — 170-RPC @a4c-bucket/@a4c-consultant-callable/@a4c-phase-target backfill
---   [ ] Step 14 — authorization_reference column + CHECK + index + handler ext
+--   [x] Step 14 — authorization_reference column + CHECK + index + handler ext
 --   [ ] Step 15 — grant_role_templates table + RLS + seed
 --
 -- Step 12 (codegen) and Step 13 (CI workflow) ship as file additions, not SQL.
@@ -3845,6 +3845,267 @@ END $$;
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 14-15 pending)
+-- Step 14 — authorization_reference column + CHECK + index + handler extension
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 14 (Phase 0.4 Decision C.4):
+-- (a) ADD COLUMN authorization_reference uuid to
+--     cross_tenant_access_grants_projection.
+-- (b) ADD CONSTRAINT enforcing authorization_reference IS NOT NULL OR
+--     authorization_type = 'emergency_access' (emergency grants may not have
+--     a formal reference document; all other authorization types MUST cite one).
+-- (c) ADD partial index WHERE authorization_reference IS NOT NULL — supports
+--     lookups by authorization_reference (Phase 2+ uses for grant-by-reference
+--     queries on var_partnerships_projection joins).
+-- (d) CREATE OR REPLACE process_access_grant_event extending the
+--     access_grant.created branch (baseline_v4:10417-10451) to populate
+--     authorization_reference from (event_data->>'authorization_reference')::uuid.
+--     This is the SECOND rewrite of this router in Phase 1 — Step 10 added the
+--     policy_override_applied branch + Rule 8 ELSE fix. Step 14 preserves all
+--     of Step 10's changes and ADDs the new column to the INSERT.
+--
+-- Constraint name length: `cross_tenant_access_grants_projection_auth_ref_check`
+-- is 52 bytes (the natural `_authorization_reference_check` form is 67 bytes,
+-- exceeding NAMEDATALEN-1 = 63 limit and would silently truncate). The
+-- abbreviated form mirrors the same architectural class as Step 9 but fits
+-- the limit cleanly.
+--
+-- Pre-flight context (Stage B probe 2026-05-29): row count = 0 on dev. The
+-- ALTER TABLE ADD COLUMN validates zero rows; the ADD CONSTRAINT validates
+-- zero rows. On prod (Phase 2+ activation), if any active grant carries
+-- authorization_reference IS NULL AND authorization_type != 'emergency_access',
+-- the ADD CONSTRAINT FAILS by design — catches schema-open-hole exploitation
+-- before propagation. Idempotent via the IF NOT EXISTS / DROP IF EXISTS
+-- + ADD pattern established in Steps 2, 6, 9.
+--
+-- Interaction with Step 9: Step 9's authorization_type CHECK enumerates 5
+-- values including 'emergency_access'. Step 14's CHECK references that value
+-- — if Step 9's enumeration ever drops 'emergency_access', Step 14's CHECK
+-- becomes effectively NOT NULL.
+--
+-- Interaction with Step 15: Step 15's grant_role_templates table is referenced
+-- via authorization_reference for grants whose authorization_type is
+-- 'var_contract' (the var_default template ties var_partnerships rows to
+-- grants via this column). Step 15 ships AFTER Step 14 because grant_role_
+-- templates depends on the authorization_reference column existing.
+
+-- -----------------------------------------------------------------------------
+-- Step 14a — ALTER TABLE ADD COLUMN
+-- -----------------------------------------------------------------------------
+
+ALTER TABLE public.cross_tenant_access_grants_projection
+  ADD COLUMN IF NOT EXISTS authorization_reference uuid;
+
+COMMENT ON COLUMN public.cross_tenant_access_grants_projection.authorization_reference IS
+  'UUID reference to the authoritative document/record backing this grant '
+  '(e.g., var_partnerships_projection.id for var_contract grants, '
+  'court_authorizations_projection.id for court_order grants — Phase N tables). '
+  'NULL is permitted ONLY when authorization_type = ''emergency_access'' '
+  '(emergency grants may not have a formal reference document at issuance time). '
+  'Phase 1 step 14 of cross-tenant-access-grant-rollout per Phase 0.4 Decision C.4.';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 14b — CHECK constraint (NOT NULL or emergency_access)
+-- -----------------------------------------------------------------------------
+
+ALTER TABLE public.cross_tenant_access_grants_projection
+  DROP CONSTRAINT IF EXISTS cross_tenant_access_grants_projection_auth_ref_check;
+
+ALTER TABLE public.cross_tenant_access_grants_projection
+  ADD CONSTRAINT cross_tenant_access_grants_projection_auth_ref_check
+  CHECK (
+    authorization_reference IS NOT NULL
+    OR authorization_type = 'emergency_access'
+  );
+
+COMMENT ON CONSTRAINT cross_tenant_access_grants_projection_auth_ref_check
+  ON public.cross_tenant_access_grants_projection IS
+  'Enforces authorization_reference is non-null EXCEPT for emergency_access '
+  'grants. Emergency grants are the only authorization_type where a formal '
+  'reference document is not required at issuance (e.g., crisis access during '
+  'workflow disruption). All other authorization types (var_contract, '
+  'court_order, family_participation, social_services_assignment) MUST cite '
+  'a backing document. Phase 1 step 14 of cross-tenant-access-grant-rollout. '
+  'Constraint name abbreviated (auth_ref vs authorization_reference) to fit '
+  'PostgreSQL NAMEDATALEN-1 = 63 byte limit.';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 14c — Partial index on authorization_reference
+-- -----------------------------------------------------------------------------
+--
+-- Supports lookups by authorization_reference (Phase 2+ join patterns:
+-- e.g., "given a var_partnerships_projection.id, find all grants that cite
+-- it" — useful for partnership-termination cascade scenarios). Partial WHERE
+-- excludes NULL rows (emergency_access grants) which are typically a small
+-- fraction of the projection. Standard partial-index storage efficiency.
+
+CREATE INDEX IF NOT EXISTS idx_access_grants_authorization_reference_partial
+  ON public.cross_tenant_access_grants_projection (authorization_reference)
+  WHERE authorization_reference IS NOT NULL;
+
+COMMENT ON INDEX public.idx_access_grants_authorization_reference_partial IS
+  'Partial index on authorization_reference for lookup-by-reference query '
+  'patterns (Phase 2+ var_partnerships → grants reverse-lookup, etc.). '
+  'Partial WHERE excludes emergency_access grants (which carry NULL '
+  'authorization_reference per the auth_ref_check constraint). '
+  'Phase 1 step 14 of cross-tenant-access-grant-rollout.';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 14d — Extend process_access_grant_event.access_grant.created branch
+-- -----------------------------------------------------------------------------
+--
+-- SECOND rewrite of this router in Phase 1 (Step 10 added the
+-- policy_override_applied branch + Rule 8 ELSE fix). Step 14 preserves all
+-- of Step 10's changes and ADDS authorization_reference to the
+-- access_grant.created branch's INSERT.
+--
+-- The handler reference file at
+-- infrastructure/supabase/handlers/routers/process_access_grant_event.sql
+-- is updated to match below (per CLAUDE.md Rule 7.1).
+
+CREATE OR REPLACE FUNCTION public.process_access_grant_event(p_event record)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  v_grant_id UUID;
+BEGIN
+  CASE p_event.event_type
+
+    WHEN 'access_grant.created' THEN
+      -- Step 14 extension: authorization_reference column added at end of
+      -- INSERT (preserves column order from Step 10 + extends).
+      INSERT INTO cross_tenant_access_grants_projection (
+        id, consultant_org_id, consultant_user_id, provider_org_id,
+        scope, scope_id, authorization_type, legal_reference,
+        granted_by, granted_at, expires_at, permissions, terms,
+        status, created_at, updated_at,
+        authorization_reference
+      ) VALUES (
+        p_event.stream_id,
+        safe_jsonb_extract_uuid(p_event.event_data, 'consultant_org_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'consultant_user_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'provider_org_id'),
+        safe_jsonb_extract_text(p_event.event_data, 'scope'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'scope_id'),
+        safe_jsonb_extract_text(p_event.event_data, 'authorization_type'),
+        safe_jsonb_extract_text(p_event.event_data, 'legal_reference'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'granted_by'),
+        p_event.created_at,
+        safe_jsonb_extract_timestamp(p_event.event_data, 'expires_at'),
+        COALESCE(p_event.event_data->'permissions', '[]'::jsonb),
+        COALESCE(p_event.event_data->'terms', '{}'::jsonb),
+        'active',
+        p_event.created_at,
+        p_event.created_at,
+        safe_jsonb_extract_uuid(p_event.event_data, 'authorization_reference')
+      );
+
+    WHEN 'access_grant.revoked' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'revoked',
+          revoked_at = p_event.created_at,
+          revoked_by = safe_jsonb_extract_uuid(p_event.event_data, 'revoked_by'),
+          revocation_reason = safe_jsonb_extract_text(p_event.event_data, 'revocation_reason'),
+          revocation_details = safe_jsonb_extract_text(p_event.event_data, 'revocation_details'),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    WHEN 'access_grant.expired' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'expired',
+          expired_at = p_event.created_at,
+          expiration_type = safe_jsonb_extract_text(p_event.event_data, 'expiration_type'),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    WHEN 'access_grant.suspended' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'suspended',
+          suspended_at = p_event.created_at,
+          suspended_by = safe_jsonb_extract_uuid(p_event.event_data, 'suspended_by'),
+          suspension_reason = safe_jsonb_extract_text(p_event.event_data, 'suspension_reason'),
+          suspension_details = safe_jsonb_extract_text(p_event.event_data, 'suspension_details'),
+          expected_resolution_date = safe_jsonb_extract_timestamp(p_event.event_data, 'expected_resolution_date'),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    WHEN 'access_grant.reactivated' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'active',
+          suspended_at = NULL, suspended_by = NULL,
+          suspension_reason = NULL, suspension_details = NULL,
+          expected_resolution_date = NULL,
+          reactivated_at = p_event.created_at,
+          reactivated_by = safe_jsonb_extract_uuid(p_event.event_data, 'reactivated_by'),
+          resolution_details = safe_jsonb_extract_text(p_event.event_data, 'resolution_details'),
+          expires_at = COALESCE(
+            safe_jsonb_extract_timestamp(p_event.event_data, 'new_expires_at'),
+            expires_at
+          ),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    -- Phase 1 Step 10 — Decision B.3 policy override application.
+    -- Handler-only; emit RPC api.revoke_permission_across_grants ships Phase 2.
+    -- F4 fold-in 2026-06-02 (Step 10 architect review): added jsonb_typeof
+    -- check on permissions.
+    WHEN 'access_grant.policy_override_applied' THEN
+      IF p_event.event_data->'permissions' IS NULL
+         OR jsonb_typeof(p_event.event_data->'permissions') <> 'array' THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing or non-array required field: permissions'
+          USING ERRCODE = 'P9001';
+      END IF;
+
+      IF COALESCE(p_event.event_data->>'override_reason', '') = '' THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: override_reason'
+          USING ERRCODE = 'P9001';
+      END IF;
+
+      UPDATE cross_tenant_access_grants_projection
+      SET permissions = p_event.event_data->'permissions',
+          updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Grant not found for policy_override_applied'
+          USING ERRCODE = 'P0002';
+      END IF;
+
+    ELSE
+      -- Phase 1 Step 10 — Rule 8 drift correction (RAISE WARNING → RAISE
+      -- EXCEPTION P9001). Warnings are invisible to process_domain_event;
+      -- exceptions are caught and persisted to processing_error.
+      RAISE EXCEPTION 'Unhandled event type "%" in process_access_grant_event', p_event.event_type
+        USING ERRCODE = 'P9001';
+  END CASE;
+
+END;
+$function$;
+
+ALTER FUNCTION public.process_access_grant_event(record) OWNER TO postgres;
+
+COMMENT ON FUNCTION public.process_access_grant_event(record) IS
+  'Main access grant event processor — handles cross-tenant grant lifecycle '
+  'with CQRS compliance. Phase 1 of cross-tenant-access-grant-rollout: '
+  'Step 10 added access_grant.policy_override_applied branch (handler-only '
+  'per Decision B.3; emit RPC ships Phase 2) + Rule 8 drift correction on '
+  'ELSE (RAISE WARNING → RAISE EXCEPTION P9001). Step 14 extends the '
+  'access_grant.created branch to populate authorization_reference from '
+  '(event_data->>''authorization_reference'')::uuid per Phase 0.4 Decision C.4 '
+  '(the column is added by Step 14a; CHECK constraint enforces NON-NULL '
+  'except for emergency_access via Step 14b).';
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Step 15 pending)
 -- =============================================================================
 -- (Steps 12-13 are file additions — codegen script + CI workflow — not SQL.)
