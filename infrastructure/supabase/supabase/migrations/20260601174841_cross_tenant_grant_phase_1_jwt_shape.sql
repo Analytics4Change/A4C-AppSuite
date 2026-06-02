@@ -231,8 +231,16 @@ grant_derived_perms AS (
       g.consultant_user_id = p_user_id
       OR (
         g.consultant_user_id IS NULL
-        AND g.consultant_org_id = ANY(
-          (SELECT accessible_orgs FROM user_accessible_orgs)
+        -- Bugfix 2026-06-02 (Stage E deploy): the architect-suggested form
+        -- `ANY((SELECT accessible_orgs FROM CTE))` is interpreted by PG as a
+        -- scalar subquery returning rows of `uuid[]`, then ANY(<row>) tries
+        -- to compare scalar uuid against the uuid[] row value → operator
+        -- does not exist: uuid = uuid[]. The EXISTS form with column
+        -- reference resolves correctly: `ANY(uao.accessible_orgs)` is then
+        -- ANY(uuid[]) array-element semantics, the canonical pattern.
+        AND EXISTS (
+          SELECT 1 FROM user_accessible_orgs uao
+          WHERE g.consultant_org_id = ANY(uao.accessible_orgs)
         )
       )
     )
@@ -2999,7 +3007,13 @@ BEGIN
     AND p.prokind = 'f'
     AND (
       d.description IS NULL
-      OR d.description !~ '@a4c-rpc-shape:\s*(envelope|read)\b'
+      -- Stage E deploy bugfix 2026-06-02: PG's ARE regex `\b` (word boundary)
+      -- is silently treated as no-op / no-match on this PG instance (likely
+      -- ARE-vs-ERE-vs-quoting variation; M3 backfill `20260430172625:87`
+      -- uses the same pattern but masks the bug since it has no assertion
+      -- gate). PG-specific `\y` is documented end-of-word and works
+      -- correctly. Equivalent semantic; correct execution.
+      OR d.description !~ '@a4c-rpc-shape:\s*(envelope|read)\y'
     );
 
   IF v_untagged_count > 0 THEN
@@ -3825,10 +3839,13 @@ BEGIN
       -- per-prefix. PG POSIX regex matches alternation left-to-right at each
       -- position; a bare `A` alternative listed before `A-variant` would
       -- greedy-match `A` on `@a4c-bucket: A-variant` (the position between `A`
-      -- and `-` satisfies `\b`), silently masking malformed values like
-      -- `@a4c-bucket: A-something-junk`. Listing the variants first ensures
-      -- the assertion fails on garbage rather than accepting `A` as a prefix.
-      OR d.description !~ '@a4c-bucket:\s*(A-variant|A|B|C|D-variant|D|E-variant|E)\b'
+      -- and `-` satisfies word boundary), silently masking malformed values
+      -- like `@a4c-bucket: A-something-junk`. Listing the variants first
+      -- ensures the assertion fails on garbage rather than accepting `A` as a
+      -- prefix. Stage E deploy bugfix 2026-06-02: replaced PG ARE `\b` with
+      -- PG-specific `\y` after `\b` was found to silently fail-no-match on
+      -- this PG instance (same root cause as the Step 8 fix above).
+      OR d.description !~ '@a4c-bucket:\s*(A-variant|A|B|C|D-variant|D|E-variant|E)\y'
       OR d.description !~ '@a4c-consultant-callable:\s*\S+'
       OR d.description !~ '@a4c-phase-target:\s*\S+'
     );
