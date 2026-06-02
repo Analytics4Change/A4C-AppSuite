@@ -2837,7 +2837,7 @@ $$;
 -- backfill DO block + body-introspection rule to know which tag each RPC
 -- carries.
 --
--- Shape classification (body introspection per `20260430172625_*.sql:77-83`):
+-- Shape classification (body introspection per `20260430172625_*.sql:74-83`):
 --   `envelope` IFF returns jsonb/json AND body contains `'success', true|false`
 --   `read` otherwise
 --
@@ -3066,8 +3066,11 @@ COMMENT ON CONSTRAINT cross_tenant_access_grants_projection_authorization_type_c
   'court_order, family_participation, social_services_assignment, '
   'emergency_access. Closes the schema-open hole that previously allowed '
   'silent invalid writes. The projection COMMENT (baseline_v4:12516) and '
-  'provider-partners-architecture.md L324 are kept in sync with this '
-  'enumeration (Phase 1 step 9 of cross-tenant-access-grant-rollout).';
+  'provider-partners-architecture.md (L313 canonical TS type union; L345 '
+  'interface field repeat) are kept in sync with this enumeration '
+  '(Phase 1 step 9 of cross-tenant-access-grant-rollout). Note L513 '
+  'declares a NARROWER 3-value enumeration for a different table — not '
+  'this column.';
 
 
 -- =============================================================================
