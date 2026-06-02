@@ -24,7 +24,7 @@
 --   [x] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
 --   [x] Step 9  — authorization_type CHECK constraint (5 values)
 --   [x] Step 10 — access_grant.policy_override_applied handler + perm-defined events
---   [ ] Step 11 — 170-RPC @a4c-bucket tag backfill
+--   [x] Step 11 — 170-RPC @a4c-bucket/@a4c-consultant-callable/@a4c-phase-target backfill
 --   [ ] Step 14 — authorization_reference column + CHECK + index + handler ext
 --   [ ] Step 15 — grant_role_templates table + RLS + seed
 --
@@ -3432,5 +3432,409 @@ END $$;
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 11-15 pending)
+-- Step 11 — 170-RPC @a4c-bucket / @a4c-consultant-callable / @a4c-phase-target
 -- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 11: backfill COMMENT ON FUNCTION tags for ALL
+-- api.* RPCs with @a4c-bucket + @a4c-consultant-callable +
+-- @a4c-consultant-callable-reason (when applicable) + @a4c-phase-target per
+-- the Phase 0.3 matrix (Stage R reconciled 2026-05-29; scope expanded from
+-- 104 → 170). Must happen BEFORE Step 12 (codegen) so the script has
+-- deterministic input.
+--
+-- Post-Step-7 transformation: the 10 C-legacy RPCs (the must-pair set with
+-- Step 1's DISTINCT ON tightening) flip from `C-legacy` to `C` post-
+-- normalization. The mapping below reflects the POST-Phase-1 state, so the
+-- 10 are tagged `@a4c-bucket: C`.
+--
+-- Mapping source: documentation/architecture/authorization/cross-tenant-
+-- access-grant-rpc-reachability-matrix.md § The matrix (170 rows). Extracted
+-- mechanically by parsing the markdown table — names verified against live
+-- pg_proc (Stage B probe 5 / Stage R reconciliation set diff).
+--
+-- Idempotency: COMMENT ON FUNCTION has replace-semantics. Re-runs strip any
+-- prior @a4c-* tags from the existing description and re-apply the canonical
+-- set from this mapping. Existing prose (e.g., from baseline_v4 or PR-#43-
+-- style manually-written comments) is preserved by appending the tag block
+-- to whatever remains after the strip.
+--
+-- F2 lesson from Step 10 (per architect 2026-06-02): COMMENT ON FUNCTION
+-- does NOT emit domain events — it's pure pg_catalog metadata. So the
+-- dead-code EXCEPTION WHEN unique_violation guard pattern does not apply
+-- here. COMMENT is naturally idempotent.
+--
+-- Bucket → derived tags rule:
+--   A             → callable=no, phase=3, reason=early-return tenancy guard
+--                   (PR #66 pattern); forward-incompatible with grant-bearers;
+--                   Phase 3 refactor target.
+--   A-variant     → same as A (RAISE-not-RETURN variant of strict-A).
+--   B             → callable=no, phase=none, reason=JWT-bound; consultant
+--                   variant deferred to case-by-case Phase 2+ work.
+--   C             → callable=yes, phase=none, reason=scope-path-bound
+--                   has_effective_permission; forward-compatible with
+--                   multi-scope grants.
+--   D             → callable=pending-phase4-rls, phase=4, reason=entity-lookup
+--                   with RLS-enforced tenancy; per-table RLS audit in Phase 4.
+--   D-variant     → same as D (admin-override branch + load-bearing RLS).
+--   E             → callable=yes, phase=none, reason=no tenancy context;
+--                   grant-irrelevant by default. Per-RPC sub-classification
+--                   ([admin-only] / [service-role-only] / [pre-auth] /
+--                   [emitter-primitive]) deferred to a follow-up that the
+--                   matrix-doc codegen (Step 12) will surface.
+--   E-variant     → same as E (mixed self-context + org-admin predicate).
+--
+-- Assertion: a final scan verifies that EVERY api.* function carries the
+-- @a4c-bucket tag. Functions in pg_proc.api.* that were NOT in the matrix-
+-- doc mapping (e.g., added in unrelated work after 2026-05-29 Stage R
+-- reconciliation) RAISE EXCEPTION so the deploy fails fast — surfaces
+-- post-reconciliation drift immediately rather than letting it propagate
+-- into the codegen output.
+
+DO $$
+DECLARE
+  v_mapping jsonb := $json$
+  [
+    {"n":"add_client_address","b":"B"}
+    ,{"n":"add_client_email","b":"B"}
+    ,{"n":"add_client_funding_source","b":"B"}
+    ,{"n":"add_client_insurance","b":"B"}
+    ,{"n":"add_client_phone","b":"B"}
+    ,{"n":"add_user_phone","b":"D"}
+    ,{"n":"admit_client","b":"B"}
+    ,{"n":"assign_client_contact","b":"B"}
+    ,{"n":"assign_client_to_user","b":"B"}
+    ,{"n":"assign_user_to_schedule","b":"C"}
+    ,{"n":"batch_update_field_definitions","b":"B"}
+    ,{"n":"bulk_assign_role","b":"C"}
+    ,{"n":"change_client_placement","b":"B"}
+    ,{"n":"check_field_definitions_exist","b":"E"}
+    ,{"n":"check_invitation_acceptance_eligibility","b":"E"}
+    ,{"n":"check_organization_by_name","b":"E"}
+    ,{"n":"check_organization_by_slug","b":"E"}
+    ,{"n":"check_pending_invitation","b":"D"}
+    ,{"n":"check_user_exists","b":"E"}
+    ,{"n":"check_user_invitation_existence","b":"E"}
+    ,{"n":"check_user_org_membership","b":"D"}
+    ,{"n":"create_field_category","b":"B"}
+    ,{"n":"create_field_definition","b":"B"}
+    ,{"n":"create_organization_address","b":"C"}
+    ,{"n":"create_organization_contact","b":"C"}
+    ,{"n":"create_organization_phone","b":"C"}
+    ,{"n":"create_organization_unit","b":"C"}
+    ,{"n":"create_role","b":"B"}
+    ,{"n":"create_schedule_template","b":"C"}
+    ,{"n":"deactivate_all_field_definitions","b":"E"}
+    ,{"n":"deactivate_field_category","b":"B"}
+    ,{"n":"deactivate_field_definition","b":"B"}
+    ,{"n":"deactivate_organization","b":"E"}
+    ,{"n":"deactivate_organization_unit","b":"C"}
+    ,{"n":"deactivate_role","b":"B"}
+    ,{"n":"deactivate_schedule_template","b":"C"}
+    ,{"n":"deactivate_user","b":"E"}
+    ,{"n":"delete_field_category","b":"B"}
+    ,{"n":"delete_field_definition","b":"B"}
+    ,{"n":"delete_organization_address","b":"C"}
+    ,{"n":"delete_organization_contact","b":"C"}
+    ,{"n":"delete_organization","b":"E"}
+    ,{"n":"delete_organization_phone","b":"C"}
+    ,{"n":"delete_organization_unit","b":"C"}
+    ,{"n":"delete_role","b":"B"}
+    ,{"n":"delete_schedule_template","b":"C"}
+    ,{"n":"delete_user","b":"E"}
+    ,{"n":"discharge_client","b":"B"}
+    ,{"n":"dismiss_failed_event","b":"E"}
+    ,{"n":"emit_domain_event","b":"E"}
+    ,{"n":"emit_workflow_started_event","b":"E"}
+    ,{"n":"end_client_placement","b":"B"}
+    ,{"n":"find_contacts_by_phone","b":"D"}
+    ,{"n":"get_addresses_by_org","b":"D"}
+    ,{"n":"get_assignable_roles","b":"D"}
+    ,{"n":"get_bootstrap_status","b":"D"}
+    ,{"n":"get_category_field_count","b":"B"}
+    ,{"n":"get_child_organizations","b":"E"}
+    ,{"n":"get_client","b":"B"}
+    ,{"n":"get_contacts_by_org","b":"D"}
+    ,{"n":"get_current_org_unit","b":"B"}
+    ,{"n":"get_emails_by_org","b":"D"}
+    ,{"n":"get_event_processing_stats","b":"E"}
+    ,{"n":"get_events_by_correlation","b":"E"}
+    ,{"n":"get_events_by_session","b":"E"}
+    ,{"n":"get_failed_events","b":"E"}
+    ,{"n":"get_failed_events_with_detail","b":"E"}
+    ,{"n":"get_field_usage_count","b":"B"}
+    ,{"n":"get_invitation_by_id","b":"D"}
+    ,{"n":"get_invitation_by_org_and_email","b":"D"}
+    ,{"n":"get_invitation_by_token","b":"D"}
+    ,{"n":"get_invitation_for_resend","b":"D"}
+    ,{"n":"get_organization_by_id","b":"D"}
+    ,{"n":"get_organization_details","b":"D"}
+    ,{"n":"get_organization_direct_care_settings","b":"D"}
+    ,{"n":"get_organization_name","b":"D"}
+    ,{"n":"get_organizations","b":"E"}
+    ,{"n":"get_organizations_paginated","b":"E"}
+    ,{"n":"get_organization_unit_by_id","b":"C"}
+    ,{"n":"get_organization_unit_descendants","b":"C"}
+    ,{"n":"get_organization_units","b":"C"}
+    ,{"n":"get_orphaned_deletions","b":"E"}
+    ,{"n":"get_pending_invitations_by_org","b":"D"}
+    ,{"n":"get_permission_ids_by_names","b":"E"}
+    ,{"n":"get_permissions","b":"E"}
+    ,{"n":"get_person_phones","b":"D"}
+    ,{"n":"get_phones_by_org","b":"D"}
+    ,{"n":"get_role_by_id","b":"D"}
+    ,{"n":"get_role_by_name_and_org","b":"D"}
+    ,{"n":"get_role_by_name","b":"D"}
+    ,{"n":"get_role_permission_names","b":"D"}
+    ,{"n":"get_role_permission_templates","b":"E"}
+    ,{"n":"get_roles","b":"B"}
+    ,{"n":"get_schedule_template","b":"B"}
+    ,{"n":"get_trace_timeline","b":"E"}
+    ,{"n":"get_user_addresses","b":"D"}
+    ,{"n":"get_user_addresses_for_org","b":"D-variant"}
+    ,{"n":"get_user_by_id","b":"D"}
+    ,{"n":"get_user_notification_preferences","b":"B"}
+    ,{"n":"get_user_org_access","b":"B"}
+    ,{"n":"get_user_org_details","b":"D"}
+    ,{"n":"get_user_permissions","b":"E"}
+    ,{"n":"get_user_phones","b":"D"}
+    ,{"n":"get_user_phones_for_org","b":"D"}
+    ,{"n":"get_user_sms_phones","b":"D"}
+    ,{"n":"list_clients","b":"B"}
+    ,{"n":"list_field_categories","b":"B"}
+    ,{"n":"list_field_definitions","b":"B"}
+    ,{"n":"list_field_definition_templates","b":"E"}
+    ,{"n":"list_invitations","b":"A-variant"}
+    ,{"n":"list_roles_for_user","b":"D"}
+    ,{"n":"list_schedule_templates","b":"D"}
+    ,{"n":"list_system_field_categories","b":"E"}
+    ,{"n":"list_user_client_assignments","b":"D"}
+    ,{"n":"list_user_org_access","b":"E"}
+    ,{"n":"list_user_organizations","b":"E-variant"}
+    ,{"n":"list_users","b":"A"}
+    ,{"n":"list_users_for_bulk_assignment","b":"C"}
+    ,{"n":"list_users_for_role_management","b":"C"}
+    ,{"n":"list_users_for_schedule_management","b":"C"}
+    ,{"n":"modify_user_roles","b":"B"}
+    ,{"n":"reactivate_field_category","b":"B"}
+    ,{"n":"reactivate_field_definition","b":"B"}
+    ,{"n":"reactivate_organization","b":"E"}
+    ,{"n":"reactivate_organization_unit","b":"C"}
+    ,{"n":"reactivate_role","b":"B"}
+    ,{"n":"reactivate_schedule_template","b":"C"}
+    ,{"n":"register_client","b":"B"}
+    ,{"n":"remove_client_address","b":"B"}
+    ,{"n":"remove_client_email","b":"B"}
+    ,{"n":"remove_client_funding_source","b":"B"}
+    ,{"n":"remove_client_insurance","b":"B"}
+    ,{"n":"remove_client_phone","b":"B"}
+    ,{"n":"remove_user_phone","b":"E"}
+    ,{"n":"resend_invitation","b":"E"}
+    ,{"n":"retry_deletion_workflow","b":"E"}
+    ,{"n":"retry_failed_event","b":"E"}
+    ,{"n":"revoke_invitation","b":"D"}
+    ,{"n":"safety_net_deactivate_organization","b":"E"}
+    ,{"n":"soft_delete_organization_addresses","b":"E"}
+    ,{"n":"soft_delete_organization_contacts","b":"E"}
+    ,{"n":"soft_delete_organization_phones","b":"E"}
+    ,{"n":"switch_org_unit","b":"B"}
+    ,{"n":"sync_role_assignments","b":"C"}
+    ,{"n":"sync_schedule_assignments","b":"E"}
+    ,{"n":"unassign_client_contact","b":"B"}
+    ,{"n":"unassign_client_from_user","b":"B"}
+    ,{"n":"unassign_user_from_schedule","b":"C"}
+    ,{"n":"undismiss_failed_event","b":"E"}
+    ,{"n":"update_client_address","b":"B"}
+    ,{"n":"update_client","b":"B"}
+    ,{"n":"update_client_email","b":"B"}
+    ,{"n":"update_client_funding_source","b":"B"}
+    ,{"n":"update_client_insurance","b":"B"}
+    ,{"n":"update_client_phone","b":"B"}
+    ,{"n":"update_field_category","b":"B"}
+    ,{"n":"update_field_definition","b":"B"}
+    ,{"n":"update_organization_address","b":"C"}
+    ,{"n":"update_organization","b":"C"}
+    ,{"n":"update_organization_contact","b":"C"}
+    ,{"n":"update_organization_direct_care_settings","b":"E"}
+    ,{"n":"update_organization_phone","b":"C"}
+    ,{"n":"update_organization_unit","b":"C"}
+    ,{"n":"update_role","b":"B"}
+    ,{"n":"update_schedule_template","b":"C"}
+    ,{"n":"update_user_access_dates","b":"B"}
+    ,{"n":"update_user","b":"D"}
+    ,{"n":"update_user_notification_preferences","b":"D"}
+    ,{"n":"update_user_phone","b":"B"}
+    ,{"n":"validate_role_assignment","b":"C"}
+  ]
+  $json$::jsonb;
+
+  v_entry            jsonb;
+  v_proname          text;
+  v_bucket           text;
+  v_callable         text;
+  v_phase_target     text;
+  v_reason           text;
+  v_overload         record;
+  v_existing_comment text;
+  v_new_comment      text;
+  v_tag_count        integer := 0;
+  v_overload_count   integer := 0;
+  v_missing_in_pg    text := '';
+BEGIN
+  FOR v_entry IN SELECT * FROM jsonb_array_elements(v_mapping)
+  LOOP
+    v_proname := v_entry->>'n';
+    v_bucket  := v_entry->>'b';
+
+    -- Derive callable + phase_target + reason from bucket. Generic per-bucket
+    -- reasons; the matrix doc has richer per-RPC text that the Step 12
+    -- codegen (or a follow-up) can re-emit at full fidelity.
+    CASE v_bucket
+      WHEN 'A' THEN
+        v_callable     := 'pending-phase3-refactor';
+        v_phase_target := '3';
+        v_reason       := 'Early-return tenancy guard (PR #66 strict-A pattern); forward-incompatible with grant-bearers; Phase 3 refactor target.';
+      WHEN 'A-variant' THEN
+        v_callable     := 'pending-phase3-refactor';
+        v_phase_target := '3';
+        v_reason       := 'A-variant: same equality-check shape as strict-A but RAISEs instead of RETURNs; Phase 3 refactor target.';
+      WHEN 'B' THEN
+        v_callable     := 'no';
+        v_phase_target := 'none';
+        v_reason       := 'JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work.';
+      WHEN 'C' THEN
+        v_callable     := 'yes';
+        v_phase_target := 'none';
+        v_reason       := 'Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON.';
+      WHEN 'D' THEN
+        v_callable     := 'pending-phase4-rls';
+        v_phase_target := '4';
+        v_reason       := 'Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4.';
+      WHEN 'D-variant' THEN
+        v_callable     := 'pending-phase4-rls';
+        v_phase_target := '4';
+        v_reason       := 'D-variant: has_platform_privilege() admin-override branch combined with load-bearing RLS; Phase 4 per-table audit applies.';
+      WHEN 'E' THEN
+        v_callable     := 'yes';
+        v_phase_target := 'none';
+        v_reason       := 'No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up.';
+      WHEN 'E-variant' THEN
+        v_callable     := 'yes';
+        v_phase_target := 'none';
+        v_reason       := 'E-variant: sui generis (mixed self-context + org-admin predicate).';
+      ELSE
+        RAISE EXCEPTION 'Step 11 internal error: unknown bucket % for api.%', v_bucket, v_proname
+          USING ERRCODE = 'P9001';
+    END CASE;
+
+    -- Find ALL overloads of api.<proname> in pg_proc. Each overload gets the
+    -- same logical tag set (matrix-doc classification is by function name,
+    -- not by signature). If proname has zero overloads, accumulate into
+    -- v_missing_in_pg for the final assertion.
+    v_overload_count := 0;
+    FOR v_overload IN
+      SELECT p.oid,
+             pg_get_function_identity_arguments(p.oid) AS args,
+             obj_description(p.oid, 'pg_proc') AS existing_comment
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'api'
+        AND p.prokind = 'f'
+        AND p.proname = v_proname
+    LOOP
+      v_existing_comment := COALESCE(v_overload.existing_comment, '');
+
+      -- Strip any prior @a4c-bucket / @a4c-consultant-callable /
+      -- @a4c-consultant-callable-reason / @a4c-phase-target tags. Existing
+      -- @a4c-rpc-shape (M3) is preserved — the regexes target only the four
+      -- Step 11 tags.
+      v_new_comment := regexp_replace(v_existing_comment, '\n*@a4c-bucket:\s*\S+', '', 'g');
+      v_new_comment := regexp_replace(v_new_comment, '\n*@a4c-consultant-callable-reason:[^\n]*', '', 'g');
+      v_new_comment := regexp_replace(v_new_comment, '\n*@a4c-consultant-callable:\s*\S+', '', 'g');
+      v_new_comment := regexp_replace(v_new_comment, '\n*@a4c-phase-target:\s*\S+', '', 'g');
+      v_new_comment := rtrim(v_new_comment);
+
+      IF v_new_comment <> '' THEN
+        v_new_comment := v_new_comment || E'\n\n';
+      END IF;
+
+      v_new_comment := v_new_comment
+                    || '@a4c-bucket: ' || v_bucket || E'\n'
+                    || '@a4c-consultant-callable: ' || v_callable || E'\n'
+                    || '@a4c-consultant-callable-reason: ' || v_reason || E'\n'
+                    || '@a4c-phase-target: ' || v_phase_target;
+
+      EXECUTE format(
+        'COMMENT ON FUNCTION api.%I(%s) IS %L',
+        v_proname, v_overload.args, v_new_comment
+      );
+
+      v_overload_count := v_overload_count + 1;
+      v_tag_count := v_tag_count + 1;
+    END LOOP;
+
+    IF v_overload_count = 0 THEN
+      -- Mapping-doc-says-it-exists-but-pg_proc-disagrees. Accumulate for the
+      -- final assertion below — surfaces matrix-doc drift since 2026-05-29.
+      IF v_missing_in_pg <> '' THEN
+        v_missing_in_pg := v_missing_in_pg || ', ';
+      END IF;
+      v_missing_in_pg := v_missing_in_pg || 'api.' || v_proname;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE 'Phase 1 Step 11 backfill: tagged % api.* function row(s) across % matrix-doc entries with @a4c-bucket/@a4c-consultant-callable/@a4c-phase-target', v_tag_count, jsonb_array_length(v_mapping);
+
+  IF v_missing_in_pg <> '' THEN
+    RAISE WARNING 'Phase 1 Step 11 — matrix-doc entries with no matching api.* function in pg_proc (matrix-doc post-2026-05-29 drift): %', v_missing_in_pg;
+  END IF;
+END $$;
+
+
+-- -----------------------------------------------------------------------------
+-- Step 11 assertion — every api.* function carries the four @a4c-* tags
+-- -----------------------------------------------------------------------------
+--
+-- Catches the inverse drift: api.* functions that exist in pg_proc but were
+-- NOT in the matrix-doc mapping (added by unrelated work after Stage R
+-- reconciliation, or matrix-doc typos that bypassed the loop above).
+-- RAISE EXCEPTION fails the migration deploy fast — surfaces drift
+-- immediately rather than letting it propagate into the Step 12 codegen.
+
+DO $$
+DECLARE
+  v_untagged_count  integer;
+  v_first_untagged  text;
+  v_untagged_list   text;
+BEGIN
+  SELECT
+    COUNT(*),
+    MIN(p.proname),
+    string_agg(p.proname, ', ' ORDER BY p.proname)
+  INTO v_untagged_count, v_first_untagged, v_untagged_list
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  LEFT JOIN pg_description d ON d.objoid = p.oid AND d.objsubid = 0
+  WHERE n.nspname = 'api'
+    AND p.prokind = 'f'
+    AND (
+      d.description IS NULL
+      OR d.description !~ '@a4c-bucket:\s*(A|A-variant|B|C|D|D-variant|E|E-variant)\b'
+      OR d.description !~ '@a4c-consultant-callable:\s*\S+'
+      OR d.description !~ '@a4c-phase-target:\s*\S+'
+    );
+
+  IF v_untagged_count > 0 THEN
+    RAISE EXCEPTION
+      'Phase 1 Step 11 assertion failed: % api.* function(s) lack required @a4c-bucket / @a4c-consultant-callable / @a4c-phase-target tags. First untagged: api.%. Full list: %. These functions either post-date the 2026-05-29 Stage R reconciliation OR the matrix-doc mapping in this step missed them. Update the matrix doc + this step''s v_mapping JSONB.',
+      v_untagged_count, v_first_untagged, v_untagged_list
+      USING ERRCODE = 'P9001';
+  END IF;
+
+  RAISE NOTICE 'Phase 1 Step 11 assertion: all api.* functions carry @a4c-bucket + @a4c-consultant-callable + @a4c-phase-target tags (matrix-doc deterministic input ready for Step 12 codegen)';
+END $$;
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 14-15 pending)
+-- =============================================================================
+-- (Steps 12-13 are file additions — codegen script + CI workflow — not SQL.)
