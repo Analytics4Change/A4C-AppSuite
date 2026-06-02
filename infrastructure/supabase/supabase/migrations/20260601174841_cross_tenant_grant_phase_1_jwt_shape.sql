@@ -3678,7 +3678,7 @@ DECLARE
   v_new_comment      text;
   v_tag_count        integer := 0;
   v_overload_count   integer := 0;
-  v_missing_in_pg    text := '';
+  v_matrix_entries_absent_from_pg    text := '';
 BEGIN
   FOR v_entry IN SELECT * FROM jsonb_array_elements(v_mapping)
   LOOP
@@ -3712,7 +3712,10 @@ BEGIN
       WHEN 'D-variant' THEN
         v_callable     := 'pending-phase4-rls';
         v_phase_target := '4';
-        v_reason       := 'D-variant: has_platform_privilege() admin-override branch combined with load-bearing RLS; Phase 4 per-table audit applies.';
+        -- N1 fold-in 2026-06-02: match the E branch's "deferred follow-up"
+        -- forward-pointer so future readers see the deferral at the
+        -- pg_description surface, not just the migration header.
+        v_reason       := 'D-variant: has_platform_privilege() admin-override branch combined with load-bearing RLS; Phase 4 per-table audit applies. Per-RPC sub-classification (e.g., [admin-only] vs strict-D) deferred to Step 12 codegen follow-up.';
       WHEN 'E' THEN
         v_callable     := 'yes';
         v_phase_target := 'none';
@@ -3729,7 +3732,7 @@ BEGIN
     -- Find ALL overloads of api.<proname> in pg_proc. Each overload gets the
     -- same logical tag set (matrix-doc classification is by function name,
     -- not by signature). If proname has zero overloads, accumulate into
-    -- v_missing_in_pg for the final assertion.
+    -- v_matrix_entries_absent_from_pg for the final assertion.
     v_overload_count := 0;
     FOR v_overload IN
       SELECT p.oid,
@@ -3775,17 +3778,17 @@ BEGIN
     IF v_overload_count = 0 THEN
       -- Mapping-doc-says-it-exists-but-pg_proc-disagrees. Accumulate for the
       -- final assertion below — surfaces matrix-doc drift since 2026-05-29.
-      IF v_missing_in_pg <> '' THEN
-        v_missing_in_pg := v_missing_in_pg || ', ';
+      IF v_matrix_entries_absent_from_pg <> '' THEN
+        v_matrix_entries_absent_from_pg := v_matrix_entries_absent_from_pg || ', ';
       END IF;
-      v_missing_in_pg := v_missing_in_pg || 'api.' || v_proname;
+      v_matrix_entries_absent_from_pg := v_matrix_entries_absent_from_pg || 'api.' || v_proname;
     END IF;
   END LOOP;
 
   RAISE NOTICE 'Phase 1 Step 11 backfill: tagged % api.* function row(s) across % matrix-doc entries with @a4c-bucket/@a4c-consultant-callable/@a4c-phase-target', v_tag_count, jsonb_array_length(v_mapping);
 
-  IF v_missing_in_pg <> '' THEN
-    RAISE WARNING 'Phase 1 Step 11 — matrix-doc entries with no matching api.* function in pg_proc (matrix-doc post-2026-05-29 drift): %', v_missing_in_pg;
+  IF v_matrix_entries_absent_from_pg <> '' THEN
+    RAISE WARNING 'Phase 1 Step 11 — matrix-doc entries with no matching api.* function in pg_proc (matrix-doc post-2026-05-29 drift): %', v_matrix_entries_absent_from_pg;
   END IF;
 END $$;
 
@@ -3818,7 +3821,14 @@ BEGIN
     AND p.prokind = 'f'
     AND (
       d.description IS NULL
-      OR d.description !~ '@a4c-bucket:\s*(A|A-variant|B|C|D|D-variant|E|E-variant)\b'
+      -- F1 fold-in 2026-06-02 architect review: alternation ORDERED LONGEST-FIRST
+      -- per-prefix. PG POSIX regex matches alternation left-to-right at each
+      -- position; a bare `A` alternative listed before `A-variant` would
+      -- greedy-match `A` on `@a4c-bucket: A-variant` (the position between `A`
+      -- and `-` satisfies `\b`), silently masking malformed values like
+      -- `@a4c-bucket: A-something-junk`. Listing the variants first ensures
+      -- the assertion fails on garbage rather than accepting `A` as a prefix.
+      OR d.description !~ '@a4c-bucket:\s*(A-variant|A|B|C|D-variant|D|E-variant|E)\b'
       OR d.description !~ '@a4c-consultant-callable:\s*\S+'
       OR d.description !~ '@a4c-phase-target:\s*\S+'
     );
