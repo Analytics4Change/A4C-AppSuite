@@ -175,6 +175,50 @@ Each checkbox = one manifest step. Refer to ADR § Consequences → Phase 1 migr
 
 ## Stage E — Smoke & UAT (per plan.md § Smoke / UAT strategy)
 
+### Stage E smoke results 2026-06-02
+
+**Batch 1 — Schema-level structural checks (10/10 PASS)**: verified Steps 2 column, 4 trigger + helper function, 6 partial index, 9 + 14b CHECK constraints, 14a column, 14c partial index, 15a table + 3 RLS policies all correctly deployed via information_schema / pg_indexes / pg_constraint / pg_policies queries.
+
+**Batch 2 — Dynamic behavior tests via test-grant INSERTs against live user 093c0e7b in org 2d0829ae (provider_org 43ede501)**:
+
+| Test | Coverage | Verdict |
+|---|---|---|
+| **14b CHECK rejects** `var_contract` + NULL auth_ref | Step 14b enforcement | ✅ 23514 with constraint name |
+| **14b CHECK permits** `emergency_access` + NULL auth_ref | Step 14b emergency carve-out | ✅ INSERT succeeded |
+| **N2 defensive guard** soft-deleted user skipped by helper | Step 4a `deleted_at IS NULL` filter | ✅ Stage B test user 61cbb03f was soft-deleted; helper correctly no-op'd |
+| **Test 1: INSERT** grant → trigger fires → user accessible_orgs gains provider_org | Step 4 sync_accessible_organizations_from_grants INSERT path + Step 4a helper | ✅ user_orgs went `[2d0829ae]` → `[2d0829ae, 43ede501]` |
+| **Test 4: compute_effective_permissions** returns grant-derived row | Step 1 grant_derived_perms CTE end-to-end | ✅ `partner.view_analytics` at scope `acme` returned |
+| **Test 2: UPDATE status='revoked'** → trigger fires → user loses provider_org + grant perm vanishes | Step 4 UPDATE TG_OP + Step 1 status='active' filter | ✅ accessible_orgs back to `[2d0829ae]`; grant_perm count = 0 |
+| **Test 3: DELETE** grant → trigger fires → user loses provider_org | Step 4 DELETE TG_OP | ✅ accessible_orgs restored after DELETE |
+| **Test 7a: HIPAA invariant** (propagate_through_grants=false default) | Step 2 column default + Step 1 grant-source implication arm 4 gated | ✅ `client.create` in output; `client.view` (implied) NOT propagated through grant |
+| **Test 7b: HIPAA flip** (propagate_through_grants=true) → implication propagates | Step 1 arm 4 fires when flag flipped | ✅ Both `client.create` AND `client.view` in output at same scope; flag restored to false post-test |
+| **Test 5: empty/NULL accessible_orgs user** — architect-mandated edge case | Step 1 EXISTS rewrite handles `ANY(NULL/empty)` correctly | ✅ User with NULL accessible_orgs gets 0 grant-derived rows even though matching org-wide grant exists |
+| **Test 6: DISTINCT ON multi-scope same-perm** — Step 1 load-bearing tightening | Step 1 outer DISTINCT ON `(permission_name, scope_path)` | ✅ Two rows for `client.create` at distinct scopes survive (pre-Phase-1 would have collapsed to ONE row via LIMIT-1) |
+
+**Cleanup verified**: all test grants deleted; user 093c0e7b accessible_orgs restored to `[2d0829ae]`; permission_implications.propagate_through_grants restored to FALSE; cross_tenant_access_grants_projection row count = 0.
+
+**Coverage map**:
+- ✅ Step 1 grant_derived_perms (Tests 4, 5, 6, 7a, 7b)
+- ✅ Step 1 outer DISTINCT ON tightening (Test 6)
+- ✅ Step 1 EXISTS rewrite bugfix (Test 5)
+- ✅ Step 2 propagate_through_grants column + default + gating semantics (Tests 7a + 7b)
+- ✅ Step 4 trigger TG_OP × INSERT/UPDATE/DELETE (Tests 1 + 2 + 3)
+- ✅ Step 4a helper + N2 soft-delete guard (defensive guard test)
+- ✅ Step 9 authorization_type enumeration (used in 14b emergency_access path)
+- ✅ Step 14a authorization_reference column (used in all INSERT tests)
+- ✅ Step 14b CHECK constraint both directions (rejects var_contract+NULL, accepts emergency_access+NULL)
+- ✅ Step 15 var_default seed (Batch 1 confirmed 4 rows + 3 RLS policies)
+
+**Probes deferred / not run in this batch** (Stage F PR-review can pre-flight these if needed):
+- Step 3 custom_access_token_hook v5 — exercised by every real JWT issuance against dev (no dedicated probe needed; latency re-measure indirectly validated)
+- Step 7 normalized RPCs — already validated by deploy success (assertion would have caught untagged); functional regression smoke deferred to PR open
+- Step 10 access_grant.policy_override_applied handler — handler-only, no emit RPC yet (Phase 2 testing surface)
+- Step 11 matrix tag backfill — deploy assertion passed (all 170 tagged)
+- Step 12 codegen + Step 13 CI workflow — fires on first PR touching relevant paths
+- Stage B-style baseline build-green re-run on regenerated database.types.ts (post type-regen)
+
+
+
 - [ ] Transactional smoke harness: single-org user (today's shape) — JWT structure unchanged, permission counts unchanged
 - [ ] Transactional smoke harness: simulated multi-org consultant — JWT includes grant-derived entries; `has_effective_permission` TRUE at grant scope; `accessible_organizations @>` TRUE at grant target org
 - [ ] DISTINCT ON edge case: role-only widens by `nlevel ASC`
