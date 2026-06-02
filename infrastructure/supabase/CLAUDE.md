@@ -83,6 +83,25 @@ supabase migration repair --status reverted <version>
 
 **Note**: Docker/Podman is required for some Supabase CLI commands. Set `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock` if using Podman.
 
+### PG ARE regex word-boundary: use `\y`, not `\b`
+
+On the deployed hosted Supabase PG instance, `\b` (documented as word-boundary in PG ARE per docs § 9.7.3.3) silently fails to match at end-of-input positions:
+
+```sql
+'envelope' ~ 'envelope\b'  -- → false  (BUG — should be true)
+'envelope' ~ 'envelope\y'  -- → true   (CORRECT)
+```
+
+Discovered in `20260601174841_cross_tenant_grant_phase_1_jwt_shape.sql` Stage E deploy when Steps 8 + 11 assertions falsely fired on already-tagged functions. Two pre-existing M3 backfill callsites (`20260430172625:87`, `20260430172836:78`) used `\b` for an idempotent SKIP guard — the bug only masked extra rebuild work there (the rebuild was idempotent and produced the same final state), but new assertion-driven code that depends on the regex matching will fail-loud.
+
+**Rule**: when writing PG regex anchors for word boundaries, use `\y` (PG-specific, end-of-word) instead of `\b`. Same for `\Y` (non-word-boundary) vs `\B`. Reserve `\b` for inside `[ ]` bracket expressions where it represents ASCII backspace (the documented dual meaning).
+
+**Audit query** for future migrations:
+
+```bash
+grep -rnE "['\"][^'\"]*\\\\b[^'\"]*['\"]" infrastructure/supabase/supabase/migrations/
+```
+
 ### Migration-session `SET search_path` gotcha (extension-typed parameters)
 
 Function-attribute `SET search_path TO 'public', 'extensions', ...` applies INSIDE the function body but **NOT during `CREATE OR REPLACE FUNCTION` parameter-type parsing**. Any migration that uses extension-typed parameters in a signature (`ltree`, `vector`, `pg_trgm`, etc.) will fail with `type "<type>" does not exist (SQLSTATE 42704)` unless the migration session's search_path includes `extensions`. Add a session-level `SET search_path = public, extensions, pg_temp;` at the top of the migration file before any such `CREATE OR REPLACE FUNCTION` statements. (Discovered in PR #67 when migration with `p_scope_path ltree` parameter failed first push.)
