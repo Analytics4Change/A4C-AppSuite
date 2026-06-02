@@ -23,7 +23,7 @@
 --   [x] Step 7  — 10 C-legacy RPC normalizations (must-pair with Step 1)
 --   [x] Step 8  — M3 RPC Shape Registry re-tag for the 10 normalized RPCs
 --   [x] Step 9  — authorization_type CHECK constraint (5 values)
---   [ ] Step 10 — access_grant.policy_override_applied handler + perm-defined events
+--   [x] Step 10 — access_grant.policy_override_applied handler + perm-defined events
 --   [ ] Step 11 — 170-RPC @a4c-bucket tag backfill
 --   [ ] Step 14 — authorization_reference column + CHECK + index + handler ext
 --   [ ] Step 15 — grant_role_templates table + RLS + seed
@@ -3074,5 +3074,297 @@ COMMENT ON CONSTRAINT cross_tenant_access_grants_projection_authorization_type_c
 
 
 -- =============================================================================
--- End of Phase 1 migration (drafting in progress — Steps 10-15 pending)
+-- Step 10 — access_grant.policy_override_applied handler + 7 perm.defined events
+-- =============================================================================
+--
+-- Per ADR Phase 1 manifest step 10:
+--   (a) Add the `access_grant.policy_override_applied` event handler branch to
+--       process_access_grant_event() — handler-only, no emit RPC (per Decision
+--       B.3 the emit RPC api.revoke_permission_across_grants ships in Phase 2).
+--   (b) Emit `permission.defined` events for 7 new permissions that do not
+--       exist in the current permission registry: `grant.create`, `grant.view`,
+--       `grant.revoke`, plus the 4 `partner.*` permissions seeded by the
+--       var_default template (Step 15): `partner.view_analytics`,
+--       `partner.view_support_tickets`, `partner.view_billing_reports`,
+--       `partner.export_reports`.
+--
+-- (a) DBC contract (plan.md L114-126):
+--   Preconditions:
+--     - p_event.event_data->'permissions' is the new resolved permission
+--       jsonb array (well-formed; same shape as
+--       cross_tenant_access_grants_projection.permissions).
+--     - p_event.event_data->>'override_reason' is non-empty (HIPAA
+--       audit-trail requirement; enforced at handler entry).
+--     - Target grant row identified by p_event.stream_id (global rule
+--       "use stream_id, not aggregate_id").
+--   Postconditions:
+--     - Matching grant row's permissions jsonb is REPLACED (not merged)
+--       with event_data->'permissions'.
+--     - Grant row's updated_at is bumped.
+--     - No other grant fields modified (NOT status, NOT scope, NOT
+--       consultant_*, NOT authorization_*, NOT expires_at).
+--   Invariants:
+--     - Handler is purely projective (no event emission from within).
+--       Phase 1 ships handler-only.
+--     - Replacement is byte-exact: future re-emission of identical override
+--       events is idempotent on the projection.
+--
+-- Implementation drift correction (Rule 8 in CLAUDE.md): the baseline_v4
+-- body of this router at L10521-10522 uses RAISE WARNING for the ELSE,
+-- which is a Rule 8 violation (warnings are invisible; exceptions are
+-- caught by process_domain_event and persisted to processing_error). The
+-- handler reference file at
+-- infrastructure/supabase/handlers/routers/process_access_grant_event.sql
+-- has the CORRECT RAISE EXCEPTION P9001 form. CREATE OR REPLACE FUNCTION
+-- here writes the reference body + the new WHEN branch, propagating the
+-- ELSE fix as a side-benefit of this Phase 1 touch.
+--
+-- Three-layer event audit (CLAUDE.md Rule 12):
+--   1. Emitter — none in Phase 1 (handler-only per Decision B.3). Phase 2
+--      adds api.revoke_permission_across_grants which emits this event.
+--   2. Dispatcher — process_domain_event routes stream_type='access_grant'
+--      to this router. Existing; no change.
+--   3. Router — this Step 10 adds the WHEN branch.
+
+CREATE OR REPLACE FUNCTION public.process_access_grant_event(p_event record)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  v_grant_id UUID;
+BEGIN
+  CASE p_event.event_type
+
+    WHEN 'access_grant.created' THEN
+      INSERT INTO cross_tenant_access_grants_projection (
+        id, consultant_org_id, consultant_user_id, provider_org_id,
+        scope, scope_id, authorization_type, legal_reference,
+        granted_by, granted_at, expires_at, permissions, terms,
+        status, created_at, updated_at
+      ) VALUES (
+        p_event.stream_id,
+        safe_jsonb_extract_uuid(p_event.event_data, 'consultant_org_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'consultant_user_id'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'provider_org_id'),
+        safe_jsonb_extract_text(p_event.event_data, 'scope'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'scope_id'),
+        safe_jsonb_extract_text(p_event.event_data, 'authorization_type'),
+        safe_jsonb_extract_text(p_event.event_data, 'legal_reference'),
+        safe_jsonb_extract_uuid(p_event.event_data, 'granted_by'),
+        p_event.created_at,
+        safe_jsonb_extract_timestamp(p_event.event_data, 'expires_at'),
+        COALESCE(p_event.event_data->'permissions', '[]'::jsonb),
+        COALESCE(p_event.event_data->'terms', '{}'::jsonb),
+        'active',
+        p_event.created_at,
+        p_event.created_at
+      );
+
+    WHEN 'access_grant.revoked' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'revoked',
+          revoked_at = p_event.created_at,
+          revoked_by = safe_jsonb_extract_uuid(p_event.event_data, 'revoked_by'),
+          revocation_reason = safe_jsonb_extract_text(p_event.event_data, 'revocation_reason'),
+          revocation_details = safe_jsonb_extract_text(p_event.event_data, 'revocation_details'),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    WHEN 'access_grant.expired' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'expired',
+          expired_at = p_event.created_at,
+          expiration_type = safe_jsonb_extract_text(p_event.event_data, 'expiration_type'),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    WHEN 'access_grant.suspended' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'suspended',
+          suspended_at = p_event.created_at,
+          suspended_by = safe_jsonb_extract_uuid(p_event.event_data, 'suspended_by'),
+          suspension_reason = safe_jsonb_extract_text(p_event.event_data, 'suspension_reason'),
+          suspension_details = safe_jsonb_extract_text(p_event.event_data, 'suspension_details'),
+          expected_resolution_date = safe_jsonb_extract_timestamp(p_event.event_data, 'expected_resolution_date'),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    WHEN 'access_grant.reactivated' THEN
+      v_grant_id := safe_jsonb_extract_uuid(p_event.event_data, 'grant_id');
+      UPDATE cross_tenant_access_grants_projection
+      SET status = 'active',
+          suspended_at = NULL, suspended_by = NULL,
+          suspension_reason = NULL, suspension_details = NULL,
+          expected_resolution_date = NULL,
+          reactivated_at = p_event.created_at,
+          reactivated_by = safe_jsonb_extract_uuid(p_event.event_data, 'reactivated_by'),
+          resolution_details = safe_jsonb_extract_text(p_event.event_data, 'resolution_details'),
+          expires_at = COALESCE(
+            safe_jsonb_extract_timestamp(p_event.event_data, 'new_expires_at'),
+            expires_at
+          ),
+          updated_at = p_event.created_at
+      WHERE id = v_grant_id;
+
+    -- NEW (Phase 1 Step 10) — Decision B.3 policy override application.
+    -- Handler-only; emit RPC api.revoke_permission_across_grants ships Phase 2.
+    -- Replaces (NOT merges) the grant's permissions jsonb with the event's
+    -- new permissions array. Pre-conditions enforced at handler entry per
+    -- plan.md L114-126 DBC.
+    WHEN 'access_grant.policy_override_applied' THEN
+      -- Pre-condition: event_data must carry a permissions array
+      IF p_event.event_data->'permissions' IS NULL THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: permissions'
+          USING ERRCODE = 'P9001';
+      END IF;
+
+      -- Pre-condition: override_reason non-empty (HIPAA audit-trail requirement)
+      IF COALESCE(p_event.event_data->>'override_reason', '') = '' THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: override_reason'
+          USING ERRCODE = 'P9001';
+      END IF;
+
+      -- Post-condition: REPLACE (not merge) permissions; bump updated_at.
+      -- Per DBC L121-124, no other fields modified (status/scope/consultant_*/
+      -- authorization_*/expires_at all preserved by omission).
+      UPDATE cross_tenant_access_grants_projection
+      SET permissions = p_event.event_data->'permissions',
+          updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
+
+      -- Defensive: target grant must exist. PII-safe error (no stream_id in
+      -- message per Rule 16); caller can correlate via domain_events.id.
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Grant not found for policy_override_applied'
+          USING ERRCODE = 'P0002';
+      END IF;
+
+    ELSE
+      RAISE EXCEPTION 'Unhandled event type "%" in process_access_grant_event', p_event.event_type
+        USING ERRCODE = 'P9001';
+  END CASE;
+
+END;
+$function$;
+
+ALTER FUNCTION public.process_access_grant_event(record) OWNER TO postgres;
+
+COMMENT ON FUNCTION public.process_access_grant_event(record) IS
+  'Main access grant event processor — handles cross-tenant grant lifecycle '
+  'with CQRS compliance. Phase 1 of cross-tenant-access-grant-rollout '
+  '(Step 10): added access_grant.policy_override_applied handler branch '
+  '(handler-only per Decision B.3; emit RPC ships Phase 2). Also corrected '
+  'the ELSE clause from RAISE WARNING to RAISE EXCEPTION P9001 per '
+  'CLAUDE.md Rule 8 (warnings are invisible to process_domain_event; '
+  'exceptions are caught and persisted to domain_events.processing_error).';
+
+
+-- -----------------------------------------------------------------------------
+-- Step 10.B — 7 permission.defined event emissions
+-- -----------------------------------------------------------------------------
+--
+-- Pattern matches 20260430002824:46-54 (PR #43 permission-projection rollout):
+-- emit permission.defined event via direct INSERT into domain_events; the
+-- existing handle_permission_defined handler (baseline_v4:8711-8732) populates
+-- permissions_projection via INSERT...ON CONFLICT (id) DO UPDATE.
+--
+-- Idempotency at emission: EXCEPTION WHEN unique_violation catches the case
+-- where re-running this migration produces a new domain_events stream_id but
+-- the handler's INSERT into permissions_projection trips the
+-- permissions_projection_applet_action_key UNIQUE (applet, action) constraint
+-- (baseline_v4:13976). The exception in the handler propagates back through
+-- the BEFORE INSERT trigger; without the EXCEPTION WHEN unique_violation
+-- around the INSERT-into-domain_events here, the migration would fail on
+-- re-run. With it, re-runs are no-ops.
+--
+-- Permission scope_type:
+--   - grant.* permissions are platform-management actions. scope_type='global'
+--     because grant lifecycle is administered at platform level, not at any
+--     specific org's scope.
+--   - partner.* permissions are scope-bound (apply to a specific grant target).
+--     scope_type='resource' because the resource (grant) defines the scope.
+--
+-- requires_mfa:
+--   - grant.revoke is destructive → requires_mfa=true (matches existing
+--     destructive-action precedent like user.delete).
+--   - grant.create, grant.view, and the 4 partner.* perms → requires_mfa=false.
+
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "grant", "action": "create", "description": "Create a new cross-tenant access grant (Phase 2+ emitter; gated for platform admins + future consultant-org admins)", "scope_type": "global", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.create for Phase 2+ emit RPC"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "grant", "action": "view", "description": "View cross-tenant access grant records and grant lifecycle history", "scope_type": "global", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.view"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "grant", "action": "revoke", "description": "Revoke an active cross-tenant access grant (destructive; immediate effect on JWT issuance via compute_effective_permissions filter)", "scope_type": "global", "requires_mfa": true}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed grant.revoke (MFA-required destructive action)"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+-- 4 partner.* permissions seeded by var_default template (Step 15)
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "partner", "action": "view_analytics", "description": "View usage analytics data via VAR partnership grant (PHI-restricted by var_default terms)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_analytics (var_default template member)"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "partner", "action": "view_support_tickets", "description": "View provider org support tickets via VAR partnership grant (PHI-restricted)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_support_tickets (var_default template member)"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "partner", "action": "view_billing_reports", "description": "View provider org billing/usage reports via VAR partnership grant (PHI-restricted)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.view_billing_reports (var_default template member)"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  INSERT INTO public.domain_events (stream_id, stream_type, stream_version, event_type, event_data, event_metadata)
+  VALUES (
+    gen_random_uuid(), 'permission', 1, 'permission.defined',
+    '{"applet": "partner", "action": "export_reports", "description": "Export VAR partnership reports as files (analytics, support, billing — PHI-restricted)", "scope_type": "resource", "requires_mfa": false}'::jsonb,
+    '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Phase 1 step 10: seed partner.export_reports (var_default template member)"}'::jsonb
+  );
+EXCEPTION WHEN unique_violation THEN NULL;
+END $$;
+
+
+-- =============================================================================
+-- End of Phase 1 migration (drafting in progress — Steps 11-15 pending)
 -- =============================================================================

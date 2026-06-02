@@ -82,6 +82,31 @@ BEGIN
           updated_at = p_event.created_at
       WHERE id = v_grant_id;
 
+    -- NEW (Phase 1 Step 10) — Decision B.3 policy override application.
+    -- Handler-only; emit RPC api.revoke_permission_across_grants ships Phase 2.
+    -- REPLACES (not merges) permissions jsonb. Pre-conditions enforced per
+    -- plan.md L114-126 DBC.
+    WHEN 'access_grant.policy_override_applied' THEN
+      IF p_event.event_data->'permissions' IS NULL THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: permissions'
+          USING ERRCODE = 'P9001';
+      END IF;
+
+      IF COALESCE(p_event.event_data->>'override_reason', '') = '' THEN
+        RAISE EXCEPTION 'access_grant.policy_override_applied missing required field: override_reason'
+          USING ERRCODE = 'P9001';
+      END IF;
+
+      UPDATE cross_tenant_access_grants_projection
+      SET permissions = p_event.event_data->'permissions',
+          updated_at = p_event.created_at
+      WHERE id = p_event.stream_id;
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Grant not found for policy_override_applied'
+          USING ERRCODE = 'P0002';
+      END IF;
+
     ELSE
       RAISE EXCEPTION 'Unhandled event type "%" in process_access_grant_event', p_event.event_type
           USING ERRCODE = 'P9001';
