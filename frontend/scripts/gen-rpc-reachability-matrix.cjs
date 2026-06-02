@@ -118,15 +118,19 @@ function parseTag(description, tagName) {
 function classify(rows) {
   const classified = [];
   const untagged = [];
+  const conflicts = [];
 
   // Dedup by proname — overloads share the same logical tags (Step 11
-  // applies the same COMMENT to all overloads of a given proname).
-  const seen = new Set();
+  // applies the same COMMENT to all overloads of a given proname). However,
+  // a future migration could DROP+CREATE one overload and leave the others
+  // tagged differently, OR a developer could manually retag only one
+  // overload via direct COMMENT ON FUNCTION. F1 fold-in 2026-06-02 architect
+  // review: explicitly detect cross-overload tag disagreement (mirrors M3
+  // gen-rpc-registry.cjs:118-119,127-132). Silent first-wins dedup masks the
+  // inconsistency and produces a matrix that doesn't reflect reality.
+  const byName = new Map(); // proname → { bucket, callable, phaseTarget }
 
   for (const row of rows) {
-    if (seen.has(row.name)) continue;
-    seen.add(row.name);
-
     const bucket = parseTag(row.description, 'bucket');
     const callable = parseTag(row.description, 'consultant-callable');
     const reason = parseTag(row.description, 'consultant-callable-reason');
@@ -145,6 +149,31 @@ function classify(rows) {
       continue;
     }
 
+    // Conflict detection across overloads of the same proname.
+    if (byName.has(row.name)) {
+      const prior = byName.get(row.name);
+      if (
+        prior.bucket !== bucket ||
+        prior.callable !== callable ||
+        prior.phaseTarget !== phaseTarget
+      ) {
+        conflicts.push({
+          name: row.name,
+          args: row.args,
+          prior: {
+            bucket: prior.bucket,
+            callable: prior.callable,
+            phaseTarget: prior.phaseTarget,
+          },
+          current: { bucket, callable, phaseTarget },
+        });
+      }
+      // First-wins for the classified output; conflict array surfaces the
+      // disagreement so main() can fail before writing.
+      continue;
+    }
+    byName.set(row.name, { bucket, callable, phaseTarget });
+
     classified.push({
       name: row.name,
       args: row.args,
@@ -156,7 +185,7 @@ function classify(rows) {
     });
   }
 
-  return { classified, untagged };
+  return { classified, untagged, conflicts };
 }
 
 function emitPerBucketCounts(classified) {
@@ -275,7 +304,19 @@ function main() {
   if (rows.length === 0) fail('No api.* functions returned by query');
   info(`Found ${rows.length} api.* function rows (incl. overloads)`);
 
-  const { classified, untagged } = classify(rows);
+  const { classified, untagged, conflicts } = classify(rows);
+
+  if (conflicts.length > 0) {
+    console.error('❌ Overload tag disagreement detected (F1 fold-in 2026-06-02):');
+    for (const c of conflicts) {
+      console.error(`   - api.${c.name}(${c.args}):`);
+      console.error(`       prior overload tagged   bucket=${c.prior.bucket}, callable=${c.prior.callable}, phase-target=${c.prior.phaseTarget}`);
+      console.error(`       current overload tagged bucket=${c.current.bucket}, callable=${c.current.callable}, phase-target=${c.current.phaseTarget}`);
+    }
+    console.error('   Each api.* function name must carry consistent @a4c-bucket/@a4c-consultant-callable/@a4c-phase-target across all signatures.');
+    console.error('   Re-run Step 11 backfill OR manually align via COMMENT ON FUNCTION on each signature.');
+    fail(`${conflicts.length} overload conflict(s)`);
+  }
 
   if (untagged.length > 0) {
     console.error('❌ Untagged api.* functions found:');

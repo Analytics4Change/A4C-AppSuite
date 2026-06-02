@@ -90,7 +90,8 @@ BEGIN
     -- NEW (Phase 1 Step 10) — Decision B.3 policy override application.
     -- Handler-only; emit RPC api.revoke_permission_across_grants ships Phase 2.
     -- REPLACES (not merges) permissions jsonb. Pre-conditions enforced per
-    -- plan.md L114-126 DBC.
+    -- plan.md L114-126 DBC. F4 (Step 10 architect review 2026-06-02):
+    -- jsonb_typeof check enforces "well-formed jsonb array" pre-condition.
     WHEN 'access_grant.policy_override_applied' THEN
       -- Pre-condition: event_data must carry a permissions JSONB ARRAY.
       IF p_event.event_data->'permissions' IS NULL

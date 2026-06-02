@@ -3908,6 +3908,32 @@ COMMENT ON COLUMN public.cross_tenant_access_grants_projection.authorization_ref
 -- -----------------------------------------------------------------------------
 -- Step 14b — CHECK constraint (NOT NULL or emergency_access)
 -- -----------------------------------------------------------------------------
+--
+-- F2 fold-in 2026-06-02 architect review (Steps 12-15 combined pass):
+-- Step 14a's `ADD COLUMN authorization_reference uuid` defaults to NULL on
+-- every existing row. If dev or prod has any cross_tenant_access_grants_
+-- projection rows with `authorization_type != 'emergency_access'` at
+-- deploy time, a naked `ADD CONSTRAINT ... CHECK` would FAIL LOUD with
+-- `check constraint violated by some row`, aborting the entire migration
+-- transaction.
+--
+-- Defensive belt-and-suspenders: use the canonical Postgres pattern
+-- `ADD CONSTRAINT ... NOT VALID` + `ALTER TABLE ... VALIDATE CONSTRAINT`.
+-- NOT VALID skips the existing-row check at ADD time (new rows still
+-- enforce); VALIDATE retroactively checks existing rows once safe. If dev
+-- has 0 rows (Stage B probe 2026-05-29 confirmed), VALIDATE is instant.
+-- If dev has non-emergency rows, VALIDATE fails with a clear error AFTER
+-- the column add has succeeded — operator can backfill `authorization_
+-- reference` for those rows before re-running VALIDATE.
+--
+-- Pre-deploy ritual: **MUST** re-run
+--   SELECT authorization_type, COUNT(*)
+--   FROM public.cross_tenant_access_grants_projection
+--   GROUP BY authorization_type;
+-- and confirm zero non-emergency rows OR backfill `authorization_reference`
+-- before deploy. The NOT VALID + VALIDATE pattern below makes the failure
+-- mode crisp (constraint exists, validation step fails) rather than
+-- ambiguous (entire migration rollback).
 
 ALTER TABLE public.cross_tenant_access_grants_projection
   DROP CONSTRAINT IF EXISTS cross_tenant_access_grants_projection_auth_ref_check;
@@ -3917,7 +3943,15 @@ ALTER TABLE public.cross_tenant_access_grants_projection
   CHECK (
     authorization_reference IS NOT NULL
     OR authorization_type = 'emergency_access'
-  );
+  ) NOT VALID;
+
+-- Validate against existing rows. Instant on zero-row dev (Stage B probe
+-- 2026-05-29 confirmed). Fails with `check constraint violated by some
+-- row` if non-emergency rows exist with NULL authorization_reference —
+-- operator must backfill before retrying. The validation step is
+-- separable from the constraint add so the failure mode is crisp.
+ALTER TABLE public.cross_tenant_access_grants_projection
+  VALIDATE CONSTRAINT cross_tenant_access_grants_projection_auth_ref_check;
 
 COMMENT ON CONSTRAINT cross_tenant_access_grants_projection_auth_ref_check
   ON public.cross_tenant_access_grants_projection IS
@@ -4057,7 +4091,12 @@ BEGIN
     -- Phase 1 Step 10 — Decision B.3 policy override application.
     -- Handler-only; emit RPC api.revoke_permission_across_grants ships Phase 2.
     -- F4 fold-in 2026-06-02 (Step 10 architect review): added jsonb_typeof
-    -- check on permissions.
+    -- check on permissions to enforce DBC pre-condition "well-formed jsonb
+    -- array" rather than just IS NULL (a scalar or object would otherwise
+    -- silently corrupt the grant row's permissions jsonb). N4 fold-in
+    -- 2026-06-02 (Steps 12-15 combined review): comment block restored
+    -- here to preserve the rationale alongside the executable check; was
+    -- stripped during Step 14d's CREATE OR REPLACE rewrite.
     WHEN 'access_grant.policy_override_applied' THEN
       IF p_event.event_data->'permissions' IS NULL
          OR jsonb_typeof(p_event.event_data->'permissions') <> 'array' THEN
@@ -4167,8 +4206,16 @@ CREATE TABLE IF NOT EXISTS public.grant_role_templates (
 
 ALTER TABLE public.grant_role_templates OWNER TO postgres;
 
--- Authorization_type CHECK mirrors Step 9 (5-value enumeration). Constraint
--- name is 46 bytes; fits NAMEDATALEN-1=63 cleanly.
+-- Authorization_type CHECK mirrors Step 9's enumeration on
+-- cross_tenant_access_grants_projection.authorization_type. The two
+-- constraints are conceptually coupled but NOT linked at the SQL level —
+-- if a future migration adds a 6th authorization_type (e.g.,
+-- 'guardianship') to ONE constraint without the other, runtime mismatch
+-- occurs: a grant projection row with the new type cannot be backed by
+-- a template, OR a template member cannot be applied to any real grant.
+-- N2 fold-in 2026-06-02 architect review: explicit cross-reference to
+-- prevent the coupling drift. Constraint name `grant_role_templates_
+-- authorization_type_check` is 45 bytes; fits NAMEDATALEN-1=63 cleanly.
 ALTER TABLE public.grant_role_templates
   DROP CONSTRAINT IF EXISTS grant_role_templates_authorization_type_check;
 
@@ -4270,6 +4317,14 @@ CREATE POLICY grant_role_templates_service_role_select
   FOR SELECT
   TO service_role
   USING (true);
+
+-- N3 fold-in 2026-06-02: COMMENT ON POLICY parity with baseline pattern
+-- on role_permission_templates (baseline_v4:15804).
+COMMENT ON POLICY grant_role_templates_service_role_select
+  ON public.grant_role_templates IS
+  'Service role bypass for Temporal workers + Edge Functions that need to '
+  'look up the template at grant creation time (Phase 2+ emit RPC + bootstrap '
+  'workflow). Read-only — write path is super_admin-only via grant_role_templates_write.';
 
 -- Write: super_admin only via user_roles_projection check. Mirrors
 -- role_permission_templates_write verbatim.
