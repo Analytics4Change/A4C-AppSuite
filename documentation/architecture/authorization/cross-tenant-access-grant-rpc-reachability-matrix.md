@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2026-05-26
+last_updated: 2026-06-03
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Per-RPC classification of all 104 `api.*` SQL functions into PR #67's 5-bucket taxonomy (A explicit-org-param, B JWT-bound, C scope-path-bound, D entity-lookup+RLS, E global) plus per-RPC consultant-callability decisions under the Path B JWT architecture from `adr-cross-tenant-access-grant-jwt-shape.md`. Strict Bucket A definition (early-return tenancy guard only) is used; functions taking `p_org_id` with RLS-only enforcement are Bucket D.
+**Summary**: Per-RPC classification of all `api.*` SQL functions (currently **170** per dev pg_proc) into PR #67's 5-bucket taxonomy (A explicit-org-param, B JWT-bound, C scope-path-bound, D entity-lookup+RLS, E global) plus per-RPC consultant-callability decisions under the Path B JWT architecture from `adr-cross-tenant-access-grant-jwt-shape.md`. Strict Bucket A definition (early-return tenancy guard only) is used; functions taking `p_org_id` with RLS-only enforcement are Bucket D. Exact count is dynamic — codegen (Phase 1 step 12) sources from `pg_proc` directly and CI (step 13) gates parity.
 
 **When to read**:
 - Adding a new `api.*` RPC — find the right bucket pattern to match + know whether consultant-callability needs explicit reasoning
@@ -25,7 +25,7 @@ last_updated: 2026-05-26
 # Cross-Tenant Access Grant — RPC Reachability Matrix
 
 > [!IMPORTANT]
-> **Hand-classified artifact (Phase 0.3).** This matrix was hand-classified on 2026-05-26 during Phase 0.3 of the cross-tenant-access-grant-rollout card. Once Phase 1 ships the comment-driven codegen (`frontend/scripts/gen-rpc-reachability-matrix.cjs`) plus CI workflow (`.github/workflows/rpc-reachability-matrix-sync.yml`) plus the 104-row backfill of `@a4c-bucket` + `@a4c-consultant-callable` tags on `COMMENT ON FUNCTION`, this doc becomes a **generated artifact**. From that point: **DO NOT hand-edit** — the comment tags in migrations are the source of truth, and the codegen will overwrite changes here.
+> **Hand-classified artifact (Phase 0.3, reconciled Stage R 2026-05-29 + R-6 architect re-review fold-in 2026-05-30).** This matrix was hand-classified on 2026-05-26 during Phase 0.3 of the cross-tenant-access-grant-rollout card, reconciled against the live `pg_proc` inventory on 2026-05-29 (see `dev/active/cross-tenant-grant-phase-1-jwt-shape/matrix-reconciliation-inventory.md` for the diff arithmetic + R-2 classification work-product), then re-reviewed by `software-architect-dbc` on 2026-05-30 (verdict APPROVE WITH IN-PR FIXES; 4 must-fix + 2 nits folded in this doc on the same day). Stage R surfaced 72 missing-from-matrix RPCs (user-facing CRUD families the 2026-05-26 hand-curation missed: client lifecycle, field categories/definitions, schedule templates, org-CRUD, admin surfaces) and 7 stale-in-matrix entries (`*_user_schedule` family dropped by `20260217211231_schedule_template_refactor.sql`). Stage R-6 reclassified 2 entries D→E `[service-role-only]` (F1: `check_field_definitions_exist`, `deactivate_all_field_definitions`) and 4 entries D-variant→E `[admin-only]` (F2: `deactivate_organization`, `delete_organization`, `reactivate_organization`, `retry_deletion_workflow`); rewrote 2 guard columns for `SECURITY DEFINER` definer-bypasses-RLS reads (F3); and corrected the schedule-template-family consultant-callability framing (F4). Once Phase 1 ships the comment-driven codegen (`frontend/scripts/gen-rpc-reachability-matrix.cjs`) plus CI workflow (`.github/workflows/rpc-reachability-matrix-sync.yml`) plus the full-inventory backfill of `@a4c-bucket` + `@a4c-consultant-callable` tags on `COMMENT ON FUNCTION`, this doc becomes a **generated artifact**. From that point: **DO NOT hand-edit** — the comment tags in migrations are the source of truth, and the codegen will overwrite changes here.
 
 ## Five-bucket definitions (strict)
 
@@ -38,25 +38,34 @@ last_updated: 2026-05-26
 | **D** | Entity-lookup signature: takes `p_<entity>_id uuid` (e.g., `p_client_id`, `p_user_id`, `p_invitation_id`); NO inline tenancy guard; relies entirely on RLS policies on underlying tables. **Includes RPCs taking `p_org_id` without the strict Bucket A guard.** | **CONDITIONAL** — depends on whether the underlying table's RLS extends visibility via `cross_tenant_access_grants_projection`. **Phase 4 RLS audit determines per-table.** |
 | **E** | No org/scope context AND no entity-lookup ID parameter. Or takes only non-tenant-bound params (search strings, page numbers, role names, permission names). Operates on user-as-identity surface or platform-level reference data. | **YES (mostly)** — typically grant-irrelevant. Case-by-case for any RPC with implicit org context. |
 
-## Per-bucket counts (verified 2026-05-26, post-architect-review)
-
-| Bucket | Reads | Writes | Total | Notes |
-|---|---:|---:|---:|---|
-| A (strict) | 1 | 0 | **1** | Phase 3 refactor target (`api.list_users`) |
-| A-variant | 1 | 0 | **1** | `list_invitations` — same `p_org_id = get_current_org_id()` equality check but RAISEs instead of RETURNs and requires `has_org_admin`. Treated as Phase 3 refactor target alongside strict A. |
-| B | 4 | 11 | **15** | Case-by-case consultant variants |
-| C (strict) | 3 | 0 | **3** | No work needed — only PR #67's three sister RPCs |
-| C-legacy | 3 | 7 | **10** | Phase 1 must-pair normalization: 2 mutation siblings (`bulk_assign_role`, `sync_role_assignments`) + 5 OU mutators + 3 OU readers |
-| D | 31 | 3 | **34** | Phase 4 RLS audit target |
-| D-variant | 1 | 0 | **1** | `get_user_addresses_for_org` — D with explicit `has_platform_privilege()` gate; otherwise RLS-enforced |
-| E | 19 | 19 | **38** | Mostly no work |
-| E-variant | 1 | 0 | **1** | `list_user_organizations` — sui generis (mixed self-context + org-admin predicate) |
-| **Total** | **64** | **40** | **104** | |
+## Per-bucket counts (reconciled 2026-05-29 against live dev pg_proc)
 
 > [!NOTE]
-> The "variant" rows (A-variant, D-variant, E-variant) recognize three RPCs that don't fit cleanly into the strict bucket definitions but are close enough that creating a separate bucket per variant would be over-engineering. The Phase 1 codegen treats variants as their root bucket for the `@a4c-bucket:` tag (e.g., `list_invitations` is `@a4c-bucket: A`) and uses `@a4c-consultant-callable-reason:` to capture the variant nuance.
+> Counts in this table are **derived from the per-RPC table below** (single source of truth). The `r/w` column reflects **operation semantics** (does the RPC mutate state?), NOT the M3 `@a4c-rpc-shape` envelope-vs-read tag — a read RPC may have `@a4c-rpc-shape: envelope` if it returns a wrapped result; that's orthogonal to this column. F1/F3 fold-in (architect re-review 2026-05-29) corrected this.
 
-Total verified via `grep -c "^CREATE OR REPLACE FUNCTION \"api\"\." infrastructure/supabase/supabase/migrations/20260212010625_baseline_v4.sql` = 104. No net new `api.*` functions added or removed post-baseline (DROPped: `get_organizations` 3-param + `get_organizations_paginated` 7-param sigs, both immediately replaced with new signatures in `20260308191000` and `20260306214844` respectively).
+<!-- GENERATED:PER-BUCKET-COUNTS:START -->
+| Bucket | Count |
+|---|---:|
+| A | 1 |
+| A-variant | 1 |
+| B | 56 |
+| C | 31 |
+| D | 36 |
+| D-variant | 1 |
+| E | 43 |
+| E-variant | 1 |
+| **Total** | **170** |
+<!-- GENERATED:PER-BUCKET-COUNTS:END -->
+
+> [!NOTE]
+> The "variant" rows (A-variant, D-variant, E-variant) recognize RPCs that don't fit cleanly into the strict bucket definitions but are close enough that creating a separate bucket per variant would be over-engineering. The Phase 1 codegen treats variants as their root bucket for the `@a4c-bucket:` tag — e.g., `list_invitations` is `@a4c-bucket: A` (uses `RAISE EXCEPTION` instead of `RETURN` but the equality-check shape is identical), `get_user_addresses_for_org` is `@a4c-bucket: D` (load-bearing RLS as in strict-D, but adds a `has_platform_privilege()` admin-override branch), `list_user_organizations` is `@a4c-bucket: E` (no `p_<entity>_id` parameter as in strict-E, but mixes self-context with an org-admin predicate). Each variant uses `@a4c-consultant-callable-reason:` to capture the nuance.
+
+**Reconciliation arithmetic** (2026-05-29 Stage R):
+- Pre-reconciliation: hand-curated matrix had 104 stated / 105 actual rows.
+- Set diff vs live pg_proc: 98 MATCHES, 72 MISSING-FROM-MATRIX (added via Stage R-2 body inspection), 7 STALE-IN-MATRIX (`*_user_schedule` family removed via Stage R-4 — replaced by schedule_template + assignment model in migration `20260217211231_schedule_template_refactor.sql`).
+- Net: 98 + 72 = 170 (matches live pg_proc); per-bucket sum = 170 (no residual). The 2026-05-26 hand-curation's 104-vs-105 internal discrepancy resolves via the post-reconciliation rebuild from the per-RPC table.
+
+Live count regenerated via Management API SQL: `SELECT COUNT(DISTINCT p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'api' AND p.prokind = 'f';` = **170**.
 
 ## Per-bucket consultant-callability decisions (locked in ADR)
 
@@ -69,124 +78,206 @@ Total verified via `grep -c "^CREATE OR REPLACE FUNCTION \"api\"\." infrastructu
 | D | **Consultant-callable IFF Phase 4 RLS extension lands per-table** | RLS is the enforcement mechanism; per-table audit decides per-RPC. |
 | E | **Consultant-callable by default; case-by-case for any with implicit org context** | Grant-irrelevant; permission-gated RPCs benefit from JWT extension automatically. |
 
-## The matrix (104 RPCs, alphabetical)
+## Sub-classification annotations (free-text vocabulary in the `summary` column)
 
-| `api.<name>` | bucket | r/w | guard / source-of-tenancy | summary |
+In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-phase-target` codegen tags, the matrix's per-RPC `summary` column carries a small free-text vocabulary that flags structurally narrower variants within a bucket. These annotations are documentation-only — the Phase 1 step 12 codegen does **not** parse them; they're handled via `@a4c-consultant-callable-reason:` free-text inside `COMMENT ON FUNCTION`.
+
+| Annotation | Meaning | Applicable buckets | Examples |
+|---|---|---|---|
+| `[admin-only]` | RPC is gated by `has_platform_privilege()` or platform-level `has_permission()` check; intended for admin-dashboard or platform-operator use, not consultant-callable in practice. | E primarily; D-variant when the gate is the only enforcement | `get_failed_events`, `get_event_processing_stats`, `dismiss_failed_event`, `retry_failed_event`, `undismiss_failed_event`, `get_events_by_correlation`, `get_events_by_session`, `get_trace_timeline`, `get_failed_events_with_detail`, `get_orphaned_deletions`, `retry_deletion_workflow` |
+| `[service-role-only]` | RPC has NO inline tenancy gate but `GRANT EXECUTE ... TO service_role` only (not `authenticated`); used by Temporal workers / Edge Functions as a server-side lever, never by end users. | E | `safety_net_deactivate_organization` (Temporal compensation lever for `emitBootstrapFailed → handler` failure path) |
+| `[emitter-primitive]` | RPC is a low-level event emitter called transitively by other `api.*` write RPCs, not a direct entry point from frontend/EF. | E | `emit_domain_event`, `emit_workflow_started_event` |
+| `[pre-auth]` | RPC is intentionally unauthenticated; called during signup / invitation-acceptance / pre-login flows where no JWT context exists. | E | `check_invitation_acceptance_eligibility`, `check_organization_by_name`, `check_organization_by_slug`, `check_user_exists`, `check_user_invitation_existence` |
+
+**Codegen contract**: when Phase 1 step 11 writes `COMMENT ON FUNCTION` for an RPC carrying any of these annotations, the annotation is embedded inside `@a4c-consultant-callable-reason:` (not promoted to a fifth tag). Example: `@a4c-consultant-callable-reason: [admin-only] gated by has_platform_privilege(); admin-dashboard use only`. The codegen at step 12 re-emits the annotation into the regenerated matrix's `summary` column from the reason text.
+
+## The matrix (`api.*` inventory, alphabetical — 170 RPCs)
+
+<!-- GENERATED:PER-RPC-TABLE:START -->
+| `api.<name>` | bucket | consultant-callable | phase-target | reason |
 |---|---|---|---|---|
-| `add_user_phone` | D | W | `IF NOT (has_platform_privilege() OR has_org_admin_permission() OR user=self)` (permission gate; `p_org_id` optional) | Adds phone to user |
-| `assign_client_to_user` | B | W | `v_org_id := get_current_org_id()` | Assigns client to user in active org |
-| `bulk_assign_role` | **C-legacy** | W | `get_permission_scope() + v_user_scope @> p_scope_path` (`20260430002824_*.sql:260`) | Assigns role to multiple users at scope |
-| `check_invitation_acceptance_eligibility` | E | R | (none; pre-auth check) | Validates invitation token + cross-provider gate (PR #63) |
-| `check_organization_by_name` | E | R | (none; pre-auth) | Checks if org name exists at signup |
-| `check_organization_by_slug` | E | R | (none; pre-auth) | Checks if org slug exists at signup |
-| `check_pending_invitation` | D | R | RLS on `invitations_projection` | Checks for pending invitation in org |
-| `check_user_exists` | E | R | (none; pre-auth) | Checks if user email registered on platform |
-| `check_user_invitation_existence` | E | R | (none; pre-auth) | Looks up user/invitation by email for accept-invitation EF |
-| `check_user_org_membership` | D | R | RLS on `user_roles_projection` | Checks user membership in org |
-| `create_organization_unit` | **C-legacy** | W | `v_scope_path := get_permission_scope('organization.create_ou')` (`baseline_v4:640`, also `20260221173821:47`) | Creates OU under parent |
-| `create_role` | B | W | `v_org_id := get_current_org_id()` | Creates role in active org |
-| `create_user_schedule` | B | W | `v_org_id := get_current_org_id()` | Creates user schedule in active org |
-| `deactivate_organization_unit` | **C-legacy** | W | `v_scope_path := get_permission_scope(...)` (`20260221173821_*.sql:293`) | Deactivates OU |
-| `deactivate_role` | B | W | `v_org_id := get_current_org_id()` | Deactivates role |
-| `deactivate_user_schedule` | B | W | `v_org_id := get_current_org_id()` | Deactivates user schedule |
-| `delete_organization_unit` | **C-legacy** | W | `v_scope_path := get_permission_scope('organization.delete_ou')` (`20260223163610_*.sql:37`) | Deletes OU |
-| `delete_role` | B | W | `v_org_id := get_current_org_id()` | Deletes role |
-| `delete_user` | E | W | `has_platform_privilege()` or user=self (extracted RPC PR #40) | Soft-deletes user (auth + projection) |
-| `delete_user_schedule` | B | W | `v_org_id := get_current_org_id()` | Deletes user schedule |
-| `dismiss_failed_event` | E | W | `has_platform_privilege()` | Marks event failure as manually dismissed |
-| `emit_domain_event` | E | W | (none; emitter primitive) | Core event emitter — used by every write RPC |
-| `emit_workflow_started_event` | E | W | (none; bootstrap signaling) | Emits workflow lifecycle event |
-| `find_contacts_by_phone` | D | R | RLS on `contacts_projection` | Phone-number search across contacts |
-| `get_addresses_by_org` | D | R | RLS on `addresses_projection` (`baseline_v4:1936`) | Fetches org addresses |
-| `get_assignable_roles` | D | R | RLS on `roles_projection` | Lists roles user can assign in org |
-| `get_bootstrap_status` | D | R | RLS on `bootstrap_projections` | Fetches org bootstrap state |
-| `get_child_organizations` | E | R | RLS via `has_platform_privilege()` check | Lists child orgs of parent |
-| `get_contacts_by_org` | D | R | RLS on `contacts_projection` | Fetches org contacts |
-| `get_current_org_unit` | B | R | `WHERE u.id = auth.uid()` | Returns user's current OU |
-| `get_emails_by_org` | D | R | RLS on email columns | Lists org email contacts |
-| `get_event_processing_stats` | E | R | `has_platform_privilege()` | Domain event stats (admin) |
-| `get_events_by_correlation` | E | R | `has_platform_privilege()` | Lists events by correlation ID |
-| `get_events_by_session` | E | R | `has_platform_privilege()` | Lists events by session |
-| `get_failed_events` | E | R | `has_platform_privilege()` (admin dashboard) | Lists processing failures with `processing_error_detail` if permitted |
-| `get_invitation_by_id` | D | R | RLS on `invitations_projection` | Fetches invitation details |
-| `get_invitation_by_org_and_email` | D | R | RLS on `invitations_projection` | Looks up invitation by org + email |
-| `get_invitation_by_token` | D | R | RLS on `invitations_projection` (token-keyed read) | Looks up invitation by acceptance token |
-| `get_invitation_for_resend` | D | R | RLS on `invitations_projection` | Fetches invitation for resend UI |
-| `get_organization_by_id` | D | R | RLS on `organizations_projection` | Fetches org by ID |
-| `get_organization_direct_care_settings` | D | R | RLS on `organizations_projection` | Fetches DC-specific settings |
-| `get_organization_name` | D | R | RLS on `organizations_projection` | Returns org name scalar |
-| `get_organization_unit_by_id` | **C-legacy** | R | `v_scope_path := get_permission_scope('organization.view_ou')` (`baseline_v4:2851`) | Fetches OU details |
-| `get_organization_unit_descendants` | **C-legacy** | R | `v_scope_path := get_permission_scope('organization.view_ou')` (`baseline_v4:2930`) | Lists OU descendants |
-| `get_organization_units` | **C-legacy** | R | `v_scope_path := get_permission_scope('organization.view_ou')` (`baseline_v4:3003`) | Lists OUs (scope-bound) |
-| `get_organizations` | E | R | `has_platform_privilege()` (admin) | Lists all orgs (admin) |
-| `get_organizations_paginated` | E | R | `has_platform_privilege()` (admin) | Paginated org list (admin dashboard) |
-| `get_pending_invitations_by_org` | D | R | RLS on `invitations_projection` | Lists pending invitations for org |
-| `get_permission_ids_by_names` | E | R | (none; reference lookup) | Looks up permission IDs by names |
-| `get_permissions` | E | R | (none; reference data) | Lists all platform permissions |
-| `get_person_phones` | D | R | RLS on `phones_projection` | Fetches contact phone numbers |
-| `get_phones_by_org` | D | R | RLS on `phones_projection` | Lists org phones |
-| `get_role_by_id` | D | R | RLS on `roles_projection` | Fetches role by ID |
-| `get_role_by_name` | D | R | RLS on `roles_projection` | Looks up role by name in org |
-| `get_role_by_name_and_org` | D | R | RLS on `roles_projection` | Looks up role by name+org |
-| `get_role_permission_names` | D | R | RLS on `role_permissions_projection` | Lists permission names granted by role |
-| `get_role_permission_templates` | E | R | (none; reference data) | Lists role-permission templates |
-| `get_roles` | B | R | `v_org_id := get_current_org_id()` | Lists roles in active org |
-| `get_schedule_by_id` | D | R | RLS on `user_schedules_projection` | Fetches schedule definition |
-| `get_trace_timeline` | E | R | `has_platform_privilege()` | Distributed trace reconstruction |
-| `get_user_addresses` | D | R | RLS on `user_addresses` | Fetches user addresses |
-| `get_user_addresses_for_org` | **D-variant** | R | `v_has_platform_privilege := public.has_platform_privilege()` + explicit RAISE on insufficient perms (`baseline_v4:3751`); also RLS on underlying tables | User addresses scoped to org (D with permission gate) |
-| `get_user_by_id` | D | R | RLS on `users` | Fetches user profile (org context optional) |
-| `get_user_notification_preferences` | B | R | `v_org_id := get_current_org_id()` | Fetches user notification prefs |
-| `get_user_org_access` | B | R | `v_org_id := get_current_org_id()` | Lists user access details in active org |
-| `get_user_org_details` | D | R | RLS on `users` + `user_organizations_projection` | Per-org user details |
-| `get_user_permissions` | E | R | `auth.uid()` (self-context) | Lists effective permissions for caller |
-| `get_user_phones` | D | R | RLS on `phones_projection` | Fetches user phones |
-| `get_user_phones_for_org` | D | R | RLS on `phones_projection` + `user_org_phone_overrides` | User phones for specific org |
-| `get_user_sms_phones` | D | R | RLS on `phones_projection` (SMS filter) | Fetches SMS-capable phones |
-| `list_invitations` | **A-variant** | R | `IF NOT (has_platform_privilege() OR (has_org_admin AND p_org_id = get_current_org_id())) THEN RAISE EXCEPTION` (RAISE not RETURN; `baseline_v4:4235-4252`) — same equality check as A | Lists invitations for org |
-| `list_roles_for_user` | D | R | RLS on `user_roles_projection` | Lists roles assigned to user |
-| `list_user_client_assignments` | D | R | RLS on `user_client_assignments_projection` | Lists client assignments per user |
-| `list_user_org_access` | **E** | R | `has_platform_privilege() OR p_user_id = get_current_user_id()` (self-context) | Lists org access history for user |
-| `list_user_organizations` | **E-variant** | R | Mixed: calls `get_current_org_id()` AND `get_current_user_id()`; predicate is `(has_org_admin AND uop.org_id = v_current_org_id) OR uop.user_id = v_current_user_id` | Lists orgs the caller belongs to (sui generis) |
-| **`list_users`** | **A** | R | `IF NOT (has_platform_privilege() OR p_org_id = get_current_org_id()) THEN RETURN;` (`20260519233323:132-140`) | Lists users in org with role assignments (PR #66) |
-| `list_users_for_bulk_assignment` | C | R | `has_effective_permission('user.role_assign', p_scope_path)` (`20260521195657:79`) | Lists users eligible for bulk role assignment |
-| `list_users_for_role_management` | C | R | `has_effective_permission('user.role_assign', p_scope_path)` (`20260521195657:183`) | Lists users for role CRUD at scope |
-| `list_users_for_schedule_management` | C | R | `has_effective_permission(<perm>, <derived scope>)` (`20260521195657:282`) | Lists users to manage schedule at scope |
-| `list_user_schedules` | D | R | RLS on `user_schedules_projection` (`p_org_id` optional) | Lists user schedules |
-| `modify_user_roles` | **B** | W | `v_org_id := NULLIF(v_claims ->> 'org_id', '')::uuid` (JWT-bound; `20260430172139:54,71-91`) | Modifies user role set transactionally |
-| `reactivate_organization_unit` | **C-legacy** | W | `v_scope_path := get_permission_scope(...)` (`20260221173821_*.sql:605`) | Reactivates OU |
-| `reactivate_role` | B | W | `v_org_id := get_current_org_id()` | Reactivates role |
-| `reactivate_user_schedule` | B | W | `v_org_id := get_current_org_id()` | Reactivates user schedule |
-| `remove_user_phone` | E | W | (entity-bound by phone_id; user-or-admin check) | Removes user phone |
-| `resend_invitation` | E | W | `has_platform_privilege() OR has_org_admin_permission()` | Resends invitation email |
-| `retry_failed_event` | E | W | `has_platform_privilege()` | Retries a failed event |
-| `revoke_invitation` | D | W | RLS on `invitations_projection` | Revokes pending invitation |
-| `soft_delete_organization_addresses` | E | W | `has_platform_privilege()` | Soft-deletes all org addresses |
-| `soft_delete_organization_contacts` | E | W | `has_platform_privilege()` | Soft-deletes all org contacts |
-| `soft_delete_organization_phones` | E | W | `has_platform_privilege()` | Soft-deletes all org phones |
-| `switch_org_unit` | B | W | `auth.uid()` (self-context) | Sets caller's current OU |
-| `sync_role_assignments` | **C-legacy** | W | `get_permission_scope() + v_user_scope @> p_scope_path` (`20260430002824_*.sql:417`) | Syncs role membership at scope |
-| `sync_schedule_assignments` | E | W | (template-id bound; org derived from template) | Syncs schedule users from template |
-| `unassign_client_from_user` | B | W | `v_org_id := get_current_org_id()` | Unassigns client from user |
-| `undismiss_failed_event` | E | W | `has_platform_privilege()` | Reverses event dismissal |
-| `update_organization_direct_care_settings` | E | W | `has_org_admin_permission()` | Updates DC org settings |
-| `update_organization_unit` | **C-legacy** | W | `v_scope_path := get_permission_scope('organization.update_ou')` (latest body `20260423065747_*.sql:1213`) | Updates OU details |
-| `update_role` | B | W | `v_org_id := get_current_org_id()` | Updates role definition |
-| `update_user` | **D** | W | Takes `p_org_id uuid` explicitly; no `get_current_org_id()` derivation; RLS-enforced | Updates user profile (explicit-org-param without strict-A guard) |
-| `update_user_access_dates` | B | W | `v_org_id := get_current_org_id()` | Updates user access date range |
-| `update_user_notification_preferences` | **D** | W | Takes `p_org_id uuid` explicitly; no `get_current_org_id()` derivation | Updates user notification prefs (explicit-org-param without strict-A guard) |
-| `update_user_phone` | B | W | `v_org_id := get_current_org_id()` | Updates user phone |
-| `update_user_schedule` | B | W | `v_org_id := get_current_org_id()` | Updates user schedule |
-| `validate_role_assignment` | C | R | `has_effective_permission(<perm>, p_scope_path)` (validation pre-check) | Validates role assignment before mutation |
+| `add_client_address` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `add_client_email` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `add_client_funding_source` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `add_client_insurance` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `add_client_phone` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `add_user_phone` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `admit_client` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `assign_client_contact` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `assign_client_to_user` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `assign_user_to_schedule` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `batch_update_field_definitions` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `bulk_assign_role` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `change_client_placement` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `check_field_definitions_exist` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_invitation_acceptance_eligibility` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_organization_by_name` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_organization_by_slug` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_pending_invitation` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `check_user_exists` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_user_invitation_existence` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_user_org_membership` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `create_field_category` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `create_field_definition` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `create_organization_address` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `create_organization_contact` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `create_organization_phone` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `create_organization_unit` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `create_role` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `create_schedule_template` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `deactivate_all_field_definitions` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `deactivate_field_category` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `deactivate_field_definition` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `deactivate_organization` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `deactivate_organization_unit` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `deactivate_role` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `deactivate_schedule_template` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `deactivate_user` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `delete_field_category` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `delete_field_definition` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `delete_organization` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `delete_organization_address` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `delete_organization_contact` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `delete_organization_phone` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `delete_organization_unit` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `delete_role` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `delete_schedule_template` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `delete_user` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `discharge_client` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `dismiss_failed_event` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `emit_domain_event` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `emit_workflow_started_event` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `end_client_placement` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `find_contacts_by_phone` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_addresses_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_assignable_roles` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_bootstrap_status` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_category_field_count` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_child_organizations` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_client` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_contacts_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_current_org_unit` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_emails_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_event_processing_stats` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_events_by_correlation` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_events_by_session` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_failed_events` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_failed_events_with_detail` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_field_usage_count` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_invitation_by_id` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_by_org_and_email` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_by_token` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_for_resend` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_by_id` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_details` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_direct_care_settings` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_name` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_unit_by_id` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `get_organization_unit_descendants` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `get_organization_units` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `get_organizations` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_organizations_paginated` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_orphaned_deletions` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_pending_invitations_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_permission_ids_by_names` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_permissions` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_person_phones` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_phones_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_by_id` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_by_name` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_by_name_and_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_permission_names` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_permission_templates` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_roles` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_schedule_template` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_trace_timeline` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_user_addresses` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_addresses_for_org` | D-variant | pending-phase4-rls | 4 | D-variant: has_platform_privilege() admin-override branch combined with load-bearing RLS; Phase 4 per-table audit applies. Per-RPC sub-classification (e.g., [admin-only] vs strict-D) deferred to Step 12 codegen follow-up. |
+| `get_user_by_id` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_notification_preferences` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_user_org_access` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `get_user_org_details` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_permissions` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `get_user_phones` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_phones_for_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_sms_phones` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_clients` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `list_field_categories` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `list_field_definition_templates` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `list_field_definitions` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `list_invitations` | A-variant | pending-phase3-refactor | 3 | A-variant: same equality-check shape as strict-A but RAISEs instead of RETURNs; Phase 3 refactor target. |
+| `list_roles_for_user` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_schedule_templates` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_system_field_categories` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `list_user_client_assignments` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_user_org_access` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `list_user_organizations` | E-variant | yes | none | E-variant: sui generis (mixed self-context + org-admin predicate). |
+| `list_users` | A | pending-phase3-refactor | 3 | Early-return tenancy guard (PR #66 strict-A pattern); forward-incompatible with grant-bearers; Phase 3 refactor target. |
+| `list_users_for_bulk_assignment` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `list_users_for_role_management` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `list_users_for_schedule_management` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `modify_user_roles` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `reactivate_field_category` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `reactivate_field_definition` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `reactivate_organization` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `reactivate_organization_unit` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `reactivate_role` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `reactivate_schedule_template` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `register_client` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `remove_client_address` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `remove_client_email` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `remove_client_funding_source` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `remove_client_insurance` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `remove_client_phone` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `remove_user_phone` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `resend_invitation` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `retry_deletion_workflow` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `retry_failed_event` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `revoke_invitation` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `safety_net_deactivate_organization` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `soft_delete_organization_addresses` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `soft_delete_organization_contacts` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `soft_delete_organization_phones` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `switch_org_unit` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `sync_role_assignments` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `sync_schedule_assignments` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `unassign_client_contact` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `unassign_client_from_user` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `unassign_user_from_schedule` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `undismiss_failed_event` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `update_client` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_client_address` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_client_email` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_client_funding_source` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_client_insurance` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_client_phone` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_field_category` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_field_definition` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_organization` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `update_organization_address` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `update_organization_contact` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `update_organization_direct_care_settings` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `update_organization_phone` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `update_organization_unit` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `update_role` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_schedule_template` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `update_user` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `update_user_access_dates` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_user_notification_preferences` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `update_user_phone` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `validate_role_assignment` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+<!-- GENERATED:PER-RPC-TABLE:END -->
 
 ## Phase 3 refactor target list (Bucket A + A-variant)
 
 **2 RPCs** to refactor in Phase 3 to the PR #67 three-step skeleton (replace early-return / early-raise guard with `has_effective_permission` + `accessible_organizations @>` membership predicate):
 
-| `api.<name>` | Bucket | Current canonical body | Phase 3 work |
-|---|---|---|---|
-| `list_users` | A (strict) | `20260519233323_fix_list_users_include_roleless.sql:132-140` | Replace early-return guard with three-step skeleton; consultants gain provider-scoped permissions in JWT under Path B, so the existing predicate path serves them naturally |
-| `list_invitations` | A-variant | `baseline_v4:4235-4252` | Replace `IF NOT (has_platform_privilege() OR (has_org_admin AND p_org_id = get_current_org_id())) THEN RAISE EXCEPTION` with the three-step skeleton + permission check on `invitation.read` (or equivalent) at `p_org_id`'s path |
+<!-- GENERATED:PHASE-3-TARGETS:START -->
+| `api.<name>` | Bucket | Reason |
+|---|---|---|
+| `list_invitations` | A-variant | A-variant: same equality-check shape as strict-A but RAISEs instead of RETURNs; Phase 3 refactor target. |
+| `list_users` | A | Early-return tenancy guard (PR #66 strict-A pattern); forward-incompatible with grant-bearers; Phase 3 refactor target. |
+<!-- GENERATED:PHASE-3-TARGETS:END -->
 
 If future RPCs adopt the early-return/early-raise guard pattern (anti-recommended; the three-step skeleton should be the default), they would land in Bucket A or A-variant and need the same refactor.
 
@@ -209,7 +300,7 @@ If future RPCs adopt the early-return/early-raise guard pattern (anti-recommende
 | `update_organization_unit` | latest body `20260423065747_*.sql:1213` | Same — `organization.update_ou` perm |
 | `delete_organization_unit` | `20260223163610_*.sql:37` | Same — `organization.delete_ou` perm |
 | `deactivate_organization_unit` | `20260221173821_*.sql:293` | Same — confirm perm name in body |
-| `reactivate_organization_unit` | `20260221173821_*.sql:605` | Same — confirm perm name in body |
+| `reactivate_organization_unit` | `20260221173821_*.sql:440` | Same — confirm perm name in body |
 
 ### OU readers (3)
 
@@ -234,31 +325,65 @@ grep -rn "get_permission_scope\|Requested scope is outside your permission scope
 
 Every remaining hit must be migrated to `has_effective_permission(perm, path)` in the SAME or strictly-prior migration. See `~/.claude/projects/-home-lars-dev-A4C-AppSuite/memory/pr-67-close-out.md` § Operational tripwire.
 
-## Phase 4 RLS audit target list (Bucket D + D-variant — 35 RPCs)
+## Phase 4 RLS audit target list (Bucket D + D-variant — 37 RPCs)
 
-**35 RPCs** rely on RLS policies for tenancy (34 strict-D + 1 D-variant `get_user_addresses_for_org`). Phase 4 audits the underlying tables' RLS policies and extends them to consult `cross_tenant_access_grants_projection` (via the `has_cross_tenant_access(...)` helper that the Phase 1 migration makes real). Note: the 3 OU readers (`get_organization_unit_by_id/descendants`, `get_organization_units`) moved OUT of D to C-legacy per Phase 1 normalization scope.
+**37 RPCs** rely on RLS policies for tenancy (**36 strict-D + 1 D-variant**). Phase 4 audits the underlying tables' RLS policies and extends them to consult `cross_tenant_access_grants_projection` (via the `has_cross_tenant_access(...)` helper that the Phase 1 migration makes real). Note: the 3 OU readers (`get_organization_unit_by_id/descendants`, `get_organization_units`) moved OUT of D to C-legacy per Phase 1 normalization scope. **Stage R reconciliation 2026-05-29** added 2 net D entries from missing-72 (`get_organization_details`, `list_schedule_templates`) and removed 2 stale D entries (`get_schedule_by_id`, `list_user_schedules` — replaced by the schedule_template + assignment model in migration `20260217211231_schedule_template_refactor.sql`). **Stage R-6 fold-in 2026-05-30** subsequently removed 6 entries: F1 moved 2 entries (`check_field_definitions_exist`, `deactivate_all_field_definitions`) D→E `[service-role-only]` (no `authenticated` grant; RLS is not the enforcement); F2 moved 4 entries (`deactivate_organization`, `delete_organization`, `reactivate_organization`, `retry_deletion_workflow`) D-variant→E `[admin-only]` (their `has_platform_privilege()` gate is the only enforcement; RLS not load-bearing).
 
 The per-table audit cluster (each row in the per-RPC table above lists the underlying table in its guard column):
 
-- `addresses_projection` → 1 RPC (`get_addresses_by_org`)
-- `contacts_projection` → 2 RPCs (`find_contacts_by_phone`, `get_contacts_by_org`)
-- `emails` → 1 RPC (`get_emails_by_org`)
-- `invitations_projection` → 6 RPCs (`check_pending_invitation`, `get_invitation_by_id/org_and_email/token/resend`, `revoke_invitation`, `get_pending_invitations_by_org`) — note: `list_invitations` moved OUT to A-variant
-- `organizations_projection` → 3 RPCs (`get_organization_by_id`, `get_organization_direct_care_settings`, `get_organization_name`)
-- `phones_projection` → 5 RPCs (`get_person_phones`, `get_phones_by_org`, `get_user_phones`, `get_user_phones_for_org`, `get_user_sms_phones`)
-- `roles_projection` / `role_permissions_projection` → 5 RPCs (`get_role_by_id`, `get_role_by_name`, `get_role_by_name_and_org`, `get_role_permission_names`, `get_assignable_roles`)
-- `users` / `user_roles_projection` / `user_organizations_projection` → 4 RPCs (`check_user_org_membership`, `get_user_by_id`, `get_user_org_details`, `list_roles_for_user`)
-- `user_addresses` → 2 RPCs (`get_user_addresses`, `get_user_addresses_for_org` [D-variant])
-- `user_schedules_projection` → 2 RPCs (`get_schedule_by_id`, `list_user_schedules`)
-- `user_client_assignments_projection` → 1 RPC (`list_user_client_assignments`)
-- `bootstrap_projections` → 1 RPC (`get_bootstrap_status`)
-- Entity writes (RLS-enforced + explicit-org-param without strict-A guard): 4 RPCs (`add_user_phone`, `revoke_invitation`, `update_user`, `update_user_notification_preferences`)
+<!-- GENERATED:PHASE-4-TARGETS:START -->
+| `api.<name>` | Bucket | Reason |
+|---|---|---|
+| `add_user_phone` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `check_pending_invitation` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `check_user_org_membership` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `find_contacts_by_phone` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_addresses_by_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_assignable_roles` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_bootstrap_status` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_contacts_by_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_emails_by_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_by_id` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_by_org_and_email` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_by_token` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_for_resend` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_by_id` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_details` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_direct_care_settings` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_organization_name` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_pending_invitations_by_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_person_phones` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_phones_by_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_by_id` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_by_name` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_by_name_and_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_role_permission_names` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_addresses` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_addresses_for_org` | D-variant | D-variant: has_platform_privilege() admin-override branch combined with load-bearing RLS; Phase 4 per-table audit applies. Per-RPC sub-classification (e.g., [admin-only] vs strict-D) deferred to Step 12 codegen follow-up. |
+| `get_user_by_id` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_org_details` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_phones` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_phones_for_org` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_user_sms_phones` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_roles_for_user` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_schedule_templates` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `list_user_client_assignments` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `revoke_invitation` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `update_user` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `update_user_notification_preferences` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+<!-- GENERATED:PHASE-4-TARGETS:END -->
 
 Phase 4 deliverable: per-table RLS policy review with grant-aware EXISTS clauses (`OR EXISTS (SELECT 1 FROM cross_tenant_access_grants_projection ctag WHERE ctag.consultant_user_id = auth.uid() AND ctag.provider_org_id = <table>.organization_id AND ctag.status='active' AND (ctag.expires_at IS NULL OR ctag.expires_at > now()))` — or, after Phase 1 makes the predicate real, a single `OR public.has_cross_tenant_access(...)` call).
 
-### Phase 4 sub-audit note: `check_user_org_membership`
+### Phase 4 sub-audit note: definer-bypasses-RLS cluster
 
-`check_user_org_membership` (`baseline_v4:593-606`) is SECURITY DEFINER with `search_path` set — DEFINER bypasses caller-RLS so the "RLS-enforcement" framing is misleading for this RPC. In practice it's an unauthenticated org-membership probe (any caller can check any user/org pair). Forward-compatible by accident with cross-tenant grants (no restriction = no rejection), but worth an explicit Phase 4 review to decide whether the function should narrow its surface or document the open-by-design behavior.
+Several Bucket-D RPCs are `SECURITY DEFINER` with `search_path` set — DEFINER bypasses caller-RLS, so the "RLS-enforcement" framing in the guard column is **informational only** for these entries. Each needs an explicit Phase 4 review to decide whether to add an inline permission check, narrow the surface, or document the open-by-design behavior.
+
+- **`check_user_org_membership`** (`baseline_v4:593-606`) — unauthenticated org-membership probe; any caller can check any user/org pair. Forward-compatible by accident with cross-tenant grants (no restriction = no rejection).
+- **`get_organization_details`** (`20260226002002_*.sql:214`) [Stage R-6 F3 fold-in 2026-05-30] — no permission check, no tenancy guard; `p_org_id` taken at face value. Any `authenticated` caller can fetch any org's extended metadata. **Pre-existing gap; orthogonal to cross-tenant grant migration.** Phase 4 decision: add `has_effective_permission('organization.view', <p_org_id>'s path)` gate, OR document as open-by-design (e.g., if details are public-by-design), OR replace with a `has_org_admin_permission()` gate.
+- **`list_schedule_templates`** (`20260218001058_*.sql:164`) [Stage R-6 F3 fold-in 2026-05-30] — `COALESCE(p_org_id, get_current_org_id())` is taken at face value with no permission check. Any `authenticated` caller can list schedule templates of any org by passing `p_org_id`. **Pre-existing gap; orthogonal to cross-tenant grant migration.** Phase 4 decision: add `has_effective_permission(<perm>, <p_org_id>'s path)` gate matching the schedule-template-mutation family's enforcement.
+
+**Possible follow-up card seeding**: this cluster is the visible tip of a broader audit population — every `api.*` `SECURITY DEFINER` RPC that takes `p_org_id`/`p_<entity>_id` without an explicit permission check or tenancy guard is structurally similar. Out of Phase 1 scope; consider seeding `dev/active/security-audit-definer-bypass-rls/` with an inventory pass once Phase 1 ships.
 
 Per-table audit work is large; Phase 4 may sub-divide into per-table sub-cards.
 
@@ -307,6 +432,21 @@ $cmt$;
 - **`api.list_user_schedules`** is D not B; takes `p_org_id` optionally but enforces via RLS on `user_schedules_projection`.
 - **OU-mutator RPCs** (`create_organization_unit`, `update_organization_unit`, `deactivate_organization_unit`, `reactivate_organization_unit`, `delete_organization_unit`) are Bucket C even though they don't take an explicit `p_scope_path` parameter — they derive the scope from the OU itself (via `p_unit_id` lookup) and check `has_effective_permission(<perm>, <ou.path>)`. This is structurally Bucket C semantics ("scope-bound permission check") even though the wire parameter is an entity id. The codegen tag would be `@a4c-bucket: C`.
 - **`api.revoke_invitation`**: marked D because it operates entity-bound (`p_invitation_id`) with RLS enforcement. PR #64 surfaced naming-clarity issue (parameter named `p_invitation_id` actually filters on projection PK `id`) — separate seed at `dev/active/api-revoke-invitation-param-naming/`.
+
+### Structural classification notes (2026-05-29 reconciliation pass)
+
+> Surfaced during the matrix-doc reconciliation work in `dev/active/cross-tenant-grant-phase-1-jwt-shape/` (Stage R, 2026-05-29). Heading kept stage-agnostic so this section remains discoverable after the card is archived.
+
+- **B-vs-C path-source discriminator** (codified during Stage R-2 body inspection): when a body calls `has_effective_permission(<perm>, <scope_var>)`, the bucket is determined by HOW `<scope_var>` was assigned, NOT by whether `get_current_org_id()` appears anywhere in the body. **B**: `<scope_var>` traces to `WHERE id = v_org_id` AND `v_org_id := get_current_org_id()` (JWT-derived). **C**: `<scope_var>` traces to `WHERE id = p_<param>_id` directly OR to `WHERE id = v_<rec>.organization_id` where `v_<rec>` was assigned from a caller-supplied entity-id (entity-derived). Worked example: `api.admit_client` is B despite taking `p_client_id` — its `v_org_path` comes from `WHERE id = v_org_id` (JWT). `api.update_organization` is C despite declaring `v_org_id := get_current_org_id();` (vestigial unused variable) — its `v_org` comes from `WHERE id = p_org_id` (caller-supplied).
+- **`api.update_organization` vestigial JWT-org variable**: the body declares `v_org_id uuid := get_current_org_id();` but uses `p_org_id` (caller-supplied) for the perm-check path lookup. The `v_org_id` value is unused. This pattern requires the path-source discriminator above to classify correctly (Bucket C) — naive "if get_current_org_id appears then B" misclassifies. Pattern observed in `20260423065747_api_rpc_readback_v2_event_id_check.sql:1353`.
+- **Schedule template family — COALESCE hybrid scope-source**: 7 of the 8 schedule mgmt RPCs (`create/deactivate/delete/reactivate/update_schedule_template`, `assign_user_to_schedule`, `unassign_user_from_schedule`) use `has_effective_permission(<perm>, COALESCE((SELECT path FROM organization_units_projection WHERE id = <entity-OU-id>), (SELECT path FROM organizations_projection WHERE id = v_org_id)))`. When an OU-id is supplied (directly or via a fetched template), scope is entity-derived → primary path is **Bucket C**. When the OU-id is NULL (template was created with no OU target), scope falls back to JWT-org-derived (B-like). Net classification: **C** (canonical case dominates; JWT-fallback is the degenerate edge). **Consultant-callability is NOT automatic under Path B** even though the perm-check succeeds: the family also performs a hard-coded `WHERE id = p_org_unit_id AND organization_id = v_org_id` OU-tenancy validation where `v_org_id := get_current_org_id()` (the consultant's JWT home-org). A partner consultant whose JWT home-org is X but who holds a grant-derived `user.schedule_manage` at provider Y's OU path will pass `has_effective_permission` (Path B carries the grant-derived perm at the right scope) but FAIL the subsequent `organization_id = v_org_id` validation. Consultant variant requires Phase 2+ parameterization — either a `p_target_org_id` override or relaxation of the post-perm OU-org validation to consult `accessible_organizations`. Stage R-6 F4 fold-in 2026-05-30 corrected an earlier overly-optimistic claim here.
+- **`api.get_schedule_template`** (the 8th schedule mgmt RPC) does NOT use COALESCE hybrid; it's a tenancy-only read (`WHERE id = p_template_id AND organization_id = v_org_id`) with no `has_effective_permission` call. **Bucket B** (tenancy-only).
+- **`api.safety_net_deactivate_organization`** ([service-role-only]) has NO inline tenancy gate — it relies entirely on `GRANT EXECUTE ... TO service_role` (NOT to `authenticated`). Functions as a Temporal compensation lever for `emitBootstrapFailed → handler` failure path. **Bucket E** despite taking `p_org_id uuid` — not D, because RLS isn't the enforcement mechanism (caller is service_role which bypasses RLS); the only enforcement is the `GRANT` itself. Documented as "intentional CQRS exception for last-resort rollback" in the function header comment. Not consultant-callable under any model (consultants authenticate as `authenticated`, not as service_role).
+- **`api.deactivate_user`** uses unscoped `has_permission('user.update')` + manual tenancy guard (`IF v_target_org_id IS DISTINCT FROM v_org_id`). Same structural pattern as existing matrix entry `api.delete_user` (per `adr-edge-function-vs-sql-rpc.md` Rollout 2026-04-27 course correction: users-as-identity surface uses unscoped `has_permission` with manual tenancy guard, NOT `has_effective_permission`). **Bucket E** — matches `delete_user` precedent.
+- **Client lifecycle RPCs and field-definition family — all Bucket B**: 16 client-lifecycle RPCs (`add_client_*`, `admit_client`, `change_client_placement`, `discharge_client`, `register_client`, `update_client`, `update_client_*`, `remove_client_*`, `unassign_client_contact`) and ~14 field-categories/definitions RPCs (`create_field_*`, `deactivate_field_*`, `delete_field_*`, `update_field_*`, `list_field_categories`, `list_field_definitions`, `reactivate_field_*`, etc.) share the canonical B pattern: `v_org_id := get_current_org_id()` → `SELECT path INTO v_org_path FROM organizations_projection WHERE id = v_org_id` → `has_effective_permission(<perm>, v_org_path)`. Consultants on Path B cannot target these in a grant org because `get_current_org_id()` returns home-org. **Consultant-callable parameterization deferred to Phase 2+ per ADR**.
+- **Reference-data list RPCs**: `api.list_field_definition_templates` and `api.list_system_field_categories` have NO tenancy gate at all (return platform-level reference data). **Bucket E** by definition — grant-irrelevant.
+- **Admin-dashboard family**: `api.get_failed_events_with_detail` `[admin-only]` uses `has_permission('platform.view_event_details')`; `api.get_orphaned_deletions` `[admin-only]` and `api.retry_deletion_workflow` `[admin-only]` use `has_platform_privilege()`. These join the existing admin-only matrix entries (`get_failed_events`, `get_event_processing_stats`, `dismiss_failed_event`, `retry_failed_event`, `undismiss_failed_event`, `get_events_by_*`, `get_trace_timeline`). All E or D-variant.
+- **`@a4c-rpc-shape` is a wire-shape contract, NOT a r/w marker** (clarified during R-6 N1 resolution 2026-05-30): the M3 backfill rule (`20260430172625_*.sql:77-83`) deterministically tags RPCs as `envelope` iff the body constructs a `{success, true|false, ...}` discriminator, else `read`. This means several state-mutating RPCs in the per-RPC table above carry `@a4c-rpc-shape: read` despite their `r/w = W` semantics — specifically `bulk_assign_role`, `sync_role_assignments`, `sync_schedule_assignments`, `deactivate_all_field_definitions`, and `safety_net_deactivate_organization`. Their return shapes lack the `{success}` discriminator (e.g., `{successful, failed, totalRequested, ...}` or `{found, deactivated, deactivated_at}`), so the frontend services callers (`SupabaseRoleService`, `SupabaseScheduleService`) correctly consume them via `apiRpc<T>` (read helper, returns raw payload). The wire-shape tag classifies which TS helper narrows on the function name; the matrix's `r/w` column is the semantic operation marker. The two axes are intentionally orthogonal.
 
 ## Related Documentation
 

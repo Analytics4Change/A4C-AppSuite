@@ -83,6 +83,25 @@ supabase migration repair --status reverted <version>
 
 **Note**: Docker/Podman is required for some Supabase CLI commands. Set `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock` if using Podman.
 
+### PG ARE regex word-boundary: use `\y`, not `\b`
+
+On the deployed hosted Supabase PG instance, `\b` (documented as word-boundary in PG ARE per docs § 9.7.3.3) silently fails to match at end-of-input positions:
+
+```sql
+'envelope' ~ 'envelope\b'  -- → false  (BUG — should be true)
+'envelope' ~ 'envelope\y'  -- → true   (CORRECT)
+```
+
+Discovered in `20260601174841_cross_tenant_grant_phase_1_jwt_shape.sql` Stage E deploy when Steps 8 + 11 assertions falsely fired on already-tagged functions. Two pre-existing M3 backfill callsites (`20260430172625:87`, `20260430172836:78`) used `\b` for an idempotent SKIP guard — the bug only masked extra rebuild work there (the rebuild was idempotent and produced the same final state), but new assertion-driven code that depends on the regex matching will fail-loud.
+
+**Rule**: when writing PG regex anchors for word boundaries, use `\y` (PG-specific, end-of-word) instead of `\b`. Same for `\Y` (non-word-boundary) vs `\B`. Reserve `\b` for inside `[ ]` bracket expressions where it represents ASCII backspace (the documented dual meaning).
+
+**Audit query** for future migrations:
+
+```bash
+grep -rnE "['\"][^'\"]*\\\\b[^'\"]*['\"]" infrastructure/supabase/supabase/migrations/
+```
+
 ### Migration-session `SET search_path` gotcha (extension-typed parameters)
 
 Function-attribute `SET search_path TO 'public', 'extensions', ...` applies INSIDE the function body but **NOT during `CREATE OR REPLACE FUNCTION` parameter-type parsing**. Any migration that uses extension-typed parameters in a signature (`ltree`, `vector`, `pg_trgm`, etc.) will fail with `type "<type>" does not exist (SQLSTATE 42704)` unless the migration session's search_path includes `extensions`. Add a session-level `SET search_path = public, extensions, pg_temp;` at the top of the migration file before any such `CREATE OR REPLACE FUNCTION` statements. (Discovered in PR #67 when migration with `p_scope_path ltree` parameter failed first push.)
@@ -105,6 +124,31 @@ The four `api.list_users*` RPCs share a normalized three-step skeleton (establis
 **Four-site distribution audit** (baseline_v4 grep for the two-step `'Requested scope is outside your permission scope'` error): `api.bulk_assign_role` (L362, mutation), `api.list_users_for_bulk_assignment` (L4705, visibility — normalized in PR #67), `api.list_users_for_role_management` (L4793, visibility — normalized in PR #67), `api.sync_role_assignments` (L5571, mutation). The two mutation siblings remain on the legacy pattern; a future card may extend normalization to them.
 
 **Pattern origin**: PR #66 introduced the `accessible_organizations @>` membership convention; PR #67 extended it to the three sister RPCs + normalized the permission-check helper. See `memory/pr-66-close-out.md` and (when written post-merge) `memory/pr-67-close-out.md` for the full close-out narratives.
+
+### `accessible_organizations` is the canonical membership oracle (UNION-canonical post-Phase-1)
+
+`public.users.accessible_organizations` is the canonical membership predicate for ALL access-derived decisions (per the PR #66/#67 `@>` convention). **Post-Phase-1 (cross-tenant-access-grant-rollout)**, this array represents the UNION of two source projections:
+
+1. `user_organizations_projection.org_id` rows for the user — direct membership.
+2. `provider_org_id`s from active in-window `cross_tenant_access_grants_projection` rows addressing the user (user-specific via `consultant_user_id` OR org-wide via `consultant_org_id` matching one of the user's accessible_organizations entries).
+
+**Two triggers maintain the invariant**:
+- `sync_accessible_organizations` (on `user_organizations_projection` INSERT/UPDATE/DELETE) — the pre-Phase-1 trigger; body rewritten in Phase 1 to delegate.
+- `sync_accessible_organizations_from_grants` (on `cross_tenant_access_grants_projection` INSERT/UPDATE/DELETE) — added in Phase 1.
+
+**Both delegate to the shared helper** `public.recompute_user_accessible_organizations(p_user_id uuid)` which performs the canonical UNION recomputation with deterministic `ORDER BY org_id` for idempotency at the array-equality level.
+
+**Critical rules**:
+- **Never write `users.accessible_organizations` directly** — route through the helper so the UNION invariant is preserved.
+- **Never use `users.current_organization_id` as a membership oracle.** It is the active-session pointer (set by `switch_organization` at clock-in for direct-care staff, or initial signup default). It is NOT a membership predicate. A user switched to a different org would be silently excluded by any logic keyed on `current_organization_id`. The canonical predicate for "is U a member of org X?" is `u.accessible_organizations @> ARRAY[X]::uuid[]` — GIN-indexed via `idx_users_accessible_orgs_gin`.
+- **For org-wide grant addressing in `cross_tenant_access_grants_projection`** (rows with `consultant_user_id IS NULL`), the eligible-user predicate is `u.accessible_organizations @> ARRAY[g.consultant_org_id]::uuid[]`. Used in `compute_effective_permissions`, `sync_accessible_organizations_from_grants`, and the Phase 1 backfill DO-block. Anti-pattern: `u.current_organization_id = g.consultant_org_id` (was caught + remediated in Phase 1 architect review M1 fold-in 2026-06-01).
+
+**Anti-pattern audit query** when reviewing any Phase 2+ migration that touches grant addressing or membership:
+```bash
+grep -rnE "current_organization_id\s*=\s*(consultant_org_id|p_org_id|v_org_id)" \
+  infrastructure/supabase/supabase/migrations/
+```
+Every match needs review; replace with the `accessible_organizations @>` form.
 
 ## PL/pgSQL Validation (plpgsql_check)
 
