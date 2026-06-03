@@ -57,6 +57,15 @@ const DB_URL =
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
 const FIELD_SEP = '<<<A4C_FIELD>>>';
+// Row separator: pg_description.description can contain literal newlines
+// (multi-line COMMENTs in baseline_v4 like "Validation:\n...", "Used by:\n...",
+// "Tenancy model:\n...") so we cannot split on '\n'. Default psql record
+// separator is '\n'; -R overrides it. This mirrors the FIELD_SEP rationale:
+// pick a string that no description body will contain. Without this fix,
+// each continuation line becomes a phantom row with garbage `name` field
+// and gets reported as untagged — the 1329-untagged-functions CI failure
+// (PR #70 first push, 2026-06-02).
+const ROW_SEP = '<<<A4C_ROW>>>';
 
 const QUERY = `
   SELECT
@@ -87,7 +96,7 @@ function success(msg) {
 
 function runQuery() {
   const cmd =
-    `psql "${DB_URL}" -A -t -F'${FIELD_SEP}' -X -v ON_ERROR_STOP=1 -c "${QUERY.replace(/\n/g, ' ')}"`;
+    `psql "${DB_URL}" -A -t -R '${ROW_SEP}' -F'${FIELD_SEP}' -X -v ON_ERROR_STOP=1 -c "${QUERY.replace(/\n/g, ' ')}"`;
   let output;
   try {
     output = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -95,8 +104,8 @@ function runQuery() {
     fail(`psql query failed: ${e.message || e}\nDB_URL: ${DB_URL}`);
   }
   return output
-    .trim()
-    .split('\n')
+    .split(ROW_SEP)
+    .map((l) => l.trim())
     .filter((l) => l.length > 0)
     .map((line) => {
       const [name, args, returns, description] = line.split(FIELD_SEP);
