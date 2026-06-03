@@ -102,6 +102,45 @@ Discovered in `20260601174841_cross_tenant_grant_phase_1_jwt_shape.sql` Stage E 
 grep -rnE "['\"][^'\"]*\\\\b[^'\"]*['\"]" infrastructure/supabase/supabase/migrations/
 ```
 
+### `ANY((SELECT array_col FROM CTE))` is a scalar subquery returning rows-of-arrays
+
+PG interprets a parenthesized subquery in `ANY((SELECT ...))` as scalar-returning. When the SELECT projects an array column, PG ends up evaluating `<scalar> = <array-of-arrays>` → `operator does not exist: uuid = uuid[]`. Discovered in `20260601174841_cross_tenant_grant_phase_1_jwt_shape.sql` Stage E deploy when Step 1's grant-derived CTE used `g.consultant_org_id = ANY((SELECT accessible_orgs FROM user_accessible_orgs))`.
+
+```sql
+-- ❌ WRONG: scalar subquery returns rows-of-arrays
+AND g.consultant_org_id = ANY((SELECT accessible_orgs FROM user_accessible_orgs))
+
+-- ✅ CORRECT: EXISTS with column reference; ANY(uao.accessible_orgs) applies array-element semantics
+AND EXISTS (
+  SELECT 1 FROM user_accessible_orgs uao
+  WHERE g.consultant_org_id = ANY(uao.accessible_orgs)
+)
+```
+
+**Rule**: `ANY(<expr>)` needs a column reference or array literal as `<expr>` for array-element semantics. If you're tempted to inline a subquery, wrap the surrounding predicate in `EXISTS (SELECT 1 FROM <cte> WHERE ... = ANY(<cte>.<array_col>))` instead.
+
+### `EXCEPTION WHEN unique_violation` is dead code under `process_domain_event`
+
+Handlers (and any code emitting via `api.emit_domain_event`) cannot catch `unique_violation` locally — the `process_domain_event` BEFORE INSERT trigger's `WHEN OTHERS` clause catches the violation **upstream** of any handler-internal exception block. The outer INSERT then succeeds with `processing_error` populated, producing a stale failed event in `domain_events` instead of an idempotent no-op. Re-runs leave a growing trail of failed events.
+
+```sql
+-- ❌ WRONG: handler-internal catch never fires under trigger
+BEGIN
+  INSERT INTO permissions_projection (...) VALUES (...);
+EXCEPTION WHEN unique_violation THEN NULL;
+END;
+
+-- ✅ CORRECT: precondition guard before the conflicting INSERT
+IF NOT EXISTS (
+  SELECT 1 FROM permissions_projection
+  WHERE applet = '...' AND action = '...'
+) THEN
+  INSERT INTO permissions_projection (...) VALUES (...);
+END IF;
+```
+
+Discovered as a BLOCKING finding in PR #70 Step 10 architect review (2026-06-02). The pattern `EXCEPTION WHEN unique_violation THEN NULL` exists in `20260430002824:46-54` (PR #43) but the migration only ran once on a fresh seed, so no stale failed events ever materialized — re-applying that migration would now produce them. **Forward-incompatible note**: any migration that re-emits seed events MUST use the precondition-guard form.
+
 ### Migration-session `SET search_path` gotcha (extension-typed parameters)
 
 Function-attribute `SET search_path TO 'public', 'extensions', ...` applies INSIDE the function body but **NOT during `CREATE OR REPLACE FUNCTION` parameter-type parsing**. Any migration that uses extension-typed parameters in a signature (`ltree`, `vector`, `pg_trgm`, etc.) will fail with `type "<type>" does not exist (SQLSTATE 42704)` unless the migration session's search_path includes `extensions`. Add a session-level `SET search_path = public, extensions, pg_temp;` at the top of the migration file before any such `CREATE OR REPLACE FUNCTION` statements. (Discovered in PR #67 when migration with `p_scope_path ltree` parameter failed first push.)
@@ -637,6 +676,14 @@ $comment$Update user profile (first_name, last_name) via domain event
 > **⚠️ DROP + CREATE re-tag rule**
 >
 > `COMMENT ON FUNCTION` is keyed to the function OID. `CREATE OR REPLACE FUNCTION` (same signature) preserves the comment; `DROP FUNCTION` + `CREATE FUNCTION` (signature change) does NOT — the new OID has no comment. Any DROP+CREATE migration MUST re-issue `COMMENT ON FUNCTION ... '@a4c-rpc-shape: ...'` in the same migration.
+
+> **⚠️ Codegen parser pitfall — `pg_description.description` can contain newlines**
+>
+> When a codegen script reads `pg_description.description` via `psql -A -t` and parses rows JS-side, the default record separator is `\n`. Baseline_v4 functions have multi-line `COMMENT ON FUNCTION` bodies (`Validation:`, `Used by:`, `Tenancy model:` etc.) — each continuation line becomes a phantom row and gets reported as untagged. Discovered as the "1329 untagged functions" CI failure on PR #70 first push.
+>
+> **Two safe patterns**:
+> 1. **SQL-side extraction** (used by `gen-rpc-registry.cjs`): `CASE WHEN d.description ~ '@a4c-rpc-shape:\s*envelope' THEN 'envelope' ... ELSE '' END AS shape` — returns only single-line tag values.
+> 2. **psql row-separator override** (used by `gen-rpc-reachability-matrix.cjs:99`): `psql -A -t -R '<<<A4C_ROW>>>' -F'<<<A4C_FIELD>>>'` — split JS-side on the row sentinel instead of `\n`. Necessary when the codegen needs the full multi-line description for multi-tag parsing.
 
 CI workflow `.github/workflows/rpc-registry-sync.yml` spins up a local Supabase container, applies migrations, runs `npm run gen:rpc-registry`, and fails if (a) the registry diverges from the migration state or (b) any RPC lacks a shape tag. Run the codegen locally after applying a migration that adds, drops, or retags an `api.*` function:
 
