@@ -337,3 +337,34 @@ After Phase 0 PR merges to main:
 4. Architect review of Phase 1 plan before any migration is written.
 5. Phase 1 implementation: produce the migration file (transactional `.sql` covering all 15 steps), regenerate `database.types.ts` for both frontend + workflows, smoke-test against dev Supabase.
 6. PR + UAT + merge.
+
+## Phase 1 — Outcomes (SHIPPED 2026-06-03)
+
+**PR #70** — merged commit `485955fb` 2026-06-03 (no-squash per PR #68 precedent; preserved 33-commit per-step + architect-fold-in progression). All 3 post-merge deploys green: `Deploy Database Migrations` (27s), `Deploy Frontend`, `Deploy Temporal Workers`. Production state verified: migration `20260601174841` recorded; `grant_role_templates` has 4 var_default rows; 7 new permissions seeded (3 `grant.*` + 4 `partner.*`).
+
+**15-step manifest** — all delivered per ADR `adr-cross-tenant-access-grant-jwt-shape.md` § Phase 1 migration manifest. Single transactional migration `20260601174841_cross_tenant_grant_phase_1_jwt_shape.sql` (4,392 lines, 66 top-level statements). Six PR #68-locked ADR decisions verified end-to-end:
+
+1. ✅ Path B (extend `compute_effective_permissions`) — asymmetric `DISTINCT ON (permission_name, scope_path)` + grant_derived_perms 4-arm UNION CTE.
+2. ✅ Hybrid permission-snapshot — `cross_tenant_access_grants_projection.permissions jsonb` read directly; no template join at issuance.
+3. ✅ Asymmetric DISTINCT ON tightening — multi-scope rows for same permission preserved (Stage E verified `client.create` survives at two distinct scope paths).
+4. ✅ Separate `grant_role_templates` table — Step 15 ships with 4-row var_default seed (HIPAA `phi_restricted: true` on all 4).
+5. ✅ `propagate_through_grants` default false (HIPAA least-authority) — Step 2 ALTER TABLE; Stage E verified both directions (false blocks grant-source implication-widening; true allows it).
+6. ✅ Event-sourced policy-override — `access_grant.policy_override_applied` handler ships Phase 1; emit RPC `api.revoke_permission_across_grants` deferred to Phase 2.
+
+**Operational tripwire from PR #67 — CLOSED**: 10 C-legacy RPCs (the 2 mutation siblings + 5 OU mutators + 3 OU readers per reachability matrix § Phase 1 must-pair normalization) normalized to canonical `has_effective_permission(perm, scope_path)`. Matrix doc now shows `C-legacy = 0`; the 10 RPCs migrated to `C` (post-fold-in: C went 21 → 31; D-variant 5 → 1; E 37 → 43; total still 170).
+
+**Stage E smoke + UAT — 21/21 PASS** against dev (10 structural + 11 dynamic). Auth-hook latency p50 0.202ms / p95 0.228ms vs Stage B baseline p50 0.222 / p95 0.267 — BETTER on both (architect clearance criterion was ≤2× baseline ~0.5ms). HIPAA invariant verified both directions. EXISTS bugfix verified (empty/NULL accessible_organizations → 0 grant-derived rows). All cleanup verified.
+
+**9 architect review passes** during Stage C drafting (plan + matrix-R-6 + Steps 1+2 + 3+4 + 5+6 + 7 + 8+9 + 10 + 11 + 12+13+14+15) + Stage E deploy-bugfix review + **final-PR review verdict APPROVE** (unconditional; no must-fix; 3 nits N1-N3 — N1 folded into Phase 2 manifest above; N2/N3 cosmetic). One REQUEST-CHANGES (Step 10 — 2 BLOCKING defects: `scope_type='resource'` violated CHECK + `EXCEPTION WHEN unique_violation` dead code; both folded same-day).
+
+**Codified pitfalls** (carry forward):
+- **PG ARE `\b` vs `\y`** (`infrastructure/supabase/CLAUDE.md` § PG ARE regex word-boundary): `\b` silently fails-no-match on hosted Supabase PG; use PG-specific `\y`. Discovered via Stage E deploy bugfix on Steps 8+11 assertions.
+- **Step 12 codegen multi-line `pg_description.description` parser**: psql output must use `-R '<<<A4C_ROW>>>'` row separator when description bodies contain newlines (baseline_v4 docblocks like `Validation:`, `Used by:`, `Tenancy model:`). Discovered via "1329 untagged functions" CI failure on PR #70 first push. Codegen at `frontend/scripts/gen-rpc-reachability-matrix.cjs:99` is now hardened; M3 sibling `gen-rpc-registry.cjs` avoids the issue by SQL-side tag extraction.
+- **`ANY((SELECT array_col FROM CTE))` is a scalar subquery**: PG interprets it as returning rows of arrays → `operator does not exist: uuid = uuid[]`. Use EXISTS form with column reference instead. Discovered via Step 1 deploy bugfix.
+- **`EXCEPTION WHEN unique_violation` is dead code under `process_domain_event`**: the trigger's WHEN OTHERS catches violations upstream and persists stale failed events. Use `IF NOT EXISTS (SELECT 1 FROM proj WHERE ..) THEN INSERT...` precondition guard instead. Discovered via Step 10 BLOCKING architect finding.
+
+**Carry-forwards into Phase 2**:
+- N1 (above): register `access_grant.policy_override_applied` in `infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml` next to the emit RPC `api.revoke_permission_across_grants` (handler pre-conditions documented at migration `:3239-3249` / `:4118-4127`).
+- `var_partnerships_projection` table + emit RPCs (Phase 2 manifest above).
+- Single-grant revoke RPC `api.revoke_access_grant` (Phase 2 manifest above).
+- Phase 3 (`list_users` + `list_invitations` A-variant refactor) + Phase 4 (35 strict-D + 1 D-variant RLS audit) handoffs already locked at Phase 0.3.
