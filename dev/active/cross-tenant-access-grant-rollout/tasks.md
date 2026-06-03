@@ -262,6 +262,7 @@ Independent architect review (software-architect-dbc) on 2026-05-26 — verdict 
 - `api.get_grant_role_templates(p_authorization_type)` read RPC
 - `api.expire_var_partnership` — emitter shape decided in Phase 0.5 (scheduled job vs RPC)
 - AsyncAPI `contracts/asyncapi.yaml` updates: `var_partnership` channel + 6 message types
+- **AsyncAPI `access_grant.yaml` — register `access_grant.policy_override_applied`** (PR #70 architect review N1, 2026-06-03): the event is handler-defined in Phase 1 but not emitted until Phase 2's `api.revoke_permission_across_grants` lands. The codebase convention is "register on emit, not on handler" — so the AsyncAPI entry pairs with the emit RPC. When Phase 2 drafts the emitter, add a message definition to `infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml` next to the existing `created/revoked/expired/suspended/reactivated` entries. Schema must capture: `permissions: array<{p: string, s: ltree}>` (the replacement set), `override_reason: string` (non-empty), `applied_by: uuid` (admin actor). The handler enforces `jsonb_typeof(permissions)='array'` + non-empty `override_reason` pre-conditions (Phase 1 migration `:3239-3249`, `:4118-4127`); emitter must mirror.
 - Comment-tagging for all new RPCs (`@a4c-rpc-shape` + `@a4c-bucket` + `@a4c-consultant-callable` + `@a4c-phase-target`)
 
 ### Phase 0.5 unblocks
