@@ -22,6 +22,43 @@ This is pre-existing drift — the reference file reflects post-migration state 
 
 **Phase 4 cross-tenant access stub**: `public.has_cross_tenant_access(p_consultant_org_id, p_provider_org_id, p_user_id, p_scope)` still returns FALSE on prod (verified 2026-06-04). Phase 4 implements the body; Phase 2 confirms independence — `api.create_access_grant` HIPAA gate is at provider org path via `has_effective_permission('grant.create', v_provider_path)`, not via `has_cross_tenant_access`.
 
+## New codifiable pitfall from Chunk 2 (2026-06-04)
+
+**Verify deployed body before `CREATE OR REPLACE FUNCTION` of any pre-existing function**. Discovered during Chunk 2 Step 5 drafting: my initial draft of `process_domain_event` (CREATE OR REPLACE to add the `var_partnership` branch) silently dropped four load-bearing semantics from the deployed body:
+
+1. The `IF NEW.processed_at IS NOT NULL THEN RETURN NEW; END IF;` idempotency guard
+2. The PII three-layer model (`GET STACKED DIAGNOSTICS MESSAGE_TEXT, PG_EXCEPTION_DETAIL` → `processing_error` + `processing_error_detail`) per PR #43
+3. The `RAISE WARNING` for operator debug visibility
+4. The ERRCODE `P9002` for unknown stream_type (I had used `P9001`)
+5. `clock_timestamp()` for `processed_at` (I had used `now()`)
+
+Each item would have appeared "fine" in plpgsql_check + would have deployed cleanly to dev — but Phase 1 + PR #43 invariants would silently regress on prod.
+
+**Resolution pattern**: query Mgmt API SQL endpoint with
+```sql
+SELECT pg_get_functiondef(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = '<schema>' AND p.proname = '<func>';
+```
+BEFORE writing a CREATE OR REPLACE. Copy the deployed body verbatim, then add the minimal targeted change.
+
+This is the kind of pitfall that should fold into `infrastructure/supabase/CLAUDE.md` post-Phase-2 ship — but it's premature now (one discovery; need 2-3 instances to confirm it's a real recurring pattern, not just my first-pass error).
+
+## Chunking strategy + architect-review cadence (Stage C)
+
+Chunks chosen by complexity + dependency boundaries:
+
+| Chunk | Steps | Why grouped |
+|---|---|---|
+| 1 | 1-3 | Schema cluster — all CREATE TABLE / RLS / index together |
+| 2 | 4.0 + 4 + 5 | Event-processing cluster — helper + router + dispatcher must land together |
+| 3 | 6 + 7 + 7b | Gates cluster — 2 validation helpers + new permission seed |
+| 4 | 8 | Largest single RPC; alone for focus |
+| 5 | 9 + 10 | Revoke flow — single-event + multi-event partial-failure |
+| 6 | 11-15 | 5 VAR lifecycle RPCs (homogeneous batch); includes Step 13 cascade-revoke |
+| 7 | 16 + 17 | Read RPC + COMMENT tags (light wrap-up) |
+
+Architect review fires after each chunk per Phase 1 sub-decision 3. Default verdict for non-blocking findings = "APPROVE WITH IN-PR FIXES" with same-day fold-in (memory `feedback-no-deferral-to-cards.md`).
+
 ## Phase 1 codified pitfalls — all apply to Phase 2
 
 Per `infrastructure/supabase/CLAUDE.md` (post-PR-#70 state):

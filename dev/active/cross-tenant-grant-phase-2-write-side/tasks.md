@@ -95,6 +95,60 @@
 
 ## Current Status
 
-**Stage**: B (pre-flight) — **CLOSED 2026-06-04**. Stages A + B both closed same day. All 7 Stage B probes pass.
-**Status**: Card structure complete. Phase 2 plan locked, architect-approved (APPROVE WITH IN-PR FIXES; all findings folded). Auth-hook baseline recalibrated (p95=0.126ms, target 0.25ms). Underscore-prefix convention uncontested. Ready for Stage C drafting at Step 1.
-**Next action**: Stage C drafting begins. Create migration file via `supabase migration new cross_tenant_grant_phase_2_write_side`; draft Step 1 (CREATE TABLE var_partnerships_projection with partial UNIQUE per sub-decision G); architect review of Steps 1-3 batch.
+**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed same day 2026-06-04. Chunks 1+2 of Stage C complete with architect reviews folded.
+**Status**: Migration `20260604210910_cross_tenant_grant_phase_2_write_side.sql` at ~720 lines / 22 top-level statements. Chunks 1+2 (Steps 1-3 schema cluster + Steps 4.0+4+5 event processing) on branch HEAD `c9ad76c3`. All architect findings (3 must-fix + 3 must-fix + 2 should-fix per chunk + 2 nits per chunk) folded same-day.
+**Next action**: Chunk 3 (Steps 6+7+7b) — 2 validation helpers (`public._validate_authorization_var_contract`, `public._validate_authorization_emergency_access`) + `partnership.manage` permission seed via `permission.defined` event emit.
+
+## Resume guide (for fresh-context continuation)
+
+If picking up in a new conversation, read these in order:
+
+1. **Card files**:
+   - `dev/active/cross-tenant-grant-phase-2-write-side/plan.md` — 17-step manifest + locked sub-decisions A-K + architect plan-mode review fold-in
+   - `dev/active/cross-tenant-grant-phase-2-write-side/tasks.md` (this file) — per-step progress + Stage B/C status
+   - `dev/active/cross-tenant-grant-phase-2-write-side/observations.md` — carry-forwards + pre-existing divergences out of scope
+
+2. **Memory**:
+   - `~/.claude/projects/-home-lars-dev-A4C-AppSuite/memory/MEMORY.md` — groom log + user prefs + key patterns
+   - `~/.claude/projects/-home-lars-dev-A4C-AppSuite/memory/pr-70-close-out.md` — Phase 1 close-out + 4 codified pitfalls
+   - `~/.claude/projects/-home-lars-dev-A4C-AppSuite/memory/feedback-no-deferral-to-cards.md` — default "APPROVE WITH IN-PR FIXES" verdict
+   - `~/.claude/projects/-home-lars-dev-A4C-AppSuite/memory/feedback-branch-on-decision.md` — branch immediately on card-work decision
+
+3. **ADR**:
+   - `documentation/architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md` Decisions C.1-C.5 (lines 177-367)
+
+4. **Migration in progress**:
+   - `infrastructure/supabase/supabase/migrations/20260604210910_cross_tenant_grant_phase_2_write_side.sql`
+   - Per CLAUDE.md `infrastructure/supabase/CLAUDE.md` § codified pitfalls: PG `\y` not `\b`; psql `-R` row-separator for codegen; EXISTS form for `ANY((SELECT))`; `IF NOT EXISTS` precondition (NOT `EXCEPTION WHEN unique_violation`)
+
+5. **Branch + push status**: branch `feat/cross-tenant-grant-phase-2-write-side` pushed; HEAD `c9ad76c3` (Chunk 2 fold-in). All work durable in git.
+
+### Chunking strategy (7 total; 2 done, 5 remaining)
+
+| Chunk | Steps | Status |
+|---|---|---|
+| 1 | 1-3 (schema) | ✅ done; architect F1+F2+F3+S2+S3 folded |
+| 2 | 4.0 + 4 + 5 (helper + router + dispatcher) | ✅ done; architect F1+F2+S1+S2+N1+N2 folded |
+| **3** | **6 + 7 + 7b** (validation helpers + partnership.manage seed) | **NEXT** |
+| 4 | 8 (`api.create_access_grant` — largest RPC, alone) | pending |
+| 5 | 9 + 10 (revoke flow incl. multi-event partial-failure per F3 I-fold) | pending |
+| 6 | 11-15 (5 VAR emit RPCs incl. Step 13 cascade-revoke) | pending |
+| 7 | 16 + 17 (read RPC + COMMENT ON FUNCTION tags) | pending |
+
+### Architect-review cadence
+
+Fires after each chunk per Phase 1 cadence (sub-decision 3 user-locked). 9 total passes planned; 2 done. Default verdict for non-blocking findings = "APPROVE WITH IN-PR FIXES" with same-day fold-in.
+
+### Codified-pitfall checklist (apply during every chunk)
+
+1. PG regex word-boundary: use `\y` not `\b`
+2. Codegen reading `pg_description.description`: use psql `-R '<<<A4C_ROW>>>'` row-separator OR SQL-side `~` extraction
+3. `ANY((SELECT array_col FROM CTE))`: use EXISTS form with column reference
+4. Handler precondition: use `IF NOT EXISTS ... THEN INSERT` (NOT `EXCEPTION WHEN unique_violation`)
+5. **NEW from Chunk 2**: BEFORE `CREATE OR REPLACE FUNCTION` of any pre-existing function, fetch the deployed body via Mgmt API SQL (`pg_get_functiondef`) to verify load-bearing semantics aren't silently dropped (caught my dispatcher draft missing the PII three-layer model + idempotency guard + ERRCODE P9002).
+
+### Architect-clearance criteria
+
+- Auth-hook latency p95: ≤ 0.25 ms (Stage B baseline 0.126 ms × 2)
+- M3 RPC registry: 0 untagged regressions (post-Chunk 7)
+- Reachability matrix: +10 rows (5 VAR + 3 grant + 1 read + 1 cascade-extended terminate); C-legacy still 0
