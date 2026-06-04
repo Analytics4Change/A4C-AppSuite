@@ -32,13 +32,14 @@
 
 > Architect review fires per Phase 1 cadence (9 passes) — see plan.md § Architect-review checkpoints.
 
-- [ ] **Step 1** — `CREATE TABLE var_partnerships_projection` (14 cols, status CHECK, partnership_type CHECK, support_level CHECK, UNIQUE)
-- [ ] **Step 2** — 3 RLS policies (org-admin both sides SELECT, platform-admin SELECT, service-role SELECT; NO write policies)
-- [ ] **Step 3** — 3 indexes (2 partial WHERE status='active', 1 contract_end_date partial)
-- [ ] **Architect review of Steps 1-3** — schema CHECK enums, RLS posture, partial UNIQUE topic
-- [ ] **Step 4** — `process_var_partnership_event` router with 5-arm INLINE CASE + ELSE RAISE EXCEPTION P9001
-- [ ] **Step 5** — Dispatcher CASE extension on `public.process_domain_event()`
-- [ ] **Architect review of Steps 4-5** — router 5-arm + dispatcher branch + idempotency-guard form
+- [x] **Step 1** — `CREATE TABLE var_partnerships_projection` (21 cols, status CHECK 4-value, partnership_type CHECK, support_level CHECK, partial UNIQUE per sub-decision G, FKs with ON DELETE CASCADE per F2 fold-in)
+- [x] **Step 2** — 3 RLS policies (org-admin BOTH-sides SELECT via `has_effective_permission('organization.view', <org_path>)` scope-bound — deliberate departure from baseline `get_current_org_id()` pattern per F1 fold-in; platform-admin SELECT; service-role SELECT; NO write policies)
+- [x] **Step 3** — 3 partial indexes (partner_org_id active, provider_org_id active, contract_end_date active+nonnull)
+- [x] **Architect review of Steps 1-3 2026-06-04** — APPROVE WITH IN-PR FIXES; F1+F2+F3 must-fix + S2+S3 should-fix all folded same-day. Migration file at 276 lines / 17 statements after fold-in.
+- [x] **Step 4.0 (NEW per Chunk 2 architect F2)** — `public.safe_jsonb_extract_numeric(jsonb, text, numeric)` 7th member of safe_jsonb_extract_* family. Symmetric with safe_jsonb_extract_date body shape.
+- [x] **Step 4** — `process_var_partnership_event` router with 5-arm INLINE CASE + ELSE RAISE EXCEPTION P9001. F1 idempotency guard on stream_id replay added per architect fold-in.
+- [x] **Step 5** — Dispatcher CASE extension on `public.process_domain_event()`. FULL deployed body preserved (DECLARE + idempotency + PII three-layer model + clock_timestamp + ERRCODE P9002). New `WHEN 'var_partnership'` branch inserted between `client` and administrative-absorbed types. Reference file `handlers/trigger/process_domain_event.sql` synced in same commit per S2.
+- [x] **Architect review of Steps 4-5 2026-06-04** — APPROVE WITH IN-PR FIXES; F1+F2 must-fix + S1+S2 should-fix + N1+N2 nits all folded same-day. New router reference file `handlers/routers/process_var_partnership_event.sql` created.
 - [ ] **Step 6** — `public._validate_authorization_var_contract` (SECURITY DEFINER, GRANT EXECUTE service_role only)
 - [ ] **Step 7** — `public._validate_authorization_emergency_access`
 - [ ] **Step 7b (NEW per sub-decision J)** — emit `permission.defined` event seeding `partnership.manage` (org-scoped, no MFA). Default-bundle into provider-admin role template.
@@ -60,9 +61,7 @@
 
 ## Stage D — Post-migration deliverables (same Phase 2 PR)
 
-- [ ] `infrastructure/supabase/contracts/asyncapi/domains/var_partnership.yaml` (NEW, 5 messages)
-- [ ] `infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml` (add `AccessGrantPolicyOverrideApplied` — PR #70 N1)
-- [ ] `infrastructure/supabase/contracts/asyncapi/asyncapi.yaml` (var_partnership channel + stream_type enum L252)
+- [ ] **HARD BLOCKER before Chunk 4 (emit RPCs) merges** (Chunk 2 architect review 2026-06-04): `infrastructure/supabase/contracts/asyncapi/domains/var_partnership.yaml` (NEW, 5 messages with stream_id/stream_type/event_type/event_data/event_metadata structure per access_grant.yaml precedent; payloads enumerate keys per plan.md § "Event payload schemas") + `infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml` (add `AccessGrantPolicyOverrideApplied` per PR #70 N1) + `infrastructure/supabase/contracts/asyncapi/asyncapi.yaml` (var_partnership channel + stream_type enum L252). The router (Step 4, shipped Chunk 2) currently handles 5 event types with NO AsyncAPI schemas — emit RPCs at Steps 11-15 make these externally observable, so AsyncAPI must land before/with that chunk.
 - [ ] `npm run generate:types` + commit regen + `cp` to `frontend/src/types/generated/generated-events.ts`
 - [ ] `infrastructure/supabase/handlers/routers/process_var_partnership_event.sql` (NEW reference file, inline pattern)
 - [ ] `infrastructure/supabase/handlers/trigger/process_domain_event.sql` (add var_partnership branch)

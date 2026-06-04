@@ -273,6 +273,47 @@ CREATE INDEX IF NOT EXISTS idx_var_partnerships_contract_end
 -- ============================================================================
 
 -- ============================================================================
+-- Step 4.0 — safe_jsonb_extract_numeric helper (F2 architect fold-in 2026-06-04)
+-- ============================================================================
+-- The existing safe_jsonb_extract_* family has 6 helpers (boolean, date,
+-- organization_id, text, timestamp, uuid) but NO numeric variant. Phase 2
+-- introduces the first numeric column (revenue_share_percentage) consumed
+-- via event_data. Per architect F2: adding the 7th helper closes a
+-- forward-incompatibility pitfall — using inline `NULLIF(..., '')::numeric`
+-- would silently coerce empty-string to NULL, hiding malformed-numeric
+-- errors. The helper matches the safe_jsonb_extract_date precedent
+-- (COALESCE-with-default; throws on malformed input, caught by
+-- process_domain_event's WHEN OTHERS → persisted to processing_error).
+--
+-- Column-level precision (numeric(5,2)) is enforced at assignment, NOT in
+-- the helper signature (the helper is generic; the column is typed).
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.safe_jsonb_extract_numeric(
+    p_data    jsonb,
+    p_key     text,
+    p_default numeric DEFAULT NULL
+)
+RETURNS numeric
+LANGUAGE sql
+IMMUTABLE
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $function$
+  SELECT COALESCE((p_data->>p_key)::numeric, p_default);
+$function$;
+
+COMMENT ON FUNCTION public.safe_jsonb_extract_numeric(jsonb, text, numeric) IS
+$comment$7th member of the safe_jsonb_extract_* helper family (added Phase 2
+2026-06-04 per architect F2). Returns the value of p_key as numeric, or
+p_default if missing/null. Throws on malformed numeric input (caught
+upstream by process_domain_event's WHEN OTHERS handler — fail-loud is the
+correct behavior; silent empty-string-to-NULL coercion is anti-canonical).
+
+Symmetric with safe_jsonb_extract_date body shape. Column-level precision
+(e.g., numeric(5,2)) is enforced at column assignment, not in the helper
+signature.$comment$;
+
+-- ============================================================================
 -- Step 4 — process_var_partnership_event router (5-arm INLINE CASE)
 -- ============================================================================
 -- Per ADR Decision C.3 line 304 + sub-decision F (inline handlers, no
@@ -322,6 +363,25 @@ BEGIN
   CASE p_event.event_type
 
     WHEN 'var_partnership.created' THEN
+      -- F1 architect fold-in 2026-06-04: idempotency guard on stream_id
+      -- replay. The Step 11 emit RPC enforces the duplicate-business-key
+      -- precondition (partner_org_id, provider_org_id) via partial UNIQUE;
+      -- this guard handles the orthogonal axis (same stream_id replay
+      -- under retry / baseline rebuild). Without this, retry produces a
+      -- stale failed event per codified pitfall #4 (EXCEPTION WHEN
+      -- unique_violation is dead code).
+      --
+      -- N1 architect fold-in: created_at + updated_at use p_event.created_at
+      -- per access_grant.created precedent (handlers/routers/
+      -- process_access_grant_event.sql:36). Column DEFAULT now() at Step 1
+      -- is a belt-and-suspenders guard against the never-permitted
+      -- direct-INSERT path.
+      IF EXISTS (
+        SELECT 1 FROM public.var_partnerships_projection
+        WHERE id = p_event.stream_id
+      ) THEN
+        RETURN;
+      END IF;
       INSERT INTO public.var_partnerships_projection (
         id,
         partner_org_id, partner_org_name,
@@ -341,7 +401,7 @@ BEGIN
         public.safe_jsonb_extract_text(p_event.event_data, 'contract_number'),
         public.safe_jsonb_extract_date(p_event.event_data, 'contract_start_date'),
         public.safe_jsonb_extract_date(p_event.event_data, 'contract_end_date'),
-        NULLIF(p_event.event_data->>'revenue_share_percentage', '')::numeric(5,2),
+        public.safe_jsonb_extract_numeric(p_event.event_data, 'revenue_share_percentage'),
         public.safe_jsonb_extract_text(p_event.event_data, 'support_level'),
         COALESCE(p_event.event_data->'terms', '{}'::jsonb),
         'active',
@@ -353,6 +413,14 @@ BEGIN
       -- PATCH semantics: only non-null keys overwrite. Immutable fields
       -- (id, partner_org_id, provider_org_id, contract_start_date) are
       -- not included.
+      --
+      -- S1 architect fold-in 2026-06-04: an `updated` event with no
+      -- mutable keys still advances updated_at = p_event.created_at. This
+      -- is intentional — the event itself IS the change-record; the
+      -- projection's substantive columns may legitimately be stable
+      -- (e.g., audit-only update). The Step 12 api.update_var_partnership
+      -- emit RPC SHOULD reject empty-payload calls at the precondition
+      -- layer.
       UPDATE public.var_partnerships_projection
       SET
         partner_org_name = COALESCE(
@@ -376,7 +444,7 @@ BEGIN
           contract_end_date
         ),
         revenue_share_percentage = COALESCE(
-          NULLIF(p_event.event_data->>'revenue_share_percentage', '')::numeric(5,2),
+          public.safe_jsonb_extract_numeric(p_event.event_data, 'revenue_share_percentage'),
           revenue_share_percentage
         ),
         support_level = COALESCE(
@@ -589,7 +657,10 @@ partnership lifecycle events.
 
 Per codified guard rail (CLAUDE.md § Event Processing Architecture):
 - Single trigger; never create per-event-type triggers
-- ELSE raises P9001 (RAISE EXCEPTION, never WARNING)
+- Dispatcher ELSE raises P9002 (unknown stream_type) — RAISE EXCEPTION,
+  never WARNING. Distinct ERRCODE from router ELSEs (P9001 = unknown
+  event_type within a known stream_type — see process_var_partnership_event
+  and process_access_grant_event precedent). N2 architect fold-in 2026-06-04.
 - WHEN OTHERS sets processing_error so the trigger persists the row even
   on handler failure (Pattern A v2 audit-preservation contract)
 - Junction pre-route ($linked/$unlinked) excludes contact.user.{linked,

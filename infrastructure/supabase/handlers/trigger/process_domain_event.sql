@@ -34,6 +34,8 @@ BEGIN
                 WHEN 'client_field_definition'  THEN PERFORM process_client_field_definition_event(NEW);
                 WHEN 'client_field_category'    THEN PERFORM process_client_field_category_event(NEW);
                 WHEN 'client'                   THEN PERFORM process_client_event(NEW);
+                -- Phase 2 (2026-06-04) — VAR partnership lifecycle events
+                WHEN 'var_partnership'          THEN PERFORM process_var_partnership_event(NEW);
                 -- Administrative stream_types — No projection needed
                 WHEN 'platform_admin'    THEN NULL;
                 WHEN 'workflow_queue'    THEN NULL;
