@@ -12,7 +12,8 @@
 - [x] Read api.modify_user_roles (PR #44 partial-failure contract precedent for `revoke_permission_across_grants`) at `20260430172139_*.sql`
 - [x] User-locked decisions captured (2026-06-04): expire deferred, 5 emit RPCs, Phase 1 review cadence
 - [x] Sub-decisions A-F resolved at plan time
-- [ ] **Architect review of plan.md** — `software-architect-dbc` — pending; must complete before any migration SQL drafted
+- [x] **Architect review of plan.md** — `software-architect-dbc` — COMPLETED 2026-06-04. Verdict APPROVE WITH IN-PR FIXES. 5 must-fix F1-F5 + 6 should-fix S1-S6 + 3 nits N1-N3 + 5 sub-decisions G-K to lock. All folded same-day.
+- [x] User-facing sub-decisions G/H/J answered (2026-06-04): G=partial UNIQUE, H=cascade-revoke, J=seed `partnership.manage`. Architect-recommended choice on each.
 
 ## Stage B — Pre-flight checks (per plan.md § Verification step 1)
 
@@ -23,6 +24,7 @@
 - [ ] Concurrency check: `gh pr list --base main` returns no open PR touching var_partnership / access_grant / process_domain_event surface
 - [ ] Baseline build green: `frontend` + `workflows` `tsc --noEmit` exit 0 on HEAD
 - [ ] `npm run gen:rpc-reachability-matrix` against current dev produces 170-row matrix (no drift since Phase 1 ship)
+- [ ] **NEW per S1**: `grep -nE "CREATE OR REPLACE FUNCTION public\._" infrastructure/supabase/supabase/migrations/*.sql` — verify zero matches before codifying underscore-prefix convention. If matches exist: classify them (private helpers vs accidentally-underscore-named public) before drafting Step 6/7.
 
 ## Stage C — Migration drafting (17 manifest steps)
 
@@ -37,7 +39,8 @@
 - [ ] **Architect review of Steps 4-5** — router 5-arm + dispatcher branch + idempotency-guard form
 - [ ] **Step 6** — `public._validate_authorization_var_contract` (SECURITY DEFINER, GRANT EXECUTE service_role only)
 - [ ] **Step 7** — `public._validate_authorization_emergency_access`
-- [ ] **Architect review of Steps 6-7** — private-helper convention codification + GRANT posture
+- [ ] **Step 7b (NEW per sub-decision J)** — emit `permission.defined` event seeding `partnership.manage` (org-scoped, no MFA). Default-bundle into provider-admin role template.
+- [ ] **Architect review of Steps 6-7b** — private-helper convention codification + GRANT posture + partnership.manage seed correctness
 - [ ] **Step 8** — `api.create_access_grant` (largest RPC; ADR L184-213 locked body skeleton)
 - [ ] **Architect review of Step 8** — HIPAA gate, INTERSECT semantics, Pattern A v2 readback completeness
 - [ ] **Step 9** — `api.revoke_access_grant`
@@ -69,7 +72,8 @@
 - [ ] **Pre-deploy probe**: re-run row-count probe on `cross_tenant_access_grants_projection` (still 0); confirm `var_partnerships_projection` still does NOT exist (no race with another in-flight branch)
 - [ ] `supabase db push --linked` to dev → confirm `Finished supabase db push.`
 - [ ] **Batch 1 — Structural (10 probes)**: var_partnerships_projection 14-col shape; status/partnership_type/support_level CHECK enums; UNIQUE present; 3 RLS + 0 write policies; 3 indexes; dispatcher CASE has WHEN 'var_partnership'; router 5-arm + ELSE using `\y` regex; all 9 new api.* RPCs tagged (M3 SQL-side extraction; 0-untagged regression)
-- [ ] **Batch 2 — Dynamic (11 probes)**: VAR partnership create/suspend/reactivate/terminate; create_access_grant happy + emergency_access NULL + non-emergency NULL fails CHECK; INTERSECT narrowing; permission-snapshot equality; revoke_access_grant happy; revoke_permission_across_grants partial-failure; RLS deny-by-default; recompute_user_accessible_organizations invariant preserved
+- [ ] **Batch 2 — Dynamic (12 probes, +1 per F5)**: VAR partnership create/suspend/reactivate/terminate; create_access_grant happy + emergency_access NULL + non-emergency NULL fails CHECK; INTERSECT narrowing; permission-snapshot equality; revoke_access_grant happy; revoke_permission_across_grants partial-failure; RLS deny-by-default; recompute_user_accessible_organizations invariant preserved; **F5 NEW** — `var_default` template-created grant `permissions` jsonb is exactly 4 literal `partner.*` permissions (no derived implications) — HIPAA least-authority guarantee
+- [ ] **Batch 3 — Cascade (NEW per sub-decision H)**: 2 active var_contract grants citing 1 partnership → terminate → both grants revoked with `revocation_reason='var_partnership_terminated'`; partial-cascade failure envelope shape verified
 - [ ] **Auth-hook latency re-measure**: p50/p95 within architect 2× clearance criterion (~0.5ms p95 max)
 - [ ] **Type regen**: `npx supabase gen types typescript --linked > frontend/src/types/database.types.ts 2>/dev/null` + copy byte-identical to workflows
 - [ ] **M3 RPC registry regen**: `npm run gen:rpc-registry` against dev (using Mgmt API adapter pattern from PR #70) → diff zero or expected additions only
@@ -90,6 +94,6 @@
 
 ## Current Status
 
-**Stage**: A (plan gate) — IN PROGRESS. Plan drafted 2026-06-04 from approved planning session. Sub-decisions A-F resolved. User-locked decisions captured.
-**Status**: Card seeded 2026-06-04. Branch `feat/cross-tenant-grant-phase-2-write-side` created from main. plan.md + tasks.md + observations.md written. Awaiting architect plan-mode review before any migration SQL drafted.
-**Next action**: Invoke `software-architect-dbc` for plan.md review (Phase 1 precedent: review verdict folded in same-day before Stage B starts).
+**Stage**: A (plan gate) — **CLOSED 2026-06-04**. Plan-mode architect review completed; verdict APPROVE WITH IN-PR FIXES; 5 must-fix + 6 should-fix + 3 nits + 5 sub-decisions G-K all folded same-day. User-facing G/H/J answered via AskUserQuestion per architect recommendations.
+**Status**: Stage A closed. Card structure: plan.md, tasks.md, observations.md all updated with architect fold-ins. Awaiting Stage B pre-flight probes against dev.
+**Next action**: Stage B pre-flight probes (mirror Phase 1 Stage B): row-count probe + `var_partnerships_projection` non-existence probe + S1 underscore-prefix grep + baseline auth-hook latency + baseline build green + matrix-doc no-drift verification. After Stage B closes, begin Stage C drafting at Step 1.

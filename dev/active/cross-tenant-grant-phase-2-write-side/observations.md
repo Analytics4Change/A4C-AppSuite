@@ -12,6 +12,16 @@ This is pre-existing drift — the reference file reflects post-migration state 
 
 **Carry forward**: a future cleanup card could either (a) baseline-rebase the reference file post-Phase-2 or (b) emit an idempotent migration that re-creates `process_domain_event` matching the reference file exactly. Not blocking any phase of cross-tenant-grant rollout.
 
+**Phase 2 impact** (per N3 architect note): Phase 2 wiring REDUCES the 8-stream-type reference-file divergence by one (var_partnership goes into both baseline-diff via Step 5 dispatcher CASE extension AND the reference file via Stage D handler-reference sync). Net divergence post-Phase-2: 7 stream_types unaccounted-for in baseline.
+
+## Architect plan-mode review carry-forwards (2026-06-04)
+
+**Denormalized-name sync deferred to Phase N** (per S4 architect recommendation): ADR L296 specifies that `var_partnership.*` handlers should sync denormalized name columns on `org.updated` cross-events. Phase 2 ships the columns (`partner_org_name`, `provider_org_name`) but NOT the cross-handler hook. Risk: an org-rename leaves `var_partnerships_projection` with stale names. Mitigation: low-impact (denormalization is for display only; grant authorization uses IDs); Phase N can add a cross-handler hook OR scheduled reconciler.
+
+**Pre-existing ADR drift (sub-decision K)**: Phase 1 deployed `grant_role_templates` with 3-column UNIQUE `(template_name, authorization_type, permission_name)` per Phase 1 architect N2 fold-in, but ADR L232 still shows 2-column UNIQUE. Stage D should fold an ADR correction note below C.2.
+
+**Phase 4 cross-tenant access stub**: `public.has_cross_tenant_access(p_consultant_org_id, p_provider_org_id, p_user_id, p_scope)` still returns FALSE on prod (verified 2026-06-04). Phase 4 implements the body; Phase 2 confirms independence — `api.create_access_grant` HIPAA gate is at provider org path via `has_effective_permission('grant.create', v_provider_path)`, not via `has_cross_tenant_access`.
+
 ## Phase 1 codified pitfalls — all apply to Phase 2
 
 Per `infrastructure/supabase/CLAUDE.md` (post-PR-#70 state):
