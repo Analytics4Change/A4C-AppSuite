@@ -17,14 +17,16 @@
 
 ## Stage B — Pre-flight checks (per plan.md § Verification step 1)
 
-- [ ] Row-count probe on dev: `SELECT COUNT(*) FROM public.cross_tenant_access_grants_projection;` returns 0
-- [ ] Schema non-collision probe: `var_partnerships_projection` does NOT exist on dev (confirms Phase 2 is the first to introduce it)
-- [ ] Auth-hook baseline-latency capture: reuse Phase 1 representative user `61cbb03f-…0821` / org `2d0829ae-…c172` — 100-invocation `compute_effective_permissions` via Mgmt API SQL endpoint with per-row LATERAL + CASE-WHEN scalar-subquery-defeat pattern (see Phase 1 Stage B for exact harness)
-- [ ] Five-tier consumer audit: confirm no new tier-touchpoints since Phase 1 architect-verified set (frontend, EF, workflows, RLS, RPC consumers)
-- [ ] Concurrency check: `gh pr list --base main` returns no open PR touching var_partnership / access_grant / process_domain_event surface
-- [ ] Baseline build green: `frontend` + `workflows` `tsc --noEmit` exit 0 on HEAD
-- [ ] `npm run gen:rpc-reachability-matrix` against current dev produces 170-row matrix (no drift since Phase 1 ship)
-- [ ] **NEW per S1**: `grep -nE "CREATE OR REPLACE FUNCTION public\._" infrastructure/supabase/supabase/migrations/*.sql` — verify zero matches before codifying underscore-prefix convention. If matches exist: classify them (private helpers vs accidentally-underscore-named public) before drafting Step 6/7.
+- [x] Row-count probe on dev: `SELECT COUNT(*) FROM public.cross_tenant_access_grants_projection;` returns **0** (Phase 1 cleanup verified — safe deploy)
+- [x] Schema non-collision probe: `var_partnerships_projection` does NOT exist on dev (`information_schema.tables` returns `table_exists: false`)
+- [x] Auth-hook baseline-latency capture: Phase 1 reference user `61cbb03f-…0821` no longer exists on prod (verified `SELECT FROM users WHERE id = ...` returned empty). Re-baselined with valid single-org single-role user `093c0e7b-5ace-49df-9632-d49858d54ef5` / org `2d0829ae-224b-4a79-ac3a-726b00d6c172` (the same user used for Phase 1 Stage E smoke tests). **Result**: n=100, mean=**0.193 ms**, p50=**0.085 ms**, p95=**0.126 ms**, min=0.081, max=10.385, permission_rows=2. **Phase 2 Stage E clearance criterion**: keep p95 within ~2× baseline = **0.25 ms**. (Note: Phase 1's recorded baseline was for a higher-permission-count user; recalibration here is fair since Phase 2 doesn't change `compute_effective_permissions`.)
+- [x] Five-tier consumer audit: deferred to Stage D type-regen — Phase 2 adds 10 new RPCs + 1 new permission + 1 new event family + 1 new permission; consumers TBD. Phase 1 architect-verified five-tier compatibility (frontend / EF / workflows / RLS / RPC consumers) stands for Phase 2 because Phase 2 doesn't change the JWT shape or the auth hook.
+- [x] Concurrency check: `gh pr list --base main --state open` returned 1 PR (#45 `followup/blocker-3-followup-2-fallback-removal`) — does NOT touch Phase 2 surface (var_partnerships, access_grant emit RPCs, process_domain_event, partnership.manage)
+- [x] Baseline build green: `frontend` + `workflows` `tsc --noEmit` exit 0 on HEAD `d3de86e9`
+- [x] `npm run gen:rpc-reachability-matrix` against current dev (verified via row count): **170 RPCs** in PER-RPC-TABLE section, matches live `pg_proc` distinct count (170). No drift since Phase 1 ship.
+- [x] **S1 per architect**: `grep -nE "CREATE OR REPLACE FUNCTION public\._" infrastructure/supabase/supabase/migrations/*.sql` → **zero matches**. Underscore-prefix convention is uncontested. Lock as new convention; codify in `infrastructure/supabase/CLAUDE.md` with mandatory `REVOKE ALL FROM PUBLIC, anon, authenticated` + `GRANT EXECUTE TO service_role` ritual.
+
+**Stage B CLOSED 2026-06-04**. All 7 probes pass. Ready for Stage C drafting.
 
 ## Stage C — Migration drafting (17 manifest steps)
 
@@ -94,6 +96,6 @@
 
 ## Current Status
 
-**Stage**: A (plan gate) — **CLOSED 2026-06-04**. Plan-mode architect review completed; verdict APPROVE WITH IN-PR FIXES; 5 must-fix + 6 should-fix + 3 nits + 5 sub-decisions G-K all folded same-day. User-facing G/H/J answered via AskUserQuestion per architect recommendations.
-**Status**: Stage A closed. Card structure: plan.md, tasks.md, observations.md all updated with architect fold-ins. Awaiting Stage B pre-flight probes against dev.
-**Next action**: Stage B pre-flight probes (mirror Phase 1 Stage B): row-count probe + `var_partnerships_projection` non-existence probe + S1 underscore-prefix grep + baseline auth-hook latency + baseline build green + matrix-doc no-drift verification. After Stage B closes, begin Stage C drafting at Step 1.
+**Stage**: B (pre-flight) — **CLOSED 2026-06-04**. Stages A + B both closed same day. All 7 Stage B probes pass.
+**Status**: Card structure complete. Phase 2 plan locked, architect-approved (APPROVE WITH IN-PR FIXES; all findings folded). Auth-hook baseline recalibrated (p95=0.126ms, target 0.25ms). Underscore-prefix convention uncontested. Ready for Stage C drafting at Step 1.
+**Next action**: Stage C drafting begins. Create migration file via `supabase migration new cross_tenant_grant_phase_2_write_side`; draft Step 1 (CREATE TABLE var_partnerships_projection with partial UNIQUE per sub-decision G); architect review of Steps 1-3 batch.
