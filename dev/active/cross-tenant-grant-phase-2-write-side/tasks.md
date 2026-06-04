@@ -40,10 +40,13 @@
 - [x] **Step 4** — `process_var_partnership_event` router with 5-arm INLINE CASE + ELSE RAISE EXCEPTION P9001. F1 idempotency guard on stream_id replay added per architect fold-in.
 - [x] **Step 5** — Dispatcher CASE extension on `public.process_domain_event()`. FULL deployed body preserved (DECLARE + idempotency + PII three-layer model + clock_timestamp + ERRCODE P9002). New `WHEN 'var_partnership'` branch inserted between `client` and administrative-absorbed types. Reference file `handlers/trigger/process_domain_event.sql` synced in same commit per S2.
 - [x] **Architect review of Steps 4-5 2026-06-04** — APPROVE WITH IN-PR FIXES; F1+F2 must-fix + S1+S2 should-fix + N1+N2 nits all folded same-day. New router reference file `handlers/routers/process_var_partnership_event.sql` created.
-- [ ] **Step 6** — `public._validate_authorization_var_contract` (SECURITY DEFINER, GRANT EXECUTE service_role only)
-- [ ] **Step 7** — `public._validate_authorization_emergency_access`
-- [ ] **Step 7b (NEW per sub-decision J)** — emit `permission.defined` event seeding `partnership.manage` (org-scoped, no MFA). Default-bundle into provider-admin role template.
-- [ ] **Architect review of Steps 6-7b** — private-helper convention codification + GRANT posture + partnership.manage seed correctness
+- [x] **Step 6** — `public._validate_authorization_var_contract` (STABLE, SECURITY DEFINER, GRANT EXECUTE service_role only; queries var_partnerships_projection for ACTIVE row). 'suspended' status intentionally excluded per S1.a fold-in.
+- [x] **Step 7** — `public._validate_authorization_emergency_access` (returns TRUE unconditionally; signature uniformity for Phase N court/agency/family helpers per N2 fold-in)
+- [x] **Step 7b (per sub-decision J + F1 fold-in)** — THREE-PART seed per canonical Phase 1 + `20260422052825_*.sql:653-680` precedent:
+  - 7b.a: emit `permission.defined` event (precondition-guarded)
+  - 7b.b: INSERT INTO role_permission_templates ('provider_admin', 'partnership.manage') ON CONFLICT DO NOTHING — future bootstraps grant it
+  - 7b.c: BACKFILL existing provider_admin roles' role_permissions_projection — closes gap for existing prod tenants
+- [x] **Architect review of Steps 6-7b 2026-06-04** — APPROVE WITH IN-PR FIXES; F1 must-fix (partnership.manage bundling gap — Option A: implement plan as written via template INSERT + backfill) + S1.a should-fix (SECURITY DEFINER COMMENT honesty) + N2 nit (ADR cross-reference) all folded same-day. Phase-N validator helper gotcha noted in observations.md.
 - [ ] **Step 8** — `api.create_access_grant` (largest RPC; ADR L184-213 locked body skeleton)
 - [ ] **Architect review of Step 8** — HIPAA gate, INTERSECT semantics, Pattern A v2 readback completeness
 - [ ] **Step 9** — `api.revoke_access_grant`
@@ -95,9 +98,9 @@
 
 ## Current Status
 
-**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed same day 2026-06-04. Chunks 1+2 of Stage C complete with architect reviews folded.
-**Status**: Migration `20260604210910_cross_tenant_grant_phase_2_write_side.sql` at ~720 lines / 22 top-level statements. Chunks 1+2 (Steps 1-3 schema cluster + Steps 4.0+4+5 event processing) on branch HEAD `c9ad76c3`. All architect findings (3 must-fix + 3 must-fix + 2 should-fix per chunk + 2 nits per chunk) folded same-day.
-**Next action**: Chunk 3 (Steps 6+7+7b) — 2 validation helpers (`public._validate_authorization_var_contract`, `public._validate_authorization_emergency_access`) + `partnership.manage` permission seed via `permission.defined` event emit.
+**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3 of Stage C complete with architect reviews folded.
+**Status**: Migration at ~895 lines / 35 top-level statements. Chunks 1-3 (Steps 1-7b) on branch HEAD pending Chunk 3 fold-in commit. All 3 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3 + Phase-N validator gotcha noted).
+**Next action** (after context clear): Chunk 4 — Step 8 `api.create_access_grant` (largest single RPC; ADR L184-213 locked body skeleton; 13 params; F1 + F2 + K fold-ins from plan-mode pre-applied). This is the biggest single-RPC drafting of Phase 2; fresh context recommended.
 
 ## Resume guide (for fresh-context continuation)
 

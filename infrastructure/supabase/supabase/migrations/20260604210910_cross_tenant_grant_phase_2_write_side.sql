@@ -693,11 +693,16 @@ infrastructure/supabase/handlers/trigger/process_domain_event.sql$comment$;
 -- infrastructure/supabase/CLAUDE.md as part of Phase 2 Stage D documentation.
 --
 -- Hard GRANT posture (architect S1): REVOKE ALL FROM PUBLIC, anon,
--- authenticated; GRANT EXECUTE TO service_role ONLY. SECURITY DEFINER
--- because the helper queries var_partnerships_projection which is RLS-
--- gated to org-admin SELECT; service_role bypasses RLS but we still set
--- SECURITY DEFINER for explicit-authority semantics + symmetry with
--- _validate_authorization_emergency_access (Step 7).
+-- authenticated; GRANT EXECUTE TO service_role ONLY.
+--
+-- SECURITY DEFINER is FUNCTIONALLY REDUNDANT under the service_role-only
+-- GRANT (service_role bypasses RLS at the engine level on Supabase, so
+-- INVOKER would produce identical behavior). Retained for: (a) future-
+-- flexibility if the GRANT widens to other roles, (b) symmetry with Step 7
+-- and Phase N validators that share the same shape, (c) defense-in-depth —
+-- explicit authority is documented in the function definition.
+-- (S1.a architect fold-in 2026-06-04 Chunk 3 review — original comment
+-- falsely implied SECURITY DEFINER was load-bearing for RLS bypass.)
 --
 -- NOTE on status filter: 'suspended' partnerships are NOT accepted (a
 -- suspended partnership is an explicit pause; new grant issuance against
@@ -798,7 +803,10 @@ p_reason + audit metadata).
 Signature uniformity with _validate_authorization_var_contract (Phase N
 court/agency/family helpers will share this shape). p_consultant_org_id
 + p_provider_org_id parameters are intentionally unused; the helper is
-a typed sentinel.
+a typed sentinel. ADR Decision C.1 line 205 codifies the signature
+`(p_reference uuid, p_consultant_org_id uuid, p_provider_org_id uuid)
+RETURNS boolean` as the contract; court/agency/family helpers MUST
+conform. (N2 architect fold-in 2026-06-04 Chunk 3 review.)
 
 Underscore-prefix convention (Phase 2). GRANT posture: service_role ONLY.
 
@@ -827,14 +835,23 @@ ADR Decision C.1 line 205.$comment$;
 -- event_data JSON shape that handle_permission_defined inserts into
 -- permissions_projection.
 --
--- Default-bundle into provider-admin role: DEFERRED to operator runbook
--- (or Phase 2.5 follow-up card). Reason: today's HIPAA gate
--- `has_platform_privilege() OR has_effective_permission('partnership.manage',
--- <provider_org_path>)` already admits platform admins, so VAR partnership
--- RPCs are immediately usable by platform admins without role-bundling.
--- Provider-org admins gain access via subsequent role assignment.
+-- F1 architect fold-in 2026-06-04 (Chunk 3 review): plan.md sub-decision J
+-- says "Default-bundle into provider-admin role template" — must implement.
+-- Without bundling, Phase 2 ships with provider-admin-targeted RPCs that
+-- no provider admin can call (platform admins via has_platform_privilege()
+-- short-circuit only; provider admins blocked).
+--
+-- Three-part emit per canonical Phase 1 + 20260422052825 precedent:
+--   (a) permission.defined event → handler INSERTs into permissions_projection
+--   (b) INSERT INTO role_permission_templates (provider_admin, partnership.manage)
+--       — future bootstraps grant it to new provider_admin role assignments
+--   (c) BACKFILL INTO role_permissions_projection for EXISTING provider_admin
+--       roles — closes the gap for existing prod tenants. Canonical precedent
+--       at 20260422052825_client_ou_placement_and_edit_support.sql:670-680
+--       (the client.transfer rollout pattern).
 -- ----------------------------------------------------------------------------
 
+-- 7b.a — Emit permission.defined event (Phase 1 Step 10 precedent verbatim)
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.permissions_projection
@@ -851,6 +868,30 @@ DO $$ BEGIN
     );
   END IF;
 END $$;
+
+-- 7b.b — Add to provider_admin role_permission_templates so future bootstraps
+-- grant partnership.manage to new provider_admin role assignments. Pattern
+-- from 20260422052825_client_ou_placement_and_edit_support.sql:653-655.
+INSERT INTO public.role_permission_templates (role_name, permission_name, is_active)
+VALUES ('provider_admin', 'partnership.manage', true)
+ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+-- 7b.c — Backfill: grant partnership.manage to all EXISTING provider_admin
+-- role assignments. Closes the gap for prod tenants whose provider_admin
+-- roles already exist (without backfill, only NEW orgs bootstrapped after
+-- Phase 2 would get the permission). Precondition: 7b.a already INSERTed
+-- the row into permissions_projection (synchronous handler), so the JOIN
+-- below resolves. Idempotent via ON CONFLICT DO NOTHING — re-runs are
+-- byte-correct no-ops.
+INSERT INTO public.role_permissions_projection (role_id, permission_id, granted_at)
+SELECT rp.id AS role_id, pp.id AS permission_id, now() AS granted_at
+FROM public.roles_projection rp
+CROSS JOIN public.permissions_projection pp
+WHERE rp.name = 'provider_admin'
+  AND rp.deleted_at IS NULL
+  AND pp.applet = 'partnership'
+  AND pp.action = 'manage'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- ============================================================================
 -- End Chunk 3 (Steps 6-7-7b gates cluster).

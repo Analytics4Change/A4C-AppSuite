@@ -22,6 +22,19 @@ This is pre-existing drift — the reference file reflects post-migration state 
 
 **Phase 4 cross-tenant access stub**: `public.has_cross_tenant_access(p_consultant_org_id, p_provider_org_id, p_user_id, p_scope)` still returns FALSE on prod (verified 2026-06-04). Phase 4 implements the body; Phase 2 confirms independence — `api.create_access_grant` HIPAA gate is at provider org path via `has_effective_permission('grant.create', v_provider_path)`, not via `has_cross_tenant_access`.
 
+## Phase N validator helper Phase-N gotcha (Chunk 3 architect 2026-06-04)
+
+The Phase 2 `_validate_authorization_var_contract` body uses the mapping `partner_org_id = p_consultant_org_id` because in a VAR partnership the "partner_org" IS the consultant party (the `provider_partner` org_type that consults at `provider` orgs). This 1:1 mapping is VAR-specific.
+
+Phase N forward-compat gotcha: court/agency/family backing projections will likely NOT have a `partner_org_id` column. Examples:
+- `court_authorizations_projection` — may have `authorized_party_org_id` or no consultant-org-identity at all (courts authorize specific individuals)
+- `agency_assignments_projection` — may have `agency_org_id` (CPS / social services)
+- `family_consents_projection` — may have no org column (consent is per-individual)
+
+The Phase N helpers will need to translate `p_consultant_org_id` to whatever the type-specific projection's column is named. This is exactly the abstraction the underscore-prefix helper convention is designed to encapsulate — but the Phase N card author must NOT blindly grep-replace `partner_org_id` → `court_org_id`.
+
+Action for Phase N cards: each card MUST audit its type-specific projection schema and produce its own validation helper body that maps the canonical `(p_reference, p_consultant_org_id, p_provider_org_id)` signature to that projection's columns explicitly.
+
 ## New codifiable pitfall from Chunk 2 (2026-06-04)
 
 **Verify deployed body before `CREATE OR REPLACE FUNCTION` of any pre-existing function**. Discovered during Chunk 2 Step 5 drafting: my initial draft of `process_domain_event` (CREATE OR REPLACE to add the `var_partnership` branch) silently dropped four load-bearing semantics from the deployed body:
