@@ -48,10 +48,18 @@ CREATE TABLE IF NOT EXISTS public.var_partnerships_projection (
     id                       uuid PRIMARY KEY,
 
     -- Partnership parties (FK to organizations_projection; denormalized
-    -- names for display ergonomics per Decision C.3 line 289)
-    partner_org_id           uuid NOT NULL REFERENCES public.organizations_projection(id),
+    -- names for display ergonomics per Decision C.3 line 289).
+    -- F2 architect fold-in 2026-06-04: ON DELETE CASCADE matches the
+    -- cross_tenant_access_grants_projection precedent at baseline_v4:14949
+    -- + :14954. Projection rows are recomputable; the audit trail lives
+    -- in domain_events (event-sourced).
+    partner_org_id           uuid NOT NULL
+                             REFERENCES public.organizations_projection(id)
+                             ON DELETE CASCADE,
     partner_org_name         text NOT NULL,
-    provider_org_id          uuid NOT NULL REFERENCES public.organizations_projection(id),
+    provider_org_id          uuid NOT NULL
+                             REFERENCES public.organizations_projection(id)
+                             ON DELETE CASCADE,
     provider_org_name        text NOT NULL,
 
     -- Business terms
@@ -63,7 +71,11 @@ CREATE TABLE IF NOT EXISTS public.var_partnerships_projection (
     revenue_share_percentage numeric(5,2),
     support_level            text
                              CHECK (support_level IN ('tier1', 'tier1_tier2', 'full')),
-    terms                    jsonb NOT NULL DEFAULT '{}'::jsonb,
+    -- F3 architect fold-in 2026-06-04: NOT NULL dropped to match ADR L274
+    -- and cross_tenant_access_grants_projection.terms precedent
+    -- (baseline_v4:12468). DEFAULT '{}' prevents bare-null INSERTs from
+    -- event handlers that omit the column entirely.
+    terms                    jsonb DEFAULT '{}'::jsonb,
 
     -- Lifecycle status. 4-value CHECK locked at Phase 0.4 decision 10.
     -- 'expired' is included as a future-reachable state — Phase 2 ships NO
@@ -128,7 +140,17 @@ COMMENT ON INDEX idx_var_partnerships_pair_active IS
 $comment$Partial UNIQUE constraint per sub-decision G (architect plan-review
 2026-06-04). Departs from ADR L285's full UNIQUE to allow re-establishment
 of a terminated/expired partnership via a new row. Terminated rows preserved
-in the audit trail (status='terminated' indefinitely).$comment$;
+in the audit trail (status='terminated' indefinitely).
+
+S2 architect fold-in 2026-06-04: this partial UNIQUE is enforced at row
+INSERT time. Any future multi-event RPC that simultaneously terminates an
+old row AND creates a new row for the same (partner_org_id, provider_org_id)
+pair within the SAME transaction MUST sequence the UPDATE (status flip to
+'terminated') BEFORE the INSERT, or the index will fire a uniqueness
+violation. Phase 2 does NOT have any such RPC — termination
+(api.terminate_var_partnership) and re-establishment
+(api.create_var_partnership) are separate RPCs called by separate
+transactions.$comment$;
 
 -- ============================================================================
 -- Step 2 — Row-Level Security (3 SELECT policies; NO write policies)
@@ -170,10 +192,28 @@ CREATE POLICY var_partnerships_projection_org_admin_select
 
 COMMENT ON POLICY var_partnerships_projection_org_admin_select
     ON public.var_partnerships_projection IS
-$comment$Either side of the partnership can read it. Org-admin authority on
-EITHER partner_org or provider_org grants SELECT. Resolves provider_org via
-live `organizations_projection.path` lookup (idempotent under org-moves).
-Mirrors cross_tenant_grants_org_admin_select shape from baseline_v4.$comment$;
+$comment$Either side of the partnership can read it. Uses scope-bound
+permission check (organization.view at the org's live ltree path) rather
+than the get_current_org_id()-based pattern on
+cross_tenant_grants_org_admin_select (baseline_v4:15255).
+
+DELIBERATE DEPARTURE from baseline_v4 precedent (F1 architect fold-in
+2026-06-04): get_current_org_id() returns the session-active org pointer,
+NOT a cross-tenant membership oracle — a partner consultant with a valid
+grant has accessible_organizations @> [home, providerA] but
+get_current_org_id() stays at home. The scope-bound check correctly admits
+that consultant via their grant-projected effective_permissions entry at
+the provider org path.
+
+This also closes the deferred concern from pr-67-close-out.md (a): PR #66's
+api.list_users tenancy guard is grant-incompatible for the same reason;
+this RLS policy intentionally adopts the post-Phase-1 canonical form.
+
+LOAD-BEARING: this same authority model gates the partnership.manage
+permission used by Steps 11-15 emit RPCs. SELECT-RLS and write-path
+authority MUST remain consistent — both use
+has_effective_permission(perm, organizations_projection.path) at the
+relevant org.$comment$;
 
 -- 2.b — platform-admin SELECT (global)
 DROP POLICY IF EXISTS var_partnerships_projection_platform_admin_select
@@ -200,10 +240,12 @@ CREATE POLICY var_partnerships_projection_service_role_select
 
 COMMENT ON POLICY var_partnerships_projection_service_role_select
     ON public.var_partnerships_projection IS
-$comment$service_role bypasses RLS by default; explicit policy for parity
-with grant_role_templates baseline (Phase 1 Step 15c) and as
-defense-in-depth marker. Removing this policy alone would NOT block
-service_role reads; the policy is documentary.$comment$;
+$comment$Explicit policy makes service_role read intent grep-able from
+pg_policies for security audits. service_role bypasses RLS at the engine
+level, so removing this policy would NOT affect runtime behavior — but
+it would remove the documentary audit trail. Mirrors
+grant_role_templates_service_role_select Phase 1 precedent. (S3 architect
+fold-in 2026-06-04 — original COMMENT was internally contradictory.)$comment$;
 
 -- ============================================================================
 -- Step 3 — Indexes (3 secondary + 1 partial UNIQUE already in Step 1)
