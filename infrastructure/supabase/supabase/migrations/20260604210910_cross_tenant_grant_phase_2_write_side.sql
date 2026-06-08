@@ -2986,3 +2986,272 @@ GRANT EXECUTE ON FUNCTION api.reactivate_var_partnership(uuid, date, text)
 -- ============================================================================
 -- End Chunk 6 (Steps 11-15 VAR partnership emit RPCs).
 -- ============================================================================
+
+-- ============================================================================
+-- CHUNK 7 — Steps 16-17: read RPC + COMMENT ON FUNCTION tag wave
+-- ============================================================================
+-- Step 16: api.get_grant_role_templates — single read RPC mirroring
+--          api.get_role_permission_templates signature; returns
+--          (template_name, permission_name, default_terms) per F1 fold-in
+--          (3-column UNIQUE means template_name disambiguates rows).
+-- Step 17: COMMENT ON FUNCTION tag wave on all 9 new api.* RPCs.
+--          M3 RPC shape registry tag (@a4c-rpc-shape) + reachability
+--          matrix tags (@a4c-bucket, @a4c-consultant-callable,
+--          @a4c-consultant-callable-reason, @a4c-phase-target) per
+--          PR #70 Step 11 precedent.
+--
+-- Private helpers (_validate_authorization_*) are NOT in api schema; no
+-- M3 or matrix tags. Router (process_var_partnership_event) and the
+-- safe_jsonb_extract_numeric helper likewise out of scope (public schema).
+-- ----------------------------------------------------------------------------
+
+-- =====================================================================
+-- Step 16 — api.get_grant_role_templates (read RPC)
+-- =====================================================================
+-- ADR Decision C.1 L255 + F1 fold-in. Returns the active template rows
+-- for a given authorization_type. template_name is included because
+-- Phase 1 deployed grant_role_templates with 3-column UNIQUE
+-- (template_name, authorization_type, permission_name), so multiple
+-- templates may share an authorization_type (e.g., var_default + future
+-- var_enhanced under 'var_contract'). The caller groups by
+-- template_name to render template selection UI.
+--
+-- No permission gate — template metadata is non-sensitive (it is the
+-- LIST of available templates, not the bound grants). Bucket E
+-- (grant-irrelevant by default). Consultant-callable yes.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.get_grant_role_templates(p_authorization_type text)
+RETURNS TABLE(
+    template_name   text,
+    permission_name text,
+    default_terms   jsonb
+)
+LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+BEGIN
+    -- Input validation mirrors Step 8 / 11 authorization_type 5-value enum.
+    -- Invalid input returns empty resultset rather than RAISE (read RPCs
+    -- generally don't RAISE on invalid input — the caller gets zero rows
+    -- and can branch on count).
+    IF p_authorization_type IS NULL OR p_authorization_type NOT IN (
+        'var_contract', 'court_order', 'family_participation',
+        'social_services_assignment', 'emergency_access'
+    ) THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT grt.template_name, grt.permission_name, grt.default_terms
+    FROM public.grant_role_templates grt
+    WHERE grt.authorization_type = p_authorization_type
+      AND grt.is_active = true
+    ORDER BY grt.template_name, grt.permission_name;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.get_grant_role_templates(text)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.get_grant_role_templates(text)
+    TO authenticated;
+
+
+-- =====================================================================
+-- Step 17 — COMMENT ON FUNCTION tag wave (9 new api.* RPCs)
+-- =====================================================================
+-- M3 RPC shape registry tag (@a4c-rpc-shape) + reachability matrix tags
+-- (@a4c-bucket, @a4c-consultant-callable, @a4c-consultant-callable-reason,
+-- @a4c-phase-target) per PR #70 Step 11 precedent. Tagging direct via
+-- COMMENT ON FUNCTION (per-RPC explicit form) rather than mapping-DO-
+-- loop because Phase 2 adds only 9 RPCs (vs Phase 1's 170-row backfill).
+--
+-- Tag rationale:
+--   Emit RPCs (8 total — Steps 8/9/10/11/12/13/14/15):
+--     @a4c-rpc-shape: envelope
+--     @a4c-bucket: B (JWT-bound provider-admin operations)
+--     @a4c-consultant-callable: no
+--     @a4c-consultant-callable-reason: Provider-admin authority (HIPAA
+--       gate at provider org path); consultant variant N/A by design —
+--       grants are issued FOR consultants by provider admins, not BY
+--       consultants.
+--     @a4c-phase-target: 2 (shipped in Phase 2; canonical at deploy)
+--
+--   Read RPC (1 total — Step 16):
+--     @a4c-rpc-shape: read
+--     @a4c-bucket: E (no tenancy context; grant-irrelevant)
+--     @a4c-consultant-callable: yes
+--     @a4c-consultant-callable-reason: Template metadata — non-sensitive
+--       list of available grant-role templates; consultant can read to
+--       discover what authorization types and template names exist.
+--     @a4c-phase-target: none (canonical at deploy; no further work)
+--
+-- Step 10 (api.revoke_permission_across_grants) is platform-only — the
+-- consultant-callable tag is still "no" because the SQL gate enforces
+-- has_platform_privilege(), but the reason text reflects platform-
+-- tier authority.
+-- ----------------------------------------------------------------------------
+
+-- Step 8 — api.create_access_grant
+COMMENT ON FUNCTION api.create_access_grant(
+    uuid, uuid, text, uuid, text, text,
+    uuid, uuid, text, text[], jsonb, timestamptz, text
+) IS
+$cmt$Emit access_grant.created event with hybrid-snapshot permission
+resolution. Locks template (3-column UNIQUE filter per F1 fold-in),
+applies INTERSECT narrowing on overrides (literals only, no implication
+expansion — HIPAA least-authority), resolves scope_path per scope mode,
+emits via Pattern A v2 with BOTH-checks readback.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority (HIPAA gate at provider org path via has_effective_permission('grant.create', v_provider_path)); consultant variant N/A by design — grants are issued FOR consultants by provider admins, not BY consultants.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 9 — api.revoke_access_grant
+COMMENT ON FUNCTION api.revoke_access_grant(uuid, text, text) IS
+$cmt$Emit access_grant.revoked event for a single grant. HIPAA gate on
+grant.revoke at the grant's provider_org_path; idempotency on revoked/
+expired states (returns success-false envelope with actionable=false
+flag); Pattern A v2 BOTH-checks readback against status='revoked'.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority (HIPAA gate at provider org path via has_effective_permission('grant.revoke', v_provider_path)); consultant variant N/A by design — revocations are issued by the data-owner provider, not by the consultant.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 10 — api.revoke_permission_across_grants
+COMMENT ON FUNCTION api.revoke_permission_across_grants(text, text) IS
+$cmt$Cross-grant policy override: emit access_grant.policy_override_applied
+for every active grant carrying the targeted permission. RPC-side filter
+(I fold-in) avoids no-op events. Per-event processing_error check inside
+loop with short-circuit on first failure (S5 pattern i). Partial-failure
+envelope mirrors PR #44 modify_user_roles shape + emits
+audit.high_risk_action_logged (stream_type='platform_admin') BEFORE
+returning. candidateGrantCount in success envelope distinguishes no-op
+from typo cases. Platform-only authority (has_platform_privilege()).
+
+Multi-caller note: concurrent invocations on OVERLAPPING permission_names
+use last-emit-wins semantics on the projection (handler REPLACES
+permissions jsonb). Serial invocation is the assumed operational pattern.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Platform-tier authority (has_platform_privilege() required; cross-grant policy override is a platform-level operation by ADR sub-decision B); not callable by providers OR consultants.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 11 — api.create_var_partnership
+COMMENT ON FUNCTION api.create_var_partnership(
+    uuid, uuid, text, date, text, date, numeric, text, jsonb, text
+) IS
+$cmt$Emit var_partnership.created event with denormalized name lookup +
+DUPLICATE_PARTNERSHIP precheck against the partial UNIQUE constraint
+(status IN active/suspended). HIPAA gate on partnership.manage at
+provider org path. Pattern A v2 BOTH-checks readback.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission (org-scoped at provider path); consultant variant N/A — partnerships are business relationships established BY the provider org.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 12 — api.update_var_partnership
+COMMENT ON FUNCTION api.update_var_partnership(
+    uuid, text, text, date, numeric, text, jsonb, text
+) IS
+$cmt$Emit var_partnership.updated event with PATCH semantics (only
+non-null params overwrite). EMPTY_UPDATE rejection. Immutable identity
+fields (id, partner_org_id, provider_org_id, contract_start_date) NEVER
+in payload. Reject updates against non-active/non-suspended state.
+Reserved-keys note: partner_org_name and provider_org_name are HANDLER-
+read keys reserved for future cross-handler hook on org.updated (Phase N);
+NOT exposed as RPC parameters here.
+
+Known limitation (S1 fold-in 2026-06-08): PATCH builder cannot clear
+nullable fields back to NULL via current signature. Workaround = future
+sentinel-based clear (p_clear_fields text[]) tracked in observations.md.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; consultant variant N/A.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 13 — api.terminate_var_partnership (multi-event cascade)
+COMMENT ON FUNCTION api.terminate_var_partnership(uuid, text, text) IS
+$cmt$MULTI-EVENT cascade-revoke per sub-decision H. Emit cascade-revoke
+access_grant.revoked FIRST (HIPAA-load-bearing ordering — see migration
+header), THEN var_partnership.terminated. Partial-failure branch leaves
+partnership active (operator-retry idempotent). audit.high_risk_action_
+logged emit on partial failure. candidateGrantCount in success envelope.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; cascade-revocation is a high-risk action initiated by the provider org, not the consultant.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 14 — api.suspend_var_partnership
+COMMENT ON FUNCTION api.suspend_var_partnership(uuid, text, date, text) IS
+$cmt$Emit var_partnership.suspended event. Transition guard: active →
+suspended only. No cascade — suspension is reversible (api.reactivate_
+var_partnership); citing grants stay active; new-grant issuance blocked
+by Step 6 _validate_authorization_var_contract (accepts only 'active'
+partnerships).
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; consultant variant N/A.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 15 — api.reactivate_var_partnership
+COMMENT ON FUNCTION api.reactivate_var_partnership(uuid, date, text) IS
+$cmt$Emit var_partnership.reactivated event. Transition guard: suspended
+→ active only. Handler clears suspended_at / suspended_by /
+suspension_reason. new_contract_end_date optional back-check vs immutable
+contract_start_date.
+
+@a4c-rpc-shape: envelope
+@a4c-bucket: B
+@a4c-consultant-callable: no
+@a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; consultant variant N/A.
+@a4c-phase-target: 2$cmt$;
+
+-- Step 16 — api.get_grant_role_templates (read RPC)
+COMMENT ON FUNCTION api.get_grant_role_templates(text) IS
+$cmt$Return active grant_role_templates rows for a given authorization_
+type. Mirrors api.get_role_permission_templates shape. F1 fold-in:
+template_name returned for caller disambiguation under 3-column UNIQUE.
+No permission gate — template metadata is non-sensitive (it is the
+LIST of available templates, not the bound grants).
+
+@a4c-rpc-shape: read
+@a4c-bucket: E
+@a4c-consultant-callable: yes
+@a4c-consultant-callable-reason: Template metadata — non-sensitive list of available grant-role templates; consultants can read to discover what authorization types and templates exist (e.g., for UI rendering of "what templates does this VAR contract support").
+@a4c-phase-target: none$cmt$;
+
+-- ============================================================================
+-- End Chunk 7 (Steps 16-17 read RPC + COMMENT ON FUNCTION tag wave).
+-- ============================================================================
+-- Stage C drafting complete. Stage D (post-migration deliverables) remains:
+--   - AsyncAPI updates: var_partnership.yaml (NEW); access_grant.yaml
+--     (+AccessGrantPolicyOverrideApplied per PR #70 N1); audit.yaml
+--     (NEW for AuditHighRiskActionLogged per Chunk 5 F1); asyncapi.yaml
+--     channel + stream_type enum.
+--   - npm run generate:types + cp to frontend/src/types/generated/.
+--   - Handler reference files already synced inline during Stage C.
+--   - infrastructure/supabase/CLAUDE.md: codify underscore-prefix
+--     private-helper convention (sub-decision A); event-naming addendum
+--     per Chunk 5 F1 precedent.
+--   - documentation/architecture/data/provider-partners-architecture.md:
+--     verify no drift from locked ADR C.3.
+--   - ADR addendum below Decision C.3 documenting partial UNIQUE per
+--     sub-decision G; below Decision C.2 documenting 3-column UNIQUE per
+--     F1.
+-- Stage E (smoke + UAT) → Stage F (PR + ship) follow per Phase 1 cadence.
+-- ============================================================================
