@@ -1909,3 +1909,1047 @@ GRANT EXECUTE ON FUNCTION api.revoke_permission_across_grants(text, text)
 -- ============================================================================
 -- End Chunk 5 (Steps 9-10 revocation flow).
 -- ============================================================================
+
+-- ============================================================================
+-- CHUNK 6 — Steps 11-15: VAR partnership emit RPCs (5 RPCs)
+-- ============================================================================
+-- Homogeneous batch — 4 single-event Pattern A v2 (Steps 11/12/14/15) +
+-- 1 multi-event partial-failure RPC (Step 13 cascade-revoke per
+-- sub-decision H). All gate on `partnership.manage` (seeded Chunk 3
+-- Step 7b) at the provider org path. ADR Decision C.3 lines 257-330.
+--
+-- Naming/structure conventions established earlier in this migration
+-- carry through:
+--   - PRE-EMIT GUARDS use RAISE EXCEPTION (no audit row yet)
+--   - POST-EMIT FAILURES envelope-return (no RAISE — would roll back the
+--     audit row)
+--   - Pattern A v2 BOTH-checks (IF NOT FOUND + processing_error on
+--     captured event_id)
+--   - All 5 emit RPCs gate-reuse `partnership.manage` (per sub-decision J);
+--     platform-admin short-circuit via has_platform_privilege()
+--   - GRANT posture: REVOKE FROM PUBLIC, anon; GRANT TO authenticated
+-- ----------------------------------------------------------------------------
+
+-- =====================================================================
+-- Step 11 — api.create_var_partnership (single-event Pattern A v2)
+-- =====================================================================
+-- Emits var_partnership.created. Handler at
+-- handlers/routers/process_var_partnership_event.sql § var_partnership.
+-- created arm INSERTs into var_partnerships_projection with idempotency
+-- guard on stream_id (F1 fold-in from Chunk 2). Partial UNIQUE
+-- (partner_org_id, provider_org_id) WHERE status IN ('active',
+-- 'suspended') is enforced at projection layer; this RPC adds a pre-emit
+-- check to surface DUPLICATE_PARTNERSHIP cleanly.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.create_var_partnership(
+    -- Required
+    p_partner_org_id           uuid,
+    p_provider_org_id          uuid,
+    p_partnership_type         text,           -- 'standard' | 'white_label'
+    p_contract_start_date      date,
+    -- Optional
+    p_contract_number          text        DEFAULT NULL,
+    p_contract_end_date        date        DEFAULT NULL,
+    p_revenue_share_percentage numeric     DEFAULT NULL,
+    p_support_level            text        DEFAULT NULL,  -- tier1 | tier1_tier2 | full
+    p_terms                    jsonb       DEFAULT '{}'::jsonb,
+    p_reason                   text        DEFAULT 'VAR partnership created'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims           jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id        uuid  := public.get_current_user_id();
+    v_org_id           uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked   boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_partner_name     text;
+    v_provider_name    text;
+    v_provider_path    extensions.ltree;
+    v_partnership_id   uuid;
+    v_event_id         uuid;
+    v_processing_error text;
+BEGIN
+    -- =====================================================================
+    -- PRE-EMIT GUARDS (RAISE EXCEPTION)
+    -- =====================================================================
+
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_partner_org_id IS NULL OR p_provider_org_id IS NULL THEN
+        RAISE EXCEPTION 'partner_org_id and provider_org_id are required'
+            USING ERRCODE = '22004';
+    END IF;
+    IF p_partner_org_id = p_provider_org_id THEN
+        RAISE EXCEPTION 'partner_org_id must differ from provider_org_id'
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_partnership_type NOT IN ('standard', 'white_label') THEN
+        RAISE EXCEPTION 'Invalid partnership_type: must be standard or white_label'
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_support_level IS NOT NULL
+       AND p_support_level NOT IN ('tier1', 'tier1_tier2', 'full') THEN
+        RAISE EXCEPTION 'Invalid support_level: must be tier1, tier1_tier2, or full'
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_contract_start_date IS NULL THEN
+        RAISE EXCEPTION 'contract_start_date is required'
+            USING ERRCODE = '22004';
+    END IF;
+    IF p_contract_end_date IS NOT NULL
+       AND p_contract_end_date < p_contract_start_date THEN
+        RAISE EXCEPTION 'contract_end_date must be on or after contract_start_date'
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_revenue_share_percentage IS NOT NULL
+       AND (p_revenue_share_percentage < 0 OR p_revenue_share_percentage > 100) THEN
+        RAISE EXCEPTION 'revenue_share_percentage must be between 0 and 100'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- Lookup denormalized names for projection
+    SELECT name INTO v_partner_name
+    FROM public.organizations_projection
+    WHERE id = p_partner_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Partner organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+
+    SELECT name, path INTO v_provider_name, v_provider_path
+    FROM public.organizations_projection
+    WHERE id = p_provider_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- HIPAA gate
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('partnership.manage', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: partnership.manage at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- =====================================================================
+    -- DUPLICATE-PARTNERSHIP PRECHECK (envelope, not RAISE)
+    -- =====================================================================
+    -- Partial UNIQUE (partner_org_id, provider_org_id) WHERE status IN
+    -- ('active', 'suspended') is enforced at projection layer. Pre-check
+    -- here surfaces it cleanly so the caller doesn't see a generic
+    -- processing_error from the trigger's WHEN OTHERS catch.
+
+    IF EXISTS (
+        SELECT 1 FROM public.var_partnerships_projection
+        WHERE partner_org_id = p_partner_org_id
+          AND provider_org_id = p_provider_org_id
+          AND status IN ('active', 'suspended')
+    ) THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'DUPLICATE_PARTNERSHIP',
+            'errorDetails', jsonb_build_object(
+                'code',    'DUPLICATE_PARTNERSHIP',
+                'message', 'An active or suspended partnership already exists between these organizations'
+            )
+        );
+    END IF;
+
+    -- =====================================================================
+    -- EMIT var_partnership.created
+    -- =====================================================================
+
+    v_partnership_id := gen_random_uuid();
+
+    v_event_id := api.emit_domain_event(
+        p_stream_id   := v_partnership_id,
+        p_stream_type := 'var_partnership',
+        p_event_type  := 'var_partnership.created',
+        p_event_data  := jsonb_build_object(
+            'partner_org_id',           p_partner_org_id,
+            'partner_org_name',         v_partner_name,
+            'provider_org_id',          p_provider_org_id,
+            'provider_org_name',        v_provider_name,
+            'partnership_type',         p_partnership_type,
+            'contract_number',          p_contract_number,
+            'contract_start_date',      p_contract_start_date,
+            'contract_end_date',        p_contract_end_date,
+            'revenue_share_percentage', p_revenue_share_percentage,
+            'support_level',            p_support_level,
+            'terms',                    p_terms
+        ),
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.create_var_partnership',
+            'reason',          p_reason
+        )
+    );
+
+    -- =====================================================================
+    -- PATTERN A v2 READ-BACK (BOTH checks)
+    -- =====================================================================
+
+    PERFORM 1
+    FROM public.var_partnerships_projection
+    WHERE id = v_partnership_id;
+    IF NOT FOUND THEN
+        SELECT processing_error INTO v_processing_error
+        FROM public.domain_events WHERE id = v_event_id;
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' ||
+                    COALESCE(v_processing_error, 'projection read-back returned no row')
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' || v_processing_error
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'eventId', v_event_id,
+        'partnership', jsonb_build_object(
+            'id',                       v_partnership_id,
+            'partnerOrgId',             p_partner_org_id,
+            'providerOrgId',            p_provider_org_id,
+            'partnershipType',          p_partnership_type,
+            'contractStartDate',        p_contract_start_date,
+            'contractEndDate',          p_contract_end_date,
+            'revenueSharePercentage',   p_revenue_share_percentage,
+            'supportLevel',             p_support_level
+        )
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.create_var_partnership(
+    uuid, uuid, text, date, text, date, numeric, text, jsonb, text
+) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.create_var_partnership(
+    uuid, uuid, text, date, text, date, numeric, text, jsonb, text
+) TO authenticated;
+
+
+-- =====================================================================
+-- Step 12 — api.update_var_partnership (single-event Pattern A v2)
+-- =====================================================================
+-- Emits var_partnership.updated. PATCH semantics: only non-null event_data
+-- keys overwrite at the handler. Immutable fields (id, partner_org_id,
+-- provider_org_id, contract_start_date) NEVER appear in event_data per
+-- plan.md § "Event payload schemas (handler input contract)".
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.update_var_partnership(
+    p_partnership_id           uuid,
+    p_partnership_type         text        DEFAULT NULL,  -- 'standard' | 'white_label'
+    p_contract_number          text        DEFAULT NULL,
+    p_contract_end_date        date        DEFAULT NULL,
+    p_revenue_share_percentage numeric     DEFAULT NULL,
+    p_support_level            text        DEFAULT NULL,  -- tier1 | tier1_tier2 | full
+    p_terms                    jsonb       DEFAULT NULL,
+    p_reason                   text        DEFAULT 'VAR partnership updated'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims           jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id        uuid  := public.get_current_user_id();
+    v_org_id           uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked   boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_provider_org_id  uuid;
+    v_provider_path    extensions.ltree;
+    v_current_status   text;
+    v_contract_start   date;
+    v_event_data       jsonb := '{}'::jsonb;
+    v_event_id         uuid;
+    v_processing_error text;
+BEGIN
+    -- PRE-EMIT GUARDS
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_partnership_id IS NULL THEN
+        RAISE EXCEPTION 'partnership_id is required' USING ERRCODE = '22004';
+    END IF;
+    IF p_partnership_type IS NOT NULL
+       AND p_partnership_type NOT IN ('standard', 'white_label') THEN
+        RAISE EXCEPTION 'Invalid partnership_type'
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_support_level IS NOT NULL
+       AND p_support_level NOT IN ('tier1', 'tier1_tier2', 'full') THEN
+        RAISE EXCEPTION 'Invalid support_level'
+            USING ERRCODE = '22023';
+    END IF;
+    IF p_revenue_share_percentage IS NOT NULL
+       AND (p_revenue_share_percentage < 0 OR p_revenue_share_percentage > 100) THEN
+        RAISE EXCEPTION 'revenue_share_percentage must be between 0 and 100'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- Lookup partnership: provider_org_id + status + start_date
+    SELECT provider_org_id, status, contract_start_date
+    INTO v_provider_org_id, v_current_status, v_contract_start
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PARTNERSHIP_NOT_FOUND',
+            'errorDetails', jsonb_build_object(
+                'code',    'PARTNERSHIP_NOT_FOUND',
+                'message', 'partnership not found'
+            )
+        );
+    END IF;
+
+    -- Reject updates against non-active/non-suspended states
+    IF v_current_status NOT IN ('active', 'suspended') THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PARTNERSHIP_INACTIVE',
+            'errorDetails', jsonb_build_object(
+                'code',       'PARTNERSHIP_INACTIVE',
+                'message',    format('partnership is %s; cannot update', v_current_status),
+                'actionable', false
+            )
+        );
+    END IF;
+
+    -- contract_end_date back-check vs immutable start_date
+    IF p_contract_end_date IS NOT NULL
+       AND p_contract_end_date < v_contract_start THEN
+        RAISE EXCEPTION 'contract_end_date must be on or after contract_start_date'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- HIPAA gate
+    SELECT path INTO v_provider_path
+    FROM public.organizations_projection
+    WHERE id = v_provider_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('partnership.manage', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: partnership.manage at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- =====================================================================
+    -- PATCH semantics: build event_data with ONLY non-null params.
+    -- =====================================================================
+    -- The handler at process_var_partnership_event.sql § var_partnership.
+    -- updated arm uses COALESCE(safe_jsonb_extract_*, current_value) per
+    -- column — only non-null event_data keys overwrite.
+
+    IF p_partnership_type IS NOT NULL THEN
+        v_event_data := v_event_data || jsonb_build_object('partnership_type', p_partnership_type);
+    END IF;
+    IF p_contract_number IS NOT NULL THEN
+        v_event_data := v_event_data || jsonb_build_object('contract_number', p_contract_number);
+    END IF;
+    IF p_contract_end_date IS NOT NULL THEN
+        v_event_data := v_event_data || jsonb_build_object('contract_end_date', p_contract_end_date);
+    END IF;
+    IF p_revenue_share_percentage IS NOT NULL THEN
+        v_event_data := v_event_data || jsonb_build_object('revenue_share_percentage', p_revenue_share_percentage);
+    END IF;
+    IF p_support_level IS NOT NULL THEN
+        v_event_data := v_event_data || jsonb_build_object('support_level', p_support_level);
+    END IF;
+    IF p_terms IS NOT NULL THEN
+        v_event_data := v_event_data || jsonb_build_object('terms', p_terms);
+    END IF;
+
+    -- Reject empty-update (no mutable fields supplied)
+    IF v_event_data = '{}'::jsonb THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'EMPTY_UPDATE',
+            'errorDetails', jsonb_build_object(
+                'code',    'EMPTY_UPDATE',
+                'message', 'no mutable fields provided'
+            )
+        );
+    END IF;
+
+    -- =====================================================================
+    -- EMIT var_partnership.updated
+    -- =====================================================================
+
+    v_event_id := api.emit_domain_event(
+        p_stream_id      := p_partnership_id,
+        p_stream_type    := 'var_partnership',
+        p_event_type     := 'var_partnership.updated',
+        p_event_data     := v_event_data,
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.update_var_partnership',
+            'reason',          p_reason
+        )
+    );
+
+    -- PATTERN A v2 READ-BACK. Handler RAISEs P0002 if row missing —
+    -- captured in processing_error. The projection itself doesn't have a
+    -- "was updated" predicate so we use the processing_error check as
+    -- the canonical "did the handler succeed" signal.
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' || v_processing_error
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success',       true,
+        'eventId',       v_event_id,
+        'partnershipId', p_partnership_id
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.update_var_partnership(
+    uuid, text, text, date, numeric, text, jsonb, text
+) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.update_var_partnership(
+    uuid, text, text, date, numeric, text, jsonb, text
+) TO authenticated;
+
+
+-- =====================================================================
+-- Step 13 — api.terminate_var_partnership (MULTI-EVENT cascade-revoke)
+-- =====================================================================
+-- Sub-decision H + F4 fold-in (plan-mode architect review): termination
+-- cascades to revoke all active var_contract grants citing this partnership.
+-- Emit order: cascade-revoke access_grant.revoked FIRST (with
+-- revocation_reason='var_partnership_terminated'), THEN the
+-- var_partnership.terminated event. If any cascade-revoke fails, the
+-- partnership termination event is NOT emitted (partnership stays active)
+-- — leaves the system in a known consistent state for the operator to
+-- diagnose.
+--
+-- Partial-failure envelope shape (mirrors Step 10 + sub-decision B):
+--   { success: false, partial: true, error: 'PARTIAL_FAILURE',
+--     partnershipId, cascadedGrantEventIds[], failureIndex, failedGrantId,
+--     processingError, auditEventId }
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.terminate_var_partnership(
+    p_partnership_id     uuid,
+    p_termination_reason text,
+    p_reason             text DEFAULT 'VAR partnership terminated'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims              jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id           uuid  := public.get_current_user_id();
+    v_org_id              uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked      boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_provider_org_id     uuid;
+    v_provider_path       extensions.ltree;
+    v_current_status      text;
+    v_grant_row           record;
+    v_grant_event_id      uuid;
+    v_cascade_event_ids   uuid[] := '{}'::uuid[];
+    v_partnership_event_id uuid;
+    v_loop_index          int := 0;
+    v_failed_grant_id     uuid;
+    v_processing_error    text;
+    v_audit_event_id      uuid;
+    v_candidate_count     int := 0;
+BEGIN
+    -- PRE-EMIT GUARDS
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_partnership_id IS NULL THEN
+        RAISE EXCEPTION 'partnership_id is required' USING ERRCODE = '22004';
+    END IF;
+    IF p_termination_reason IS NULL OR p_termination_reason = '' THEN
+        RAISE EXCEPTION 'termination_reason is required for HIPAA audit trail'
+            USING ERRCODE = '22004';
+    END IF;
+
+    -- Lookup partnership
+    SELECT provider_org_id, status
+    INTO v_provider_org_id, v_current_status
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PARTNERSHIP_NOT_FOUND',
+            'errorDetails', jsonb_build_object(
+                'code',    'PARTNERSHIP_NOT_FOUND',
+                'message', 'partnership not found'
+            )
+        );
+    END IF;
+
+    -- Idempotency: already terminated/expired → envelope
+    IF v_current_status IN ('terminated', 'expired') THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'ALREADY_INACTIVE',
+            'errorDetails', jsonb_build_object(
+                'code',       'ALREADY_INACTIVE',
+                'message',    format('partnership is already %s; cannot terminate', v_current_status),
+                'actionable', false
+            )
+        );
+    END IF;
+
+    -- HIPAA gate
+    SELECT path INTO v_provider_path
+    FROM public.organizations_projection
+    WHERE id = v_provider_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('partnership.manage', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: partnership.manage at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- Candidate-grants count for success envelope distinguishing
+    SELECT count(*) INTO v_candidate_count
+    FROM public.cross_tenant_access_grants_projection
+    WHERE authorization_type      = 'var_contract'
+      AND authorization_reference = p_partnership_id
+      AND status                  = 'active';
+
+    -- =====================================================================
+    -- CASCADE-REVOKE LOOP (S5 pattern (i) per-event check + short-circuit)
+    -- =====================================================================
+    -- Emit access_grant.revoked for each active var_contract grant citing
+    -- this partnership. Deterministic ORDER BY g.id for replay-stability.
+
+    FOR v_grant_row IN
+        SELECT id AS grant_id
+        FROM public.cross_tenant_access_grants_projection
+        WHERE authorization_type      = 'var_contract'
+          AND authorization_reference = p_partnership_id
+          AND status                  = 'active'
+        ORDER BY id
+    LOOP
+        BEGIN
+            v_grant_event_id := api.emit_domain_event(
+                p_stream_id   := v_grant_row.grant_id,
+                p_stream_type := 'access_grant',
+                p_event_type  := 'access_grant.revoked',
+                p_event_data  := jsonb_build_object(
+                    'grant_id',           v_grant_row.grant_id,
+                    'revoked_by',         v_caller_id,
+                    'revocation_reason',  'var_partnership_terminated',
+                    'revocation_details', format(
+                        'Cascade-revoke triggered by termination of partnership %s: %s',
+                        p_partnership_id, p_termination_reason
+                    )
+                ),
+                p_event_metadata := jsonb_build_object(
+                    'user_id',         v_caller_id,
+                    'organization_id', v_org_id,
+                    'source',          'api.terminate_var_partnership',
+                    'reason',          p_reason
+                )
+            );
+
+            SELECT processing_error INTO v_processing_error
+            FROM public.domain_events WHERE id = v_grant_event_id;
+            IF v_processing_error IS NOT NULL THEN
+                v_failed_grant_id := v_grant_row.grant_id;
+                EXIT;
+            END IF;
+
+            v_cascade_event_ids := v_cascade_event_ids || v_grant_event_id;
+            v_loop_index := v_loop_index + 1;
+        EXCEPTION WHEN OTHERS THEN
+            v_failed_grant_id  := v_grant_row.grant_id;
+            v_processing_error := SQLERRM;
+            EXIT;
+        END;
+    END LOOP;
+
+    -- =====================================================================
+    -- PARTIAL-FAILURE BRANCH (do NOT emit partnership termination)
+    -- =====================================================================
+
+    IF v_failed_grant_id IS NOT NULL THEN
+        -- audit emit (sub-decision B); same WARNING pattern as Step 10
+        BEGIN
+            v_audit_event_id := api.emit_domain_event(
+                p_stream_id   := gen_random_uuid(),
+                p_stream_type := 'platform_admin',
+                p_event_type  := 'audit.high_risk_action_logged',
+                p_event_data  := jsonb_build_object(
+                    'action',             'terminate_var_partnership_partial_failure',
+                    'partnership_id',     p_partnership_id,
+                    'termination_reason', p_termination_reason,
+                    'failed_grant_id',    v_failed_grant_id,
+                    'cascade_event_ids',  to_jsonb(v_cascade_event_ids),
+                    'failure_index',      v_loop_index,
+                    'processing_error',   v_processing_error
+                ),
+                p_event_metadata := jsonb_build_object(
+                    'user_id',         v_caller_id,
+                    'organization_id', v_org_id,
+                    'source',          'api.terminate_var_partnership',
+                    'reason',          'High-risk action: partial-failure during cascade-revoke'
+                )
+            );
+        EXCEPTION WHEN OTHERS THEN
+            RAISE WARNING 'audit emit failed during partnership-termination partial-failure: %', SQLERRM;
+            v_audit_event_id := NULL;
+        END;
+
+        RETURN jsonb_build_object(
+            'success',              false,
+            'partial',              true,
+            'error',                'PARTIAL_FAILURE',
+            'partnershipId',        p_partnership_id,
+            'cascadedGrantEventIds', to_jsonb(v_cascade_event_ids),
+            'failureIndex',         v_loop_index,
+            'failedGrantId',        v_failed_grant_id,
+            'processingError',      v_processing_error,
+            'auditEventId',         v_audit_event_id
+        );
+    END IF;
+
+    -- =====================================================================
+    -- EMIT var_partnership.terminated (cascade complete)
+    -- =====================================================================
+
+    v_partnership_event_id := api.emit_domain_event(
+        p_stream_id   := p_partnership_id,
+        p_stream_type := 'var_partnership',
+        p_event_type  := 'var_partnership.terminated',
+        p_event_data  := jsonb_build_object(
+            'terminated_by',      v_caller_id,
+            'termination_reason', p_termination_reason
+        ),
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.terminate_var_partnership',
+            'reason',          p_reason
+        )
+    );
+
+    -- PATTERN A v2 READ-BACK for partnership termination
+    PERFORM 1
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id AND status = 'terminated';
+    IF NOT FOUND THEN
+        SELECT processing_error INTO v_processing_error
+        FROM public.domain_events WHERE id = v_partnership_event_id;
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Partnership termination event processing failed: ' ||
+                    COALESCE(v_processing_error, 'projection read-back returned no row')
+            ),
+            'partnershipEventId',   v_partnership_event_id,
+            'cascadedGrantEventIds', to_jsonb(v_cascade_event_ids)
+        );
+    END IF;
+
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_partnership_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Partnership termination event processing failed: ' || v_processing_error
+            ),
+            'partnershipEventId',   v_partnership_event_id,
+            'cascadedGrantEventIds', to_jsonb(v_cascade_event_ids)
+        );
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success',                true,
+        'partnershipId',          p_partnership_id,
+        'partnershipEventId',     v_partnership_event_id,
+        'cascadedGrantEventIds',  to_jsonb(v_cascade_event_ids),
+        'cascadedGrantCount',     COALESCE(array_length(v_cascade_event_ids, 1), 0),
+        'candidateGrantCount',    v_candidate_count
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.terminate_var_partnership(uuid, text, text)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.terminate_var_partnership(uuid, text, text)
+    TO authenticated;
+
+
+-- =====================================================================
+-- Step 14 — api.suspend_var_partnership (single-event Pattern A v2)
+-- =====================================================================
+-- Emits var_partnership.suspended. No cascade — suspension is reversible
+-- (api.reactivate_var_partnership). Citing grants stay active; the
+-- VAR-validator helper accepts only 'active' partnerships, so new grant
+-- issuance against a suspended partnership is blocked by Step 6's
+-- _validate_authorization_var_contract.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.suspend_var_partnership(
+    p_partnership_id          uuid,
+    p_suspension_reason       text,
+    p_expected_resolution_date date DEFAULT NULL,
+    p_reason                  text DEFAULT 'VAR partnership suspended'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims           jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id        uuid  := public.get_current_user_id();
+    v_org_id           uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked   boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_provider_org_id  uuid;
+    v_provider_path    extensions.ltree;
+    v_current_status   text;
+    v_event_id         uuid;
+    v_processing_error text;
+BEGIN
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_partnership_id IS NULL THEN
+        RAISE EXCEPTION 'partnership_id is required' USING ERRCODE = '22004';
+    END IF;
+    IF p_suspension_reason IS NULL OR p_suspension_reason = '' THEN
+        RAISE EXCEPTION 'suspension_reason is required for HIPAA audit trail'
+            USING ERRCODE = '22004';
+    END IF;
+
+    SELECT provider_org_id, status
+    INTO v_provider_org_id, v_current_status
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PARTNERSHIP_NOT_FOUND',
+            'errorDetails', jsonb_build_object(
+                'code',    'PARTNERSHIP_NOT_FOUND',
+                'message', 'partnership not found'
+            )
+        );
+    END IF;
+
+    -- Only active partnerships can be suspended
+    IF v_current_status <> 'active' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'INVALID_STATE_TRANSITION',
+            'errorDetails', jsonb_build_object(
+                'code',       'INVALID_STATE_TRANSITION',
+                'message',    format('partnership is %s; only active partnerships can be suspended', v_current_status),
+                'actionable', false
+            )
+        );
+    END IF;
+
+    SELECT path INTO v_provider_path
+    FROM public.organizations_projection
+    WHERE id = v_provider_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('partnership.manage', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: partnership.manage at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    v_event_id := api.emit_domain_event(
+        p_stream_id   := p_partnership_id,
+        p_stream_type := 'var_partnership',
+        p_event_type  := 'var_partnership.suspended',
+        p_event_data  := jsonb_build_object(
+            'suspended_by',             v_caller_id,
+            'suspension_reason',        p_suspension_reason,
+            'expected_resolution_date', p_expected_resolution_date
+        ),
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.suspend_var_partnership',
+            'reason',          p_reason
+        )
+    );
+
+    PERFORM 1
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id AND status = 'suspended';
+    IF NOT FOUND THEN
+        SELECT processing_error INTO v_processing_error
+        FROM public.domain_events WHERE id = v_event_id;
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' ||
+                    COALESCE(v_processing_error, 'projection read-back returned no row')
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' || v_processing_error
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success',       true,
+        'eventId',       v_event_id,
+        'partnershipId', p_partnership_id
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.suspend_var_partnership(uuid, text, date, text)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.suspend_var_partnership(uuid, text, date, text)
+    TO authenticated;
+
+
+-- =====================================================================
+-- Step 15 — api.reactivate_var_partnership (single-event Pattern A v2)
+-- =====================================================================
+-- Emits var_partnership.reactivated. Transition: suspended → active.
+-- Handler clears suspended_at / suspended_by / suspension_reason.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.reactivate_var_partnership(
+    p_partnership_id        uuid,
+    p_new_contract_end_date date DEFAULT NULL,
+    p_reason                text DEFAULT 'VAR partnership reactivated'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims           jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id        uuid  := public.get_current_user_id();
+    v_org_id           uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked   boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_provider_org_id  uuid;
+    v_provider_path    extensions.ltree;
+    v_current_status   text;
+    v_contract_start   date;
+    v_event_id         uuid;
+    v_processing_error text;
+BEGIN
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_partnership_id IS NULL THEN
+        RAISE EXCEPTION 'partnership_id is required' USING ERRCODE = '22004';
+    END IF;
+
+    SELECT provider_org_id, status, contract_start_date
+    INTO v_provider_org_id, v_current_status, v_contract_start
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PARTNERSHIP_NOT_FOUND',
+            'errorDetails', jsonb_build_object(
+                'code',    'PARTNERSHIP_NOT_FOUND',
+                'message', 'partnership not found'
+            )
+        );
+    END IF;
+
+    -- Only suspended partnerships can be reactivated
+    IF v_current_status <> 'suspended' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'INVALID_STATE_TRANSITION',
+            'errorDetails', jsonb_build_object(
+                'code',       'INVALID_STATE_TRANSITION',
+                'message',    format('partnership is %s; only suspended partnerships can be reactivated', v_current_status),
+                'actionable', false
+            )
+        );
+    END IF;
+
+    -- new_contract_end_date back-check vs immutable start_date
+    IF p_new_contract_end_date IS NOT NULL
+       AND p_new_contract_end_date < v_contract_start THEN
+        RAISE EXCEPTION 'new_contract_end_date must be on or after contract_start_date'
+            USING ERRCODE = '22023';
+    END IF;
+
+    SELECT path INTO v_provider_path
+    FROM public.organizations_projection
+    WHERE id = v_provider_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('partnership.manage', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: partnership.manage at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    v_event_id := api.emit_domain_event(
+        p_stream_id   := p_partnership_id,
+        p_stream_type := 'var_partnership',
+        p_event_type  := 'var_partnership.reactivated',
+        p_event_data  := jsonb_build_object(
+            'reactivated_by',         v_caller_id,
+            'new_contract_end_date',  p_new_contract_end_date
+        ),
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.reactivate_var_partnership',
+            'reason',          p_reason
+        )
+    );
+
+    PERFORM 1
+    FROM public.var_partnerships_projection
+    WHERE id = p_partnership_id AND status = 'active';
+    IF NOT FOUND THEN
+        SELECT processing_error INTO v_processing_error
+        FROM public.domain_events WHERE id = v_event_id;
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' ||
+                    COALESCE(v_processing_error, 'projection read-back returned no row')
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' || v_processing_error
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success',       true,
+        'eventId',       v_event_id,
+        'partnershipId', p_partnership_id
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.reactivate_var_partnership(uuid, date, text)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.reactivate_var_partnership(uuid, date, text)
+    TO authenticated;
+
+-- ============================================================================
+-- End Chunk 6 (Steps 11-15 VAR partnership emit RPCs).
+-- ============================================================================
