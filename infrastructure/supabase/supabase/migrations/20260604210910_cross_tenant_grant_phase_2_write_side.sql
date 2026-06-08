@@ -3055,6 +3055,12 @@ REVOKE ALL ON FUNCTION api.get_grant_role_templates(text)
     FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION api.get_grant_role_templates(text)
     TO authenticated;
+-- S1 architect fold-in 2026-06-08 (Chunk 7 review): GRANT to service_role
+-- defensively for future bootstrap-workflow / Edge Function callers
+-- enumerating available templates. Matches Phase 1's grant_role_templates
+-- service_role RLS carve-out spirit.
+GRANT EXECUTE ON FUNCTION api.get_grant_role_templates(text)
+    TO service_role;
 
 
 -- =====================================================================
@@ -3066,6 +3072,17 @@ GRANT EXECUTE ON FUNCTION api.get_grant_role_templates(text)
 -- COMMENT ON FUNCTION (per-RPC explicit form) rather than mapping-DO-
 -- loop because Phase 2 adds only 9 RPCs (vs Phase 1's 170-row backfill).
 --
+-- N1 architect fold-in 2026-06-08 (Chunk 7 review): 9 = 8 emit + 1 read.
+-- The 5 private validators (`public._validate_authorization_*`), router
+-- (`public.process_var_partnership_event`), and helper
+-- (`public.safe_jsonb_extract_numeric`) are in `public` schema, NOT
+-- `api`. The codegen SQL filter `WHERE n.nspname = 'api'` at
+-- `gen-rpc-registry.cjs:69` + `gen-rpc-reachability-matrix.cjs` makes
+-- them invisible to both registries; M3 + reachability matrix N/A by
+-- design. Plan.md row 89's "14 new functions" count was inclusive of
+-- those out-of-scope public functions for clarity, not as a tagging
+-- requirement.
+--
 -- Tag rationale:
 --   Emit RPCs (8 total — Steps 8/9/10/11/12/13/14/15):
 --     @a4c-rpc-shape: envelope
@@ -3075,7 +3092,11 @@ GRANT EXECUTE ON FUNCTION api.get_grant_role_templates(text)
 --       gate at provider org path); consultant variant N/A by design —
 --       grants are issued FOR consultants by provider admins, not BY
 --       consultants.
---     @a4c-phase-target: 2 (shipped in Phase 2; canonical at deploy)
+--     @a4c-phase-target: none (canonical at deploy; matches Phase 1
+--                                B-bucket convention — `phase-target` is
+--                                a forward-refactor-target marker, not a
+--                                "shipped this phase" tag. F2 architect
+--                                fold-in 2026-06-08 Chunk 7 review.)
 --
 --   Read RPC (1 total — Step 16):
 --     @a4c-rpc-shape: read
@@ -3107,7 +3128,7 @@ emits via Pattern A v2 with BOTH-checks readback.
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority (HIPAA gate at provider org path via has_effective_permission('grant.create', v_provider_path)); consultant variant N/A by design — grants are issued FOR consultants by provider admins, not BY consultants.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 9 — api.revoke_access_grant
 COMMENT ON FUNCTION api.revoke_access_grant(uuid, text, text) IS
@@ -3120,7 +3141,7 @@ flag); Pattern A v2 BOTH-checks readback against status='revoked'.
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority (HIPAA gate at provider org path via has_effective_permission('grant.revoke', v_provider_path)); consultant variant N/A by design — revocations are issued by the data-owner provider, not by the consultant.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 10 — api.revoke_permission_across_grants
 COMMENT ON FUNCTION api.revoke_permission_across_grants(text, text) IS
@@ -3137,11 +3158,18 @@ Multi-caller note: concurrent invocations on OVERLAPPING permission_names
 use last-emit-wins semantics on the projection (handler REPLACES
 permissions jsonb). Serial invocation is the assumed operational pattern.
 
+F1+S3 architect fold-in 2026-06-08 (Chunk 7 review): bucket E (NOT B)
+— this RPC has NO JWT-derived tenancy binding (no get_current_org_id
+call). Phase 1 bucket taxonomy: E = "no tenancy context; grant-irrelevant
+by default" — exactly the right classification for a platform-only
+cross-grant operation. Disambiguates from ADR §B sub-decision lettering
+(unrelated namespaces).
+
 @a4c-rpc-shape: envelope
-@a4c-bucket: B
+@a4c-bucket: E
 @a4c-consultant-callable: no
-@a4c-consultant-callable-reason: Platform-tier authority (has_platform_privilege() required; cross-grant policy override is a platform-level operation by ADR sub-decision B); not callable by providers OR consultants.
-@a4c-phase-target: 2$cmt$;
+@a4c-consultant-callable-reason: Platform-tier authority (has_platform_privilege() required); cross-grant policy override is a platform-level operation; not callable by providers OR consultants.
+@a4c-phase-target: none$cmt$;
 
 -- Step 11 — api.create_var_partnership
 COMMENT ON FUNCTION api.create_var_partnership(
@@ -3156,7 +3184,7 @@ provider org path. Pattern A v2 BOTH-checks readback.
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission (org-scoped at provider path); consultant variant N/A — partnerships are business relationships established BY the provider org.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 12 — api.update_var_partnership
 COMMENT ON FUNCTION api.update_var_partnership(
@@ -3178,7 +3206,7 @@ sentinel-based clear (p_clear_fields text[]) tracked in observations.md.
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; consultant variant N/A.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 13 — api.terminate_var_partnership (multi-event cascade)
 COMMENT ON FUNCTION api.terminate_var_partnership(uuid, text, text) IS
@@ -3192,7 +3220,7 @@ logged emit on partial failure. candidateGrantCount in success envelope.
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; cascade-revocation is a high-risk action initiated by the provider org, not the consultant.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 14 — api.suspend_var_partnership
 COMMENT ON FUNCTION api.suspend_var_partnership(uuid, text, date, text) IS
@@ -3206,7 +3234,7 @@ partnerships).
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; consultant variant N/A.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 15 — api.reactivate_var_partnership
 COMMENT ON FUNCTION api.reactivate_var_partnership(uuid, date, text) IS
@@ -3219,7 +3247,7 @@ contract_start_date.
 @a4c-bucket: B
 @a4c-consultant-callable: no
 @a4c-consultant-callable-reason: Provider-admin authority + partnership.manage permission; consultant variant N/A.
-@a4c-phase-target: 2$cmt$;
+@a4c-phase-target: none$cmt$;
 
 -- Step 16 — api.get_grant_role_templates (read RPC)
 COMMENT ON FUNCTION api.get_grant_role_templates(text) IS
@@ -3234,6 +3262,53 @@ LIST of available templates, not the bound grants).
 @a4c-consultant-callable: yes
 @a4c-consultant-callable-reason: Template metadata — non-sensitive list of available grant-role templates; consultants can read to discover what authorization types and templates exist (e.g., for UI rendering of "what templates does this VAR contract support").
 @a4c-phase-target: none$cmt$;
+
+-- =====================================================================
+-- Step 17 assertion — Phase-2-scoped tag-presence safety net
+-- =====================================================================
+-- S2 architect fold-in 2026-06-08 (Chunk 7 review): re-fires the Phase 1
+-- 0-untagged invariant on every Phase 2 apply. Catches drift introduced
+-- by ANY prior migration (not just Phase 2) that added an api.* function
+-- without tagging it. Defensive — CI gates `rpc-registry-sync.yml` +
+-- `rpc-reachability-matrix-sync.yml` already catch this at PR time, but
+-- a deploy-time assertion fails fast on any post-CI drift (e.g., manual
+-- pg_proc edits, side-channel migrations).
+--
+-- Invariant: every `api.*` function carries @a4c-rpc-shape (envelope|read)
+-- + @a4c-bucket (A|A-variant|B|C|D|D-variant|E|E-variant) + @a4c-phase-
+-- target (non-empty token). Reuses Phase 1's assertion regexes including
+-- the codified-pitfall #1 fix (\y vs \b for word-boundary).
+-- ----------------------------------------------------------------------------
+
+DO $$
+DECLARE
+    v_untagged_count integer;
+    v_untagged_list  text;
+BEGIN
+    SELECT
+        COUNT(*),
+        string_agg(p.proname, ', ' ORDER BY p.proname)
+    INTO v_untagged_count, v_untagged_list
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    LEFT JOIN pg_description d ON d.objoid = p.oid AND d.objsubid = 0
+    WHERE n.nspname = 'api'
+      AND p.prokind = 'f'
+      AND (
+            d.description IS NULL
+         OR d.description !~ '@a4c-rpc-shape:\s*(envelope|read)\y'
+         OR d.description !~ '@a4c-bucket:\s*(A-variant|A|B|C|D-variant|D|E-variant|E)\y'
+         OR d.description !~ '@a4c-phase-target:\s*\S+'
+      );
+
+    IF v_untagged_count > 0 THEN
+        RAISE EXCEPTION 'Phase 2 Step 17 assertion failed: % api.* function(s) lack one or more of @a4c-rpc-shape / @a4c-bucket / @a4c-phase-target tags. Untagged: %',
+            v_untagged_count, COALESCE(v_untagged_list, '<none>')
+            USING ERRCODE = 'P9001';
+    END IF;
+
+    RAISE NOTICE 'Phase 2 Step 17 assertion: all api.* functions carry the canonical tag set';
+END $$;
 
 -- ============================================================================
 -- End Chunk 7 (Steps 16-17 read RPC + COMMENT ON FUNCTION tag wave).

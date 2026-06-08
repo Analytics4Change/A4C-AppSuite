@@ -86,7 +86,7 @@ Plan-mode architect review (`software-architect-dbc`) returned **APPROVE WITH IN
 | 14 | `api.suspend_var_partnership` emit RPC — gate on `partnership.manage`. | ADR C.3 + J |
 | 15 | `api.reactivate_var_partnership` emit RPC — gate on `partnership.manage`. | ADR C.3 + J |
 | 16 | `api.get_grant_role_templates(p_authorization_type)` read RPC. **F1 fold-in**: `RETURNS TABLE("template_name" text, "permission_name" text, "default_terms" jsonb)` — `template_name` returned for caller disambiguation under 3-column UNIQUE. | ADR L255 + F1 |
-| 17 | COMMENT ON FUNCTION tags on all 14 new functions (M3 + reachability matrix; +1 for `_validate_authorization_emergency_access` registry-exclusion). Emit RPCs: envelope/B/no/partnership-management/2. Read RPC: read/E/yes. | PR #70 Step 11 precedent |
+| 17 | COMMENT ON FUNCTION tags on the 9 new api.* RPCs (8 emit + 1 read). Private helpers (`_validate_authorization_*`), router (`process_var_partnership_event`), and `safe_jsonb_extract_numeric` are in `public` schema — M3/matrix registries N/A by codegen SQL filter. Emit RPCs: envelope/B (Steps 8+9+11-15) or E (Step 10 platform-only)/no/per-RPC reason text/phase-target=`none` (canonical at deploy — matches Phase 1 B-bucket convention). Read RPC (Step 16): read/E/yes/phase-target=`none`. | PR #70 Step 11 precedent + Chunk 7 architect F1+F2 fold-ins (2026-06-08) |
 
 ## Hard ordering constraints
 

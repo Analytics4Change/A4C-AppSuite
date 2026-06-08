@@ -58,9 +58,9 @@
 - [x] **Step 14** — `api.suspend_var_partnership` (single-event Pattern A v2; transition guard active→suspended only; no cascade — citing grants stay active, new-grant issuance blocked by Step 6 var-validator)
 - [x] **Step 15** — `api.reactivate_var_partnership` (single-event Pattern A v2; transition guard suspended→active only; new_contract_end_date optional back-check vs immutable start_date)
 - [x] **Architect review of Steps 11-15 2026-06-08** — APPROVE WITH IN-PR FIXES; S1 (PATCH NULL-clear doc + future-card carry-forward in observations.md) + S2 (HIPAA-rationale comment on Step 13 cascade-first ordering) + N1 (Step 12 docblock note on reserved partner_org_name/provider_org_name keys) all folded same-day.
-- [ ] **Step 16** — `api.get_grant_role_templates` read RPC
-- [ ] **Step 17** — COMMENT ON FUNCTION tags on all 13 new functions
-- [ ] **Architect review of Steps 16-17 + AsyncAPI + type-gen** — M3 tag audit, var_partnership.yaml schema completeness, matrix regen diff
+- [x] **Step 16** — `api.get_grant_role_templates` read RPC (mirrors `api.get_role_permission_templates` shape; F1 fold-in template_name returned for 3-column UNIQUE disambiguation; no permission gate; invalid input → empty rowset; GRANT to authenticated + service_role per Chunk 7 S1 fold-in)
+- [x] **Step 17** — COMMENT ON FUNCTION tags on the 9 new api.* RPCs (8 emit + 1 read). Private helpers / router / safe_jsonb_extract_numeric in `public` schema are out-of-registry by codegen SQL filter (N1 fold-in). Includes Phase-2-scoped tag-presence assertion DO block per S2 fold-in.
+- [x] **Architect review of Steps 16-17 2026-06-08** — APPROVE WITH IN-PR FIXES; F1 (Step 10 bucket B→E per Phase 1 taxonomy: no JWT-tenancy binding → bucket E) + F2 (phase-target 2→none for all 8 emit RPCs per Phase 1 B-bucket convention) + S1 (Step 16 GRANT to service_role) + S2 (Phase-2-scoped tag-presence assertion) + N1 (docblock 9-RPC explanation) all folded same-day. S3 subsumed by F1; N2 (Stage D handler-ref diff) deferred to Stage D ritual. plan.md row 89 updated to match F1+F2 corrections.
 
 ## Stage D — Post-migration deliverables (same Phase 2 PR)
 
@@ -98,9 +98,17 @@
 
 ## Current Status
 
-**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3+4+5+6 of Stage C complete with architect reviews folded.
-**Status**: Migration at ~2,975 lines / 45 top-level statements. All 6 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5; S1+S2+N1 for Chunk 6).
-**Next action**: Chunk 7 — Steps 16-17. Step 16 = `api.get_grant_role_templates(p_authorization_type)` read RPC mirroring `api.get_role_permission_templates` signature. Step 17 = `COMMENT ON FUNCTION` tag wave on all 14 new functions (M3 RPC shape registry + reachability matrix tags). After Chunk 7, Stage D = post-migration deliverables (AsyncAPI updates incl. var_partnership.yaml + audit.yaml + access_grant.policy_override_applied + asyncapi.yaml stream_type enum; type regen; handler reference files; CLAUDE.md codification of underscore-prefix convention + ADR addendums).
+**Stage**: C (drafting) — **COMPLETE 2026-06-08**. Stages A + B closed 2026-06-04. All 7 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5; S1+S2+N1 for Chunk 6; F1+F2+S1+S2+N1 for Chunk 7).
+**Status**: Migration at ~3,300 lines / 56 top-level statements. Stage C COMPLETE; ready for Stage D.
+**Next action**: Stage D — post-migration deliverables (same Phase 2 PR). Hard blockers before merge:
+1. AsyncAPI updates: `var_partnership.yaml` (NEW, 5 messages) + `access_grant.yaml` (+`AccessGrantPolicyOverrideApplied` per PR #70 N1) + `audit.yaml` (NEW for `AuditHighRiskActionLogged` per Chunk 5 F1 precedent) + `asyncapi.yaml` channel wiring + stream_type enum (add `var_partnership`).
+2. `npm run generate:types` + commit + cp to `frontend/src/types/generated/`.
+3. Verify `infrastructure/supabase/handlers/routers/process_var_partnership_event.sql` matches migration body (N2 carry-forward ritual).
+4. `infrastructure/supabase/CLAUDE.md`: codify underscore-prefix private-helper convention (sub-decision A) + event-naming addendum (Chunk 5 F1 precedent: `audit.*` family uses 2-level form).
+5. ADR addendums: partial UNIQUE per sub-decision G; 3-column UNIQUE per F1; clarify phase-target convention per Chunk 7 F2.
+6. Type regen: `frontend/src/types/database.types.ts` + `workflows/src/types/database.types.ts` (both byte-identical).
+7. M3 RPC registry regen: `npm run gen:rpc-registry`.
+8. Reachability matrix regen: `npm run gen:rpc-reachability-matrix` (+9 rows: 8 emit + 1 read; Step 10 now bucket E per Chunk 7 F1).
 
 ## Resume guide (for fresh-context continuation)
 
@@ -136,7 +144,7 @@ If picking up in a new conversation, read these in order:
 | 4 | 8 (`api.create_access_grant` — largest RPC, alone) | ✅ done; architect S1+S2+S3+N3+N4 folded |
 | 5 | 9 + 10 (revoke flow incl. multi-event partial-failure per F3 I-fold) | ✅ done; architect F1+S1+S2+S3+N1+N2 folded |
 | 6 | 11-15 (5 VAR emit RPCs incl. Step 13 cascade-revoke) | ✅ done; architect S1+S2+N1 folded |
-| **7** | **16 + 17** (read RPC + COMMENT ON FUNCTION tags) | **NEXT** |
+| 7 | 16 + 17 (read RPC + COMMENT ON FUNCTION tags) | ✅ done; architect F1+F2+S1+S2+N1 folded — Stage C COMPLETE |
 
 ### Architect-review cadence
 
