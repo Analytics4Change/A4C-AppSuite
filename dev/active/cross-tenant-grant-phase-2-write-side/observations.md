@@ -99,6 +99,14 @@ Per `infrastructure/supabase/CLAUDE.md` (post-PR-#70 state):
 - ADR L255: `api.get_grant_role_templates(p_authorization_type text) RETURNS TABLE("template_name" text, "permission_name" text, "default_terms" jsonb)` — confirm this signature matches `api.get_role_permission_templates` shape on dev before drafting.
 - ADR L317-330: var_partnership AsyncAPI sketch shows 6 messages including `VarPartnershipExpired` — Phase 2 ships 5 (no `expired` per user decision 1). Verify ADR is the SOURCE OF TRUTH for the 5 we ship + that the sixth deferred message gets a docblock noting deferral.
 
+## Cosmetic carry-forwards from Chunk 4 architect review (2026-06-08)
+
+Two nits left undeferred for this PR; not folded inline because they're presentation-only and the diff cost outweighs the readability benefit at Phase 2 scale:
+
+- **N1 (Chunk 4)**: `api.create_access_grant` success envelope returns `grantedAt: v_now` (RPC-side timestamp) but the handler stamps `granted_at := p_event.created_at` (the `domain_events.created_at` from the trigger). They are typically equal but can drift by microseconds. Forward-fix: either drop `grantedAt` from the envelope (caller fetches via `get_access_grant` read RPC when needed) or read it back from the projection inside Pattern A v2. **Stage E probe** should verify the drift is bounded (< 1ms in practice). Carry to Phase-2 PR cohesion review if Stage E surfaces user-visible discrepancy.
+
+- **N2 (Chunk 4)**: envelope shape across all SCOPE_NOT_FOUND / CLIENT_DISCHARGED / TEMPLATE_NOT_FOUND / EMPTY_PERMISSION_SET / NOT_IMPLEMENTED / AUTHORIZATION_VALIDATION_FAILED / PROCESSING_FAILED branches duplicates `error` and `errorDetails.code`. The PR #44 `api.modify_user_roles` envelope dropped `code` from `errorDetails` once it matched `error`. Phase 2 RPCs keep the duplication intentionally for forward-compat with extended `errorDetails` payloads (e.g., field-level validation surfacing). Document at the M3 tag wave (Step 17) if the duplication stays.
+
 ## Stale content nominees (verify, do not auto-fix)
 
 - `documentation/architecture/data/provider-partners-architecture.md` L376-433 — PR #68 cohesion review flagged stale "Authorization Type Patterns" code blocks. Verify fix landed in PR #68 or fold-in needed during Stage D.

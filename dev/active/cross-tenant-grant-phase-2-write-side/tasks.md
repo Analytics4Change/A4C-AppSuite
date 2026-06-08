@@ -47,8 +47,8 @@
   - 7b.b: INSERT INTO role_permission_templates ('provider_admin', 'partnership.manage') ON CONFLICT DO NOTHING — future bootstraps grant it
   - 7b.c: BACKFILL existing provider_admin roles' role_permissions_projection — closes gap for existing prod tenants
 - [x] **Architect review of Steps 6-7b 2026-06-04** — APPROVE WITH IN-PR FIXES; F1 must-fix (partnership.manage bundling gap — Option A: implement plan as written via template INSERT + backfill) + S1.a should-fix (SECURITY DEFINER COMMENT honesty) + N2 nit (ADR cross-reference) all folded same-day. Phase-N validator helper gotcha noted in observations.md.
-- [ ] **Step 8** — `api.create_access_grant` (largest RPC; ADR L184-213 locked body skeleton)
-- [ ] **Architect review of Step 8** — HIPAA gate, INTERSECT semantics, Pattern A v2 readback completeness
+- [x] **Step 8** — `api.create_access_grant` (largest RPC; ADR L184-213 locked body skeleton; 13 params; F1+F2+F5+K+S6 fold-ins pre-applied)
+- [x] **Architect review of Step 8 2026-06-08** — APPROVE WITH IN-PR FIXES; S1+S2+S3 should-fix + N3+N4 nits all folded same-day. S1: HIPAA-adjacent discharged-client guard (read clients_projection.status + envelope-return on 'discharged'). S2: same-org pre-emit guard (consultant=provider). S3: back-dated expires_at pre-emit guard. N3: inline comment at emergency_access validator call. N4: tie-break determinism note on terms-merge LOOP. N1 (granted_at drift) + N2 (errorDetails.code duplication) deferred to observations.md as cosmetic.
 - [ ] **Step 9** — `api.revoke_access_grant`
 - [ ] **Step 10** — `api.revoke_permission_across_grants` (multi-event Pattern A v2 partial-failure)
 - [ ] **Architect review of Steps 9-10** — revocation flow + partial-failure contract
@@ -98,9 +98,9 @@
 
 ## Current Status
 
-**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3 of Stage C complete with architect reviews folded.
-**Status**: Migration at ~895 lines / 35 top-level statements. Chunks 1-3 (Steps 1-7b) on branch HEAD pending Chunk 3 fold-in commit. All 3 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3 + Phase-N validator gotcha noted).
-**Next action** (after context clear): Chunk 4 — Step 8 `api.create_access_grant` (largest single RPC; ADR L184-213 locked body skeleton; 13 params; F1 + F2 + K fold-ins from plan-mode pre-applied). This is the biggest single-RPC drafting of Phase 2; fresh context recommended.
+**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3+4 of Stage C complete with architect reviews folded.
+**Status**: Migration at ~1,400 lines / 38 top-level statements. All 4 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4 + N1+N2 cosmetic-deferred to observations.md).
+**Next action**: Chunk 5 — Steps 9-10 (`api.revoke_access_grant` single-event + `api.revoke_permission_across_grants` multi-event Pattern A v2 partial-failure per F3+I+S5 fold-ins from plan mode). Mirror PR #44 `api.modify_user_roles` envelope shape; emit `audit.high_risk_action.logged` in partial-failure branch.
 
 ## Resume guide (for fresh-context continuation)
 
@@ -132,9 +132,9 @@ If picking up in a new conversation, read these in order:
 |---|---|---|
 | 1 | 1-3 (schema) | ✅ done; architect F1+F2+F3+S2+S3 folded |
 | 2 | 4.0 + 4 + 5 (helper + router + dispatcher) | ✅ done; architect F1+F2+S1+S2+N1+N2 folded |
-| **3** | **6 + 7 + 7b** (validation helpers + partnership.manage seed) | **NEXT** |
-| 4 | 8 (`api.create_access_grant` — largest RPC, alone) | pending |
-| 5 | 9 + 10 (revoke flow incl. multi-event partial-failure per F3 I-fold) | pending |
+| 3 | 6 + 7 + 7b (validation helpers + partnership.manage seed) | ✅ done; architect F1+S1.a+N2 folded |
+| 4 | 8 (`api.create_access_grant` — largest RPC, alone) | ✅ done; architect S1+S2+S3+N3+N4 folded |
+| **5** | **9 + 10** (revoke flow incl. multi-event partial-failure per F3 I-fold) | **NEXT** |
 | 6 | 11-15 (5 VAR emit RPCs incl. Step 13 cascade-revoke) | pending |
 | 7 | 16 + 17 (read RPC + COMMENT ON FUNCTION tags) | pending |
 

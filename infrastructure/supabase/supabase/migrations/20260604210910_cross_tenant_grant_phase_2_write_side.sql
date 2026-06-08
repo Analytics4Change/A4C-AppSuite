@@ -956,6 +956,7 @@ DECLARE
     v_provider_path       extensions.ltree;
     v_scope_path          extensions.ltree;
     v_client_ou_id        uuid;
+    v_client_status       text;  -- S1 architect fold-in 2026-06-08 (Chunk 4 review)
     v_authorization_valid boolean;
     v_template_count      int;
     v_permissions_jsonb   jsonb;
@@ -993,6 +994,25 @@ BEGIN
     IF p_grant_role_template_name IS NULL OR p_grant_role_template_name = '' THEN
         RAISE EXCEPTION 'grant_role_template_name is required'
             USING ERRCODE = '22004';
+    END IF;
+
+    -- S2 architect fold-in 2026-06-08 (Chunk 4 review): same-org guard.
+    -- consultant_org_id = provider_org_id is semantic nonsense (org granting
+    -- itself access to its own data) and would feed a redundant row to
+    -- sync_accessible_organizations_from_grants. Reject pre-emit.
+    IF p_consultant_org_id = p_provider_org_id THEN
+        RAISE EXCEPTION 'consultant_org_id must differ from provider_org_id'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- S3 architect fold-in 2026-06-08 (Chunk 4 review): expires_at must be
+    -- in the future. Phase 1's grant_derived_perms CTE filters
+    -- (expires_at IS NULL OR expires_at > now()), so a back-dated value
+    -- would land an active projection row that JWT issuance immediately
+    -- filters out — projection-state drift. Reject pre-emit.
+    IF p_expires_at IS NOT NULL AND p_expires_at <= v_now THEN
+        RAISE EXCEPTION 'expires_at must be in the future'
+            USING ERRCODE = '22023';
     END IF;
 
     -- p_scope CHECK (matches cross_tenant_access_grants_projection_scope_check)
@@ -1061,6 +1081,11 @@ BEGIN
                 p_authorization_reference, p_consultant_org_id, p_provider_org_id
             );
         WHEN 'emergency_access' THEN
+            -- N3 architect fold-in 2026-06-08: pre-emit guard above already
+            -- enforces p_authorization_reference IS NULL for emergency_access,
+            -- so the validator always receives NULL and returns TRUE
+            -- unconditionally. Kept for signature uniformity with Phase N
+            -- helpers per _validate_authorization_emergency_access docblock.
             v_authorization_valid := public._validate_authorization_emergency_access(
                 p_authorization_reference, p_consultant_org_id, p_provider_org_id
             );
@@ -1120,7 +1145,14 @@ BEGIN
             );
         END IF;
     ELSIF p_scope = 'client_specific' THEN
-        SELECT organization_unit_id INTO v_client_ou_id
+        -- S1 architect fold-in 2026-06-08 (Chunk 4 review): also read status.
+        -- clients_projection.status CHECK is ('active','inactive','discharged')
+        -- per 20260327205738_clients_projection.sql:116. A grant issued over
+        -- a 'discharged' client would silently extend consultant access to
+        -- a discharged record — HIPAA post-discharge access must be an
+        -- explicit, gated path, not a side-door via grant creation.
+        SELECT organization_unit_id, status
+        INTO v_client_ou_id, v_client_status
         FROM public.clients_projection
         WHERE id = p_scope_id;
         IF NOT FOUND OR v_client_ou_id IS NULL THEN
@@ -1130,6 +1162,16 @@ BEGIN
                 'errorDetails', jsonb_build_object(
                     'code',    'SCOPE_NOT_FOUND',
                     'message', 'client referenced by scope_id not found or not placed in an organization_unit'
+                )
+            );
+        END IF;
+        IF v_client_status = 'discharged' THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error',   'CLIENT_DISCHARGED',
+                'errorDetails', jsonb_build_object(
+                    'code',    'CLIENT_DISCHARGED',
+                    'message', 'Cannot create grant over a discharged client'
                 )
             );
         END IF;
@@ -1216,7 +1258,10 @@ BEGIN
     -- rows share default_terms; the fold is forward-compatible if Phase N
     -- templates vary per-permission. Right-side wins on key overlap
     -- (PG jsonb || semantics). Deterministic ORDER BY permission_name for
-    -- replay-stability.
+    -- replay-stability — relies on grant_role_templates_unique
+    -- (template_name, authorization_type, permission_name) per F1/K, which
+    -- guarantees permission_name is a unique tie-break within the filtered
+    -- triple (N4 architect fold-in 2026-06-08).
     FOR v_terms_row IN
         SELECT default_terms
         FROM public.grant_role_templates
