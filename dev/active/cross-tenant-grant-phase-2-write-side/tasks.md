@@ -49,9 +49,9 @@
 - [x] **Architect review of Steps 6-7b 2026-06-04** — APPROVE WITH IN-PR FIXES; F1 must-fix (partnership.manage bundling gap — Option A: implement plan as written via template INSERT + backfill) + S1.a should-fix (SECURITY DEFINER COMMENT honesty) + N2 nit (ADR cross-reference) all folded same-day. Phase-N validator helper gotcha noted in observations.md.
 - [x] **Step 8** — `api.create_access_grant` (largest RPC; ADR L184-213 locked body skeleton; 13 params; F1+F2+F5+K+S6 fold-ins pre-applied)
 - [x] **Architect review of Step 8 2026-06-08** — APPROVE WITH IN-PR FIXES; S1+S2+S3 should-fix + N3+N4 nits all folded same-day. S1: HIPAA-adjacent discharged-client guard (read clients_projection.status + envelope-return on 'discharged'). S2: same-org pre-emit guard (consultant=provider). S3: back-dated expires_at pre-emit guard. N3: inline comment at emergency_access validator call. N4: tie-break determinism note on terms-merge LOOP. N1 (granted_at drift) + N2 (errorDetails.code duplication) deferred to observations.md as cosmetic.
-- [ ] **Step 9** — `api.revoke_access_grant`
-- [ ] **Step 10** — `api.revoke_permission_across_grants` (multi-event Pattern A v2 partial-failure)
-- [ ] **Architect review of Steps 9-10** — revocation flow + partial-failure contract
+- [x] **Step 9** — `api.revoke_access_grant` (single-event Pattern A v2; HIPAA gate on grant.revoke at provider_org_path; envelope-shape symmetric grant-existence leak guard; suspended remains revocable)
+- [x] **Step 10** — `api.revoke_permission_across_grants` (multi-event Pattern A v2 partial-failure per F3+I+S5; RPC-side filter via EXISTS-on-jsonb_array_elements; mirrors PR #44 envelope; emits `audit.high_risk_action_logged` on stream_type='platform_admin' in partial-failure branch)
+- [x] **Architect review of Steps 9-10 2026-06-08** — APPROVE WITH IN-PR FIXES; F1 BLOCKING-tier (event-type naming precedent: rename to 2-level `audit.high_risk_action_logged` matching `direct_care_settings_updated` precedent) + S2 (candidateGrantCount in success envelope) + S3 (RAISE WARNING preserves audit-emit failure trail) + S1 (`errorDetails.actionable: false` flag on ALREADY_INACTIVE) + N1 (stable section ref) + N2 (PHI hygiene comment on p_revocation_details) — ALL folded same-day. AsyncAPI audit family registration carried to Stage D per F1 dependency.
 - [ ] **Step 11** — `api.create_var_partnership`
 - [ ] **Step 12** — `api.update_var_partnership`
 - [ ] **Step 13** — `api.terminate_var_partnership`
@@ -98,9 +98,9 @@
 
 ## Current Status
 
-**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3+4 of Stage C complete with architect reviews folded.
-**Status**: Migration at ~1,400 lines / 38 top-level statements. All 4 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4 + N1+N2 cosmetic-deferred to observations.md).
-**Next action**: Chunk 5 — Steps 9-10 (`api.revoke_access_grant` single-event + `api.revoke_permission_across_grants` multi-event Pattern A v2 partial-failure per F3+I+S5 fold-ins from plan mode). Mirror PR #44 `api.modify_user_roles` envelope shape; emit `audit.high_risk_action.logged` in partial-failure branch.
+**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3+4+5 of Stage C complete with architect reviews folded.
+**Status**: Migration at ~1,870 lines / 40 top-level statements. All 5 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5 incl. event-naming precedent lock).
+**Next action**: Chunk 6 — Steps 11-15 (5 VAR partnership emit RPCs). Homogeneous batch: create / update / terminate (multi-event cascade per sub-decision H) / suspend / reactivate. All gate on `partnership.manage` (seeded in Chunk 3 Step 7b). Step 13 terminate is the only multi-event member (mirrors Step 10 partial-failure pattern but with cascade-revoke semantics — emit one `access_grant.revoked` per active var_contract grant citing the partnership + the `var_partnership.terminated` event).
 
 ## Resume guide (for fresh-context continuation)
 
@@ -134,8 +134,8 @@ If picking up in a new conversation, read these in order:
 | 2 | 4.0 + 4 + 5 (helper + router + dispatcher) | ✅ done; architect F1+F2+S1+S2+N1+N2 folded |
 | 3 | 6 + 7 + 7b (validation helpers + partnership.manage seed) | ✅ done; architect F1+S1.a+N2 folded |
 | 4 | 8 (`api.create_access_grant` — largest RPC, alone) | ✅ done; architect S1+S2+S3+N3+N4 folded |
-| **5** | **9 + 10** (revoke flow incl. multi-event partial-failure per F3 I-fold) | **NEXT** |
-| 6 | 11-15 (5 VAR emit RPCs incl. Step 13 cascade-revoke) | pending |
+| 5 | 9 + 10 (revoke flow incl. multi-event partial-failure per F3 I-fold) | ✅ done; architect F1+S1+S2+S3+N1+N2 folded |
+| **6** | **11-15** (5 VAR emit RPCs incl. Step 13 cascade-revoke) | **NEXT** |
 | 7 | 16 + 17 (read RPC + COMMENT ON FUNCTION tags) | pending |
 
 ### Architect-review cadence

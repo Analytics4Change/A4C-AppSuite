@@ -99,6 +99,20 @@ Per `infrastructure/supabase/CLAUDE.md` (post-PR-#70 state):
 - ADR L255: `api.get_grant_role_templates(p_authorization_type text) RETURNS TABLE("template_name" text, "permission_name" text, "default_terms" jsonb)` — confirm this signature matches `api.get_role_permission_templates` shape on dev before drafting.
 - ADR L317-330: var_partnership AsyncAPI sketch shows 6 messages including `VarPartnershipExpired` — Phase 2 ships 5 (no `expired` per user decision 1). Verify ADR is the SOURCE OF TRUTH for the 5 we ship + that the sixth deferred message gets a docblock noting deferral.
 
+## Chunk 5 architect review (2026-06-08) — new event family + precedent
+
+**F1 fold-in lock**: Step 10 emits a NEW event family `audit.high_risk_action_logged` on `stream_type='platform_admin'`. This is the FIRST emitter of any `audit.*` event family AND the first emitter on `platform_admin` (the dispatcher type was defined in baseline but never had an emitter). The 2-level naming form (`audit.high_risk_action_logged`) was chosen over 3-level (`audit.high_risk_action.logged`) to match `organization.direct_care_settings_updated` precedent and stay within the documented CLAUDE.md § "Event type naming convention" 2-level rule. This becomes the precedent for ALL future cross-grant / cross-tenant high-risk audit events.
+
+**Stage D carry-forward (MUST land before PR merge per Chunk 5 architect F1 dependency)**:
+
+- **AsyncAPI registration** for the new event family. Two options:
+  - (a) Extend existing admin schema with audit subtree, OR
+  - (b) NEW `infrastructure/supabase/contracts/asyncapi/domains/audit.yaml` with `AuditHighRiskActionLogged` message. Payload keys per emit body: `action, permission_name, override_reason, failed_grant_id, applied_event_ids[], failure_index, processing_error`.
+- **Wire `audit` family into top-level `asyncapi.yaml`** (channel + stream_type enum already covered by `platform_admin`, but message naming needs registration to avoid AnonymousSchema generation).
+- **Update `infrastructure/supabase/CLAUDE.md` § "Event type naming convention"** to add an addendum noting that 3-level form is reserved for the documented `contact.user.*` junction-event carve-out; `audit.*` family uses the 2-level form per this precedent.
+
+**Multi-caller race callout (architect Chunk 5 § 16)**: concurrent platform-admin invocations of `api.revoke_permission_across_grants` on OVERLAPPING permission names use **last-emit-wins** semantics at the projection (handler REPLACES `permissions` jsonb, not merges). Operational pattern: serial invocation. Document in Step 10 header in a future polish (not folded in Chunk 5; small risk surface — platform-only caller pool). Carry to Step 17 COMMENT ON FUNCTION text.
+
 ## Cosmetic carry-forwards from Chunk 4 architect review (2026-06-08)
 
 Two nits left undeferred for this PR; not folded inline because they're presentation-only and the diff cost outweighs the readability benefit at Phase 2 scale:

@@ -1423,12 +1423,25 @@ GRANT EXECUTE ON FUNCTION api.create_access_grant(
 -- Step 9 — api.revoke_access_grant (single-event Pattern A v2)
 -- =====================================================================
 -- ADR C.5 single-grant revocation. Handler at
--- handlers/routers/process_access_grant_event.sql:41-50 reads
--- event_data: grant_id, revoked_by, revocation_reason, revocation_details.
+-- handlers/routers/process_access_grant_event.sql § access_grant.revoked
+-- arm reads event_data: grant_id, revoked_by, revocation_reason,
+-- revocation_details.
 --
 -- Pattern A v2: stream_id := p_grant_id (the access_grant stream); the
 -- handler also reads grant_id from event_data for symmetry with other
 -- arms.
+--
+-- N2 architect fold-in 2026-06-08: PHI hygiene — p_revocation_details
+-- is a free-form text field that flows to BOTH event_data.revocation_
+-- details (audit trail) AND cross_tenant_access_grants_projection.
+-- revocation_details (query surface). Callers MUST NOT include PHI in
+-- p_revocation_details — it is an audit-layer FIELD only (legal/
+-- procedural context: "court order rescinded", "VAR partnership
+-- terminated"). The frontend caller (provider-admin UI) MUST surface
+-- this constraint to the user via input validation. PII three-layer
+-- model (PR #43): persistence is acceptable for audit fields IF SDK
+-- boundary masker enforces no-PHI; verify the frontend caller-side
+-- warning is in place before exposing this RPC.
 -- ----------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION api.revoke_access_grant(
@@ -1517,13 +1530,20 @@ BEGIN
     -- success-false envelope (mirrors api.deactivate_user idempotency
     -- pattern). 'suspended' is NOT short-circuited — revoking a suspended
     -- grant is a legitimate state transition.
+    --
+    -- S1 architect fold-in 2026-06-08: errorDetails.actionable=false flag
+    -- signals to the SDK boundary (apiRpcEnvelope masker / frontend toast
+    -- routing) that this envelope represents a benign terminal-state
+    -- collision, not an error. Frontend should render as info-toast
+    -- ("Grant was already revoked"), not error-toast.
     IF v_current_status IN ('revoked', 'expired') THEN
         RETURN jsonb_build_object(
             'success', false,
             'error',   'ALREADY_INACTIVE',
             'errorDetails', jsonb_build_object(
-                'code',    'ALREADY_INACTIVE',
-                'message', format('grant is already %s; cannot revoke', v_current_status)
+                'code',       'ALREADY_INACTIVE',
+                'message',    format('grant is already %s; cannot revoke', v_current_status),
+                'actionable', false
             )
         );
     END IF;
@@ -1622,11 +1642,23 @@ GRANT EXECUTE ON FUNCTION api.revoke_access_grant(uuid, text, text)
 --     appliedGrantEventIds[], failureIndex, processingError,
 --     failedGrantId, auditEventId }
 --
--- Audit emit (sub-decision B): emit audit.high_risk_action.logged in the
+-- Audit emit (sub-decision B): emit audit.high_risk_action_logged in the
 -- partial-failure branch BEFORE returning the envelope, so ops alerting
 -- has the event regardless of caller-side handling. stream_type =
 -- 'platform_admin' (the catch-all absorbed admin type per dispatcher
 -- process_domain_event.sql); no projection update needed.
+--
+-- F1 architect fold-in 2026-06-08 (Chunk 5 review): event_type naming
+-- precedent — 'audit.high_risk_action_logged' uses the 2-level form
+-- (aggregate.compound_event_name) matching organization.direct_care_
+-- settings_updated precedent + the documented CLAUDE.md § "Event type
+-- naming convention" rule (dots separate hierarchy levels; underscores
+-- compound names within a level). This is the FIRST emitter of any
+-- audit.* event family AND the first emitter on stream_type=
+-- 'platform_admin'; the 2-level form becomes the precedent for all
+-- future cross-grant/cross-tenant audit events. AsyncAPI registration
+-- of this event lands in Chunk 8 (Step 16-17 batch) alongside
+-- access_grant.policy_override_applied (PR #70 N1 carry-forward).
 --
 -- Platform-only HIPAA gate: cross-grant policy override is a platform-
 -- tier authority. Per-grant revocation by provider admins uses Step 9.
@@ -1654,6 +1686,10 @@ DECLARE
     v_loop_index          int := 0;
     v_failed_grant_id     uuid;
     v_audit_event_id      uuid;
+    -- S2 architect fold-in 2026-06-08: separate "candidate" count to
+    -- distinguish (a) zero-active-grants-carry-permission from (b)
+    -- platform-admin typo case in the success envelope.
+    v_candidate_count     int := 0;
 BEGIN
     -- =====================================================================
     -- PRE-EMIT GUARDS (RAISE EXCEPTION)
@@ -1691,6 +1727,22 @@ BEGIN
     -- pre-computed per grant via jsonb_agg filter; NULL → '[]' below.
     -- Deterministic ORDER BY g.id for replay-stability.
 
+    -- S2 architect fold-in 2026-06-08: capture candidate count BEFORE the
+    -- emit loop. Same predicate as the FOR-loop SELECT — verifies how many
+    -- active grants the permission was searched against. Surfaced in the
+    -- success envelope alongside appliedGrantCount so callers can
+    -- distinguish "0 active grants carried the permission" (legitimate
+    -- no-op) from "platform-admin typo'd the permission_name" (operator
+    -- error). HIPAA observability invariant: platform-tier destructive
+    -- cross-tenant ops must NOT silently no-op without confirmation.
+    SELECT count(*) INTO v_candidate_count
+    FROM public.cross_tenant_access_grants_projection g
+    WHERE g.status = 'active'
+      AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(g.permissions) pe
+          WHERE pe->>'p' = p_permission_name
+      );
+
     FOR v_affected IN
         SELECT
             g.id AS grant_id,
@@ -1709,8 +1761,11 @@ BEGIN
     LOOP
         -- jsonb_agg returns NULL when no rows remain after the filter
         -- (e.g., the grant carried ONLY the targeted permission). The
-        -- handler at process_access_grant_event.sql:97-101 requires a
-        -- jsonb array — coalesce to empty array.
+        -- handler at process_access_grant_event.sql § access_grant.
+        -- policy_override_applied arm requires a jsonb array
+        -- (jsonb_typeof check) — coalesce to empty array.
+        -- N1 architect fold-in 2026-06-08: stable section reference
+        -- (line-number references rot with handler-file edits).
         v_new_permissions := COALESCE(v_affected.new_permissions, '[]'::jsonb);
 
         BEGIN
@@ -1761,7 +1816,7 @@ BEGIN
     -- =====================================================================
 
     IF v_failed_grant_id IS NOT NULL THEN
-        -- Sub-decision B: emit audit.high_risk_action.logged BEFORE
+        -- Sub-decision B: emit audit.high_risk_action_logged BEFORE
         -- returning the envelope (ops alerting has the event regardless
         -- of caller-side handling). stream_type='platform_admin' is the
         -- absorbed admin type per dispatcher (no projection update).
@@ -1771,7 +1826,7 @@ BEGIN
             v_audit_event_id := api.emit_domain_event(
                 p_stream_id   := gen_random_uuid(),
                 p_stream_type := 'platform_admin',
-                p_event_type  := 'audit.high_risk_action.logged',
+                p_event_type  := 'audit.high_risk_action_logged',
                 p_event_data  := jsonb_build_object(
                     'action',            'revoke_permission_across_grants_partial_failure',
                     'permission_name',   p_permission_name,
@@ -1789,9 +1844,14 @@ BEGIN
                 )
             );
         EXCEPTION WHEN OTHERS THEN
-            -- audit emit failure does not mask original partial-failure;
-            -- ops will see the gap in the audit log and investigate.
-            NULL;
+            -- S3 architect fold-in 2026-06-08: preserve the audit-emit
+            -- failure trail in PG operator logs without masking the
+            -- original partial-failure signal to the caller. RAISE
+            -- WARNING is visible in PG logs, NOT visible to caller, NOT
+            -- persisted to domain_events. v_audit_event_id stays NULL so
+            -- the envelope honestly reflects audit-emit absence.
+            RAISE WARNING 'audit emit failed during cross-grant policy override partial-failure: %', SQLERRM;
+            v_audit_event_id := NULL;
         END;
 
         RETURN jsonb_build_object(
@@ -1810,14 +1870,28 @@ BEGIN
     -- =====================================================================
     -- SUCCESS ENVELOPE
     -- =====================================================================
-    -- appliedGrantCount may be 0 when no active grants carry the
-    -- permission — this is success (RPC-side filter shortcut), not error.
+    -- S2 architect fold-in 2026-06-08: include candidateGrantCount so the
+    -- caller can distinguish "no active grants carried this permission"
+    -- (legitimate no-op; candidateGrantCount=0) from "platform-admin typo
+    -- on permission_name" (operator error; candidateGrantCount=0 too, but
+    -- the caller knows their intent). The two cases are observationally
+    -- equivalent in the data, but the CALLER's intent makes the
+    -- distinction — exposing candidate vs applied counts gives the frontend
+    -- the signal to render "no-op (intentional)" vs "no-op (suspicious)".
+    --
+    -- appliedGrantCount=candidateGrantCount → all targeted grants updated.
+    -- appliedGrantCount=0, candidateGrantCount=0 → no active grants matched
+    --   (verify permission_name; if user expected a non-zero candidate,
+    --    surface this as a soft warning).
+    -- appliedGrantCount<candidateGrantCount → impossible on success path
+    --   (failure path returns partial-failure envelope above).
 
     RETURN jsonb_build_object(
         'success',              true,
         'permissionName',       p_permission_name,
         'appliedGrantEventIds', to_jsonb(v_applied_event_ids),
-        'appliedGrantCount',    COALESCE(array_length(v_applied_event_ids, 1), 0)
+        'appliedGrantCount',    COALESCE(array_length(v_applied_event_ids, 1), 0),
+        'candidateGrantCount',  v_candidate_count
     );
 END;
 $$;
