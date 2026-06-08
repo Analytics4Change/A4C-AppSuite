@@ -99,6 +99,18 @@ Per `infrastructure/supabase/CLAUDE.md` (post-PR-#70 state):
 - ADR L255: `api.get_grant_role_templates(p_authorization_type text) RETURNS TABLE("template_name" text, "permission_name" text, "default_terms" jsonb)` — confirm this signature matches `api.get_role_permission_templates` shape on dev before drafting.
 - ADR L317-330: var_partnership AsyncAPI sketch shows 6 messages including `VarPartnershipExpired` — Phase 2 ships 5 (no `expired` per user decision 1). Verify ADR is the SOURCE OF TRUTH for the 5 we ship + that the sixth deferred message gets a docblock noting deferral.
 
+## Chunk 6 carry-forward (2026-06-08) — Step 12 PATCH NULL-clear gap
+
+S1 architect fold-in from Chunk 6 review documented in-code. Action: `api.update_var_partnership` cannot clear nullable fields back to NULL via the current PATCH builder pattern (`IF p_X IS NOT NULL THEN v_event_data := v_event_data || jsonb_build_object('X', p_X)` — no null pass-through). Affected nullable mutable fields: `contract_number`, `contract_end_date`, `revenue_share_percentage`, `support_level`. Use case: converting a fixed-term contract to open-ended by clearing `contract_end_date`.
+
+**Resolution path** (future follow-up card, NOT Phase 2 scope):
+1. Add `p_clear_fields text[] DEFAULT '{}'` parameter to `api.update_var_partnership`.
+2. For each member of `p_clear_fields`, set `v_event_data := v_event_data || jsonb_build_object(<field>, NULL)`.
+3. Update handler at `process_var_partnership_event.sql § var_partnership.updated arm` to use key-presence semantics: `CASE WHEN p_event.event_data ? 'X' THEN safe_jsonb_extract_*(...) ELSE current_value END` instead of `COALESCE(safe_jsonb_extract_*(...), current_value)`.
+4. Validate that `p_clear_fields` only contains nullable column names (whitelist).
+
+**Phase 2 impact**: workaround = terminate + recreate (wrong audit trail for the use case). Documented as a deliberate limitation in the migration RPC docblock.
+
 ## Chunk 5 architect review (2026-06-08) — new event family + precedent
 
 **F1 fold-in lock**: Step 10 emits a NEW event family `audit.high_risk_action_logged` on `stream_type='platform_admin'`. This is the FIRST emitter of any `audit.*` event family AND the first emitter on `platform_admin` (the dispatcher type was defined in baseline but never had an emitter). The 2-level naming form (`audit.high_risk_action_logged`) was chosen over 3-level (`audit.high_risk_action.logged`) to match `organization.direct_care_settings_updated` precedent and stay within the documented CLAUDE.md § "Event type naming convention" 2-level rule. This becomes the precedent for ALL future cross-grant / cross-tenant high-risk audit events.

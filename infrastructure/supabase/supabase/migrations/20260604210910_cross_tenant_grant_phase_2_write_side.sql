@@ -2165,6 +2165,24 @@ GRANT EXECUTE ON FUNCTION api.create_var_partnership(
 -- keys overwrite at the handler. Immutable fields (id, partner_org_id,
 -- provider_org_id, contract_start_date) NEVER appear in event_data per
 -- plan.md § "Event payload schemas (handler input contract)".
+--
+-- S1 architect fold-in 2026-06-08 (Chunk 6 review): PATCH NULL-clear
+-- LIMITATION. The current builder pattern (IF p_X IS NOT NULL THEN
+-- v_event_data := ... || jsonb_build_object('X', p_X)) makes it
+-- impossible for callers to express "set nullable field back to NULL"
+-- (e.g., convert fixed-term contract to open-ended by clearing
+-- contract_end_date). Workarounds today: terminate + recreate (wrong
+-- audit trail). Resolution path deferred to a follow-up card:
+-- sentinel-based clear (p_clear_fields text[] DEFAULT '{}') + handler
+-- key-presence semantics. See observations.md § "Chunk 6 carry-forward".
+--
+-- N1 architect fold-in 2026-06-08: partner_org_name and provider_org_name
+-- are NOT exposed as RPC parameters here. They are MUTABLE handler-read
+-- keys per plan.md S4 because a future cross-handler hook (Phase N) will
+-- emit var_partnership.updated with name-only payloads on `org.updated`
+-- cross-events. Do NOT add p_partner_org_name / p_provider_org_name
+-- params to this RPC signature; names propagate via the cross-handler
+-- hook, not via user-facing update calls.
 -- ----------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION api.update_var_partnership(
@@ -2374,6 +2392,21 @@ GRANT EXECUTE ON FUNCTION api.update_var_partnership(
 -- partnership termination event is NOT emitted (partnership stays active)
 -- — leaves the system in a known consistent state for the operator to
 -- diagnose.
+--
+-- S2 architect fold-in 2026-06-08 (HIPAA-rationale lock for emit order):
+-- Cascade-FIRST ordering is HIPAA-load-bearing. Reversing it (terminate
+-- partnership first, then revoke grants) would create a transient window
+-- where: (a) partnership marked 'terminated' immediately blocks NEW
+-- var_contract grant issuance via _validate_authorization_var_contract
+-- (which accepts only 'active' partnerships), but (b) EXISTING grants
+-- referencing this partnership remain active and continue authorizing
+-- PHI access under a now-terminated business pretext. Cascade-first
+-- preserves the invariant:
+--     partnership active   ⟹ citing grants may be active
+--     partnership terminated ⟹ all citing grants terminated
+-- DO NOT flip this ordering in future refactors without re-evaluating
+-- the HIPAA semantics. Partial-failure branch (below) explicitly leaves
+-- partnership active so the operator can retry with idempotent semantics.
 --
 -- Partial-failure envelope shape (mirrors Step 10 + sub-decision B):
 --   { success: false, partial: true, error: 'PARTIAL_FAILURE',

@@ -52,12 +52,12 @@
 - [x] **Step 9** — `api.revoke_access_grant` (single-event Pattern A v2; HIPAA gate on grant.revoke at provider_org_path; envelope-shape symmetric grant-existence leak guard; suspended remains revocable)
 - [x] **Step 10** — `api.revoke_permission_across_grants` (multi-event Pattern A v2 partial-failure per F3+I+S5; RPC-side filter via EXISTS-on-jsonb_array_elements; mirrors PR #44 envelope; emits `audit.high_risk_action_logged` on stream_type='platform_admin' in partial-failure branch)
 - [x] **Architect review of Steps 9-10 2026-06-08** — APPROVE WITH IN-PR FIXES; F1 BLOCKING-tier (event-type naming precedent: rename to 2-level `audit.high_risk_action_logged` matching `direct_care_settings_updated` precedent) + S2 (candidateGrantCount in success envelope) + S3 (RAISE WARNING preserves audit-emit failure trail) + S1 (`errorDetails.actionable: false` flag on ALREADY_INACTIVE) + N1 (stable section ref) + N2 (PHI hygiene comment on p_revocation_details) — ALL folded same-day. AsyncAPI audit family registration carried to Stage D per F1 dependency.
-- [ ] **Step 11** — `api.create_var_partnership`
-- [ ] **Step 12** — `api.update_var_partnership`
-- [ ] **Step 13** — `api.terminate_var_partnership`
-- [ ] **Step 14** — `api.suspend_var_partnership`
-- [ ] **Step 15** — `api.reactivate_var_partnership`
-- [ ] **Architect review of Steps 11-15** — 5 VAR emit RPCs batch (homogeneous)
+- [x] **Step 11** — `api.create_var_partnership` (single-event Pattern A v2; HIPAA gate on partnership.manage; DUPLICATE_PARTNERSHIP precheck against partial-UNIQUE; denormalized name lookup at emit time)
+- [x] **Step 12** — `api.update_var_partnership` (PATCH semantics with non-null-only event_data; EMPTY_UPDATE rejection; immutable identity fields excluded; partner_org_name/provider_org_name reserved for future cross-handler hook)
+- [x] **Step 13** — `api.terminate_var_partnership` (MULTI-EVENT cascade-revoke per sub-decision H; cascade FIRST then partnership.terminated for HIPAA-load-bearing ordering; S5 pattern-i per-event check + short-circuit; partial-failure leaves partnership active for operator retry; audit.high_risk_action_logged emit per sub-decision B)
+- [x] **Step 14** — `api.suspend_var_partnership` (single-event Pattern A v2; transition guard active→suspended only; no cascade — citing grants stay active, new-grant issuance blocked by Step 6 var-validator)
+- [x] **Step 15** — `api.reactivate_var_partnership` (single-event Pattern A v2; transition guard suspended→active only; new_contract_end_date optional back-check vs immutable start_date)
+- [x] **Architect review of Steps 11-15 2026-06-08** — APPROVE WITH IN-PR FIXES; S1 (PATCH NULL-clear doc + future-card carry-forward in observations.md) + S2 (HIPAA-rationale comment on Step 13 cascade-first ordering) + N1 (Step 12 docblock note on reserved partner_org_name/provider_org_name keys) all folded same-day.
 - [ ] **Step 16** — `api.get_grant_role_templates` read RPC
 - [ ] **Step 17** — COMMENT ON FUNCTION tags on all 13 new functions
 - [ ] **Architect review of Steps 16-17 + AsyncAPI + type-gen** — M3 tag audit, var_partnership.yaml schema completeness, matrix regen diff
@@ -98,9 +98,9 @@
 
 ## Current Status
 
-**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3+4+5 of Stage C complete with architect reviews folded.
-**Status**: Migration at ~1,870 lines / 40 top-level statements. All 5 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5 incl. event-naming precedent lock).
-**Next action**: Chunk 6 — Steps 11-15 (5 VAR partnership emit RPCs). Homogeneous batch: create / update / terminate (multi-event cascade per sub-decision H) / suspend / reactivate. All gate on `partnership.manage` (seeded in Chunk 3 Step 7b). Step 13 terminate is the only multi-event member (mirrors Step 10 partial-failure pattern but with cascade-revoke semantics — emit one `access_grant.revoked` per active var_contract grant citing the partnership + the `var_partnership.terminated` event).
+**Stage**: C (drafting) — IN PROGRESS. Stages A + B closed 2026-06-04. Chunks 1+2+3+4+5+6 of Stage C complete with architect reviews folded.
+**Status**: Migration at ~2,975 lines / 45 top-level statements. All 6 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5; S1+S2+N1 for Chunk 6).
+**Next action**: Chunk 7 — Steps 16-17. Step 16 = `api.get_grant_role_templates(p_authorization_type)` read RPC mirroring `api.get_role_permission_templates` signature. Step 17 = `COMMENT ON FUNCTION` tag wave on all 14 new functions (M3 RPC shape registry + reachability matrix tags). After Chunk 7, Stage D = post-migration deliverables (AsyncAPI updates incl. var_partnership.yaml + audit.yaml + access_grant.policy_override_applied + asyncapi.yaml stream_type enum; type regen; handler reference files; CLAUDE.md codification of underscore-prefix convention + ADR addendums).
 
 ## Resume guide (for fresh-context continuation)
 
@@ -135,8 +135,8 @@ If picking up in a new conversation, read these in order:
 | 3 | 6 + 7 + 7b (validation helpers + partnership.manage seed) | ✅ done; architect F1+S1.a+N2 folded |
 | 4 | 8 (`api.create_access_grant` — largest RPC, alone) | ✅ done; architect S1+S2+S3+N3+N4 folded |
 | 5 | 9 + 10 (revoke flow incl. multi-event partial-failure per F3 I-fold) | ✅ done; architect F1+S1+S2+S3+N1+N2 folded |
-| **6** | **11-15** (5 VAR emit RPCs incl. Step 13 cascade-revoke) | **NEXT** |
-| 7 | 16 + 17 (read RPC + COMMENT ON FUNCTION tags) | pending |
+| 6 | 11-15 (5 VAR emit RPCs incl. Step 13 cascade-revoke) | ✅ done; architect S1+S2+N1 folded |
+| **7** | **16 + 17** (read RPC + COMMENT ON FUNCTION tags) | **NEXT** |
 
 ### Architect-review cadence
 
