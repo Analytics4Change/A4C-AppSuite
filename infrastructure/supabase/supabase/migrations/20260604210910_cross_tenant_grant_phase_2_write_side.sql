@@ -895,8 +895,463 @@ ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- ============================================================================
 -- End Chunk 3 (Steps 6-7-7b gates cluster).
--- Next chunks: 8 (create_access_grant — largest RPC, alone),
--- 9-10 (revoke flow incl. multi-event partial-failure),
--- 11-15 (5 VAR emit RPCs incl. Step 13 cascade-revoke),
--- 16-17 (read RPC + COMMENT ON FUNCTION tags).
+-- ============================================================================
+
+-- ============================================================================
+-- CHUNK 4 — Step 8: api.create_access_grant (largest single RPC)
+-- ============================================================================
+-- ADR Decision C.1 lines 184-213 + Phase 2 plan-mode architect fold-ins:
+--   F1 + K: 3-column UNIQUE template lookup (template_name + authorization_type +
+--           is_active) — Phase 1 deployed 3-column constraint, NOT ADR's
+--           2-column L232. Filter all template reads on the triple.
+--   F2:     Provider-org path lookup with not-found RAISE; HIPAA gate on
+--           v_provider_path. Org-move invariant: live-resolved at grant time;
+--           hybrid-snapshot permissions don't change post-creation.
+--   F5:     INTERSECT applies ONLY to LITERAL template permission names;
+--           implications are NOT expanded at grant creation (HIPAA least-
+--           authority). Stage E probe asserts the var_default 4-perm
+--           guarantee.
+--   S6:     Retain 13-parameter ADR signature; jsonb-bundle alternative
+--           considered + rejected (TypeScript ergonomics + frontend codegen
+--           per-parameter shape). PG parameter-order RULE: DEFAULTed params
+--           must follow non-default params, so required params come first
+--           (reorder is invisible to named-argument callers).
+--
+-- Pattern A v2 (envelope writes — adr-rpc-readback-pattern.md):
+--   - PRE-EMIT GUARDS: RAISE EXCEPTION (no audit row yet)
+--   - POST-EMIT FAILURES: jsonb envelope {success:false, error, errorDetails}
+--     — NEVER RAISE EXCEPTION (would roll back the audit row that
+--     process_domain_event just persisted with processing_error)
+--
+-- Bucket B (Phase 2 emit RPC; provider-admin only; not consultant-callable).
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.create_access_grant(
+    -- Required params (no DEFAULT — must come first per PG syntax)
+    p_consultant_org_id        uuid,
+    p_provider_org_id          uuid,
+    p_scope                    text,           -- 'organization_unit' | 'client_specific'
+    p_scope_id                 uuid,
+    p_authorization_type       text,           -- 5-value CHECK enforced
+    p_grant_role_template_name text,
+    -- Optional params (DEFAULTed)
+    p_consultant_user_id       uuid        DEFAULT NULL,    -- NULL = org-wide grant
+    p_authorization_reference  uuid        DEFAULT NULL,    -- NULL only for emergency_access
+    p_legal_reference          text        DEFAULT NULL,
+    p_permission_overrides     text[]      DEFAULT NULL,    -- INTERSECT narrowing only
+    p_terms                    jsonb       DEFAULT '{}'::jsonb,  -- merged on top of template.default_terms
+    p_expires_at               timestamptz DEFAULT NULL,
+    p_reason                   text        DEFAULT 'Grant created via cross-tenant grant flow'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims              jsonb       := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id           uuid        := public.get_current_user_id();
+    v_org_id              uuid        := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked      boolean     := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_provider_path       extensions.ltree;
+    v_scope_path          extensions.ltree;
+    v_client_ou_id        uuid;
+    v_authorization_valid boolean;
+    v_template_count      int;
+    v_permissions_jsonb   jsonb;
+    v_template_terms      jsonb       := '{}'::jsonb;
+    v_final_terms         jsonb;
+    v_grant_id            uuid;
+    v_event_id            uuid;
+    v_processing_error    text;
+    v_now                 timestamptz := now();
+    v_terms_row           record;
+BEGIN
+    -- =====================================================================
+    -- PRE-EMIT GUARDS (RAISE EXCEPTION; no audit row yet)
+    -- =====================================================================
+
+    -- Caller auth + tenant context
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+
+    -- access_blocked JWT-claim guard
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- Required-param presence
+    IF p_consultant_org_id IS NULL OR p_provider_org_id IS NULL THEN
+        RAISE EXCEPTION 'consultant_org_id and provider_org_id are required'
+            USING ERRCODE = '22004';
+    END IF;
+    IF p_scope_id IS NULL THEN
+        RAISE EXCEPTION 'scope_id is required' USING ERRCODE = '22004';
+    END IF;
+    IF p_grant_role_template_name IS NULL OR p_grant_role_template_name = '' THEN
+        RAISE EXCEPTION 'grant_role_template_name is required'
+            USING ERRCODE = '22004';
+    END IF;
+
+    -- p_scope CHECK (matches cross_tenant_access_grants_projection_scope_check)
+    IF p_scope NOT IN ('organization_unit', 'client_specific') THEN
+        RAISE EXCEPTION 'Invalid scope: must be organization_unit or client_specific'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- p_authorization_type CHECK (5-value enum mirrors
+    -- cross_tenant_access_grants_projection_authorization_type_check
+    -- at Phase 1 baseline_v4:3037-3071)
+    IF p_authorization_type NOT IN (
+        'var_contract', 'court_order', 'family_participation',
+        'social_services_assignment', 'emergency_access'
+    ) THEN
+        RAISE EXCEPTION 'Invalid authorization_type: must be one of var_contract, court_order, family_participation, social_services_assignment, emergency_access'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- authorization_reference NULL invariant
+    -- (Phase 1 Step 14 CHECK: NULL only for emergency_access)
+    IF p_authorization_type = 'emergency_access' THEN
+        IF p_authorization_reference IS NOT NULL THEN
+            RAISE EXCEPTION 'authorization_reference must be NULL for emergency_access'
+                USING ERRCODE = '22023';
+        END IF;
+    ELSE
+        IF p_authorization_reference IS NULL THEN
+            RAISE EXCEPTION 'authorization_reference is required for non-emergency_access authorization_type'
+                USING ERRCODE = '22023';
+        END IF;
+    END IF;
+
+    -- Provider org path lookup (F2 architect fold-in)
+    SELECT path
+    INTO v_provider_path
+    FROM public.organizations_projection
+    WHERE id = p_provider_org_id
+      AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- HIPAA permission gate (ADR L204 + F2 fold-in)
+    -- Path-scoped check: provider-admin authority at the provider org path is
+    -- load-bearing. has_platform_privilege() short-circuit for platform owners.
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('grant.create', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: grant.create at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- =====================================================================
+    -- PER-TYPE AUTHORIZATION VALIDATION (envelope-return, not RAISE)
+    -- =====================================================================
+    -- ADR L205: dispatch via CASE on p_authorization_type to the appropriate
+    -- _validate_authorization_<type> private helper. Phase 2 ships
+    -- var_contract + emergency_access; Phase N adds court/agency/family.
+
+    CASE p_authorization_type
+        WHEN 'var_contract' THEN
+            v_authorization_valid := public._validate_authorization_var_contract(
+                p_authorization_reference, p_consultant_org_id, p_provider_org_id
+            );
+        WHEN 'emergency_access' THEN
+            v_authorization_valid := public._validate_authorization_emergency_access(
+                p_authorization_reference, p_consultant_org_id, p_provider_org_id
+            );
+        ELSE
+            -- Phase N types not yet implemented (court/agency/family).
+            -- Envelope-return (not RAISE) so the caller gets a structured
+            -- "not yet supported" response.
+            RETURN jsonb_build_object(
+                'success', false,
+                'error',   'NOT_IMPLEMENTED',
+                'errorDetails', jsonb_build_object(
+                    'code',    'NOT_IMPLEMENTED',
+                    'message', 'authorization_type not yet supported (Phase N work)'
+                )
+            );
+    END CASE;
+
+    IF NOT v_authorization_valid THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'AUTHORIZATION_VALIDATION_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'AUTHORIZATION_VALIDATION_FAILED',
+                'message', 'No active backing record found for the supplied authorization_type + reference'
+            )
+        );
+    END IF;
+
+    -- =====================================================================
+    -- SCOPE PATH RESOLUTION (for permission-snapshot tuples)
+    -- =====================================================================
+    -- Each {p, s} permission tuple snapshots `s` at the grant's scope path
+    -- — the narrowest legitimate scope under HIPAA least-authority. All
+    -- permissions in one grant share this path (the grant is the
+    -- delegation unit; per-permission scope-narrowing belongs on a future
+    -- policy-override RPC, not on grant creation).
+    --
+    -- For p_scope='organization_unit': scope_id is the OU id directly.
+    -- For p_scope='client_specific':   scope_id is the client id; resolve
+    --                                   the client's current OU placement
+    --                                   (clients_projection.organization_unit_id),
+    --                                   then look up that OU's path.
+
+    IF p_scope = 'organization_unit' THEN
+        SELECT path INTO v_scope_path
+        FROM public.organization_units_projection
+        WHERE id = p_scope_id
+          AND deleted_at IS NULL;
+        IF NOT FOUND THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error',   'SCOPE_NOT_FOUND',
+                'errorDetails', jsonb_build_object(
+                    'code',    'SCOPE_NOT_FOUND',
+                    'message', 'organization_unit referenced by scope_id not found or deleted'
+                )
+            );
+        END IF;
+    ELSIF p_scope = 'client_specific' THEN
+        SELECT organization_unit_id INTO v_client_ou_id
+        FROM public.clients_projection
+        WHERE id = p_scope_id;
+        IF NOT FOUND OR v_client_ou_id IS NULL THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error',   'SCOPE_NOT_FOUND',
+                'errorDetails', jsonb_build_object(
+                    'code',    'SCOPE_NOT_FOUND',
+                    'message', 'client referenced by scope_id not found or not placed in an organization_unit'
+                )
+            );
+        END IF;
+        SELECT path INTO v_scope_path
+        FROM public.organization_units_projection
+        WHERE id = v_client_ou_id
+          AND deleted_at IS NULL;
+        IF NOT FOUND THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error',   'SCOPE_NOT_FOUND',
+                'errorDetails', jsonb_build_object(
+                    'code',    'SCOPE_NOT_FOUND',
+                    'message', 'organization_unit for client not found (data integrity issue)'
+                )
+            );
+        END IF;
+    END IF;
+
+    -- =====================================================================
+    -- TEMPLATE LOOKUP + PERMISSION SNAPSHOT (INTERSECT narrowing only)
+    -- =====================================================================
+    -- F1 + K architect fold-in: Phase 1 deployed grant_role_templates with
+    -- 3-column UNIQUE (template_name, authorization_type, permission_name)
+    -- — ADR L232 still shows 2-column (ADR addendum tracked in
+    -- observations.md). Filter all template reads on the triple.
+
+    -- Existence guard: at least one template row matches
+    SELECT count(*) INTO v_template_count
+    FROM public.grant_role_templates
+    WHERE template_name      = p_grant_role_template_name
+      AND authorization_type = p_authorization_type
+      AND is_active          = true;
+    IF v_template_count = 0 THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'TEMPLATE_NOT_FOUND',
+            'errorDetails', jsonb_build_object(
+                'code',    'TEMPLATE_NOT_FOUND',
+                'message', 'No active grant_role_templates row matches (template_name, authorization_type, is_active)'
+            )
+        );
+    END IF;
+
+    -- F5 fold-in: INTERSECT operates on LITERAL template permission names
+    -- only. Implications are NOT expanded here — implications happen at JWT
+    -- issuance via compute_effective_permissions, GATED on grant-source rows
+    -- by permission_implications.propagate_through_grants (HIPAA least-
+    -- authority; default FALSE blocks implication-widening for grant-derived
+    -- perms). Stage E probe F5 asserts the var_default 4-perm guarantee.
+    IF p_permission_overrides IS NULL THEN
+        SELECT jsonb_agg(jsonb_build_object('p', permission_name, 's', v_scope_path::text))
+        INTO v_permissions_jsonb
+        FROM public.grant_role_templates
+        WHERE template_name      = p_grant_role_template_name
+          AND authorization_type = p_authorization_type
+          AND is_active          = true;
+    ELSE
+        SELECT jsonb_agg(jsonb_build_object('p', perm_name, 's', v_scope_path::text))
+        INTO v_permissions_jsonb
+        FROM (
+            SELECT permission_name AS perm_name
+            FROM public.grant_role_templates
+            WHERE template_name      = p_grant_role_template_name
+              AND authorization_type = p_authorization_type
+              AND is_active          = true
+            INTERSECT
+            SELECT unnest(p_permission_overrides)
+        ) narrowed;
+        -- INTERSECT may yield empty if overrides don't intersect with template
+        IF v_permissions_jsonb IS NULL OR jsonb_array_length(v_permissions_jsonb) = 0 THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error',   'EMPTY_PERMISSION_SET',
+                'errorDetails', jsonb_build_object(
+                    'code',    'EMPTY_PERMISSION_SET',
+                    'message', 'permission_overrides INTERSECT template yielded no permissions; grant would be empty'
+                )
+            );
+        END IF;
+    END IF;
+
+    -- Merge template default_terms via jsonb concat fold. v1 var_default all
+    -- rows share default_terms; the fold is forward-compatible if Phase N
+    -- templates vary per-permission. Right-side wins on key overlap
+    -- (PG jsonb || semantics). Deterministic ORDER BY permission_name for
+    -- replay-stability.
+    FOR v_terms_row IN
+        SELECT default_terms
+        FROM public.grant_role_templates
+        WHERE template_name      = p_grant_role_template_name
+          AND authorization_type = p_authorization_type
+          AND is_active          = true
+        ORDER BY permission_name
+    LOOP
+        v_template_terms := v_template_terms || COALESCE(v_terms_row.default_terms, '{}'::jsonb);
+    END LOOP;
+
+    -- ADR L209: v_final_terms := template.default_terms || p_terms
+    -- Right-side wins on key overlap — caller-supplied terms override
+    -- template defaults when they conflict.
+    v_final_terms := v_template_terms || COALESCE(p_terms, '{}'::jsonb);
+
+    -- =====================================================================
+    -- EMIT access_grant.created EVENT (stream_id = pre-generated v_grant_id)
+    -- =====================================================================
+    -- Handler at process_access_grant_event.sql:11-39 reads event_data:
+    --   consultant_org_id, consultant_user_id, provider_org_id,
+    --   scope, scope_id, authorization_type, legal_reference,
+    --   granted_by, expires_at, permissions (TOP LEVEL), terms,
+    --   authorization_reference
+
+    v_grant_id := gen_random_uuid();
+
+    v_event_id := api.emit_domain_event(
+        p_stream_id   := v_grant_id,
+        p_stream_type := 'access_grant',
+        p_event_type  := 'access_grant.created',
+        p_event_data  := jsonb_build_object(
+            'consultant_org_id',       p_consultant_org_id,
+            'consultant_user_id',      p_consultant_user_id,
+            'provider_org_id',         p_provider_org_id,
+            'scope',                   p_scope,
+            'scope_id',                p_scope_id,
+            'authorization_type',      p_authorization_type,
+            'authorization_reference', p_authorization_reference,
+            'legal_reference',         p_legal_reference,
+            'granted_by',              v_caller_id,
+            'expires_at',              p_expires_at,
+            'permissions',             v_permissions_jsonb,
+            'terms',                   v_final_terms
+        ),
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.create_access_grant',
+            'reason',          p_reason
+        )
+    );
+
+    -- =====================================================================
+    -- PATTERN A v2 READ-BACK (BOTH checks per infrastructure CLAUDE.md)
+    -- =====================================================================
+
+    -- Check 1: IF NOT FOUND on projection read-back
+    PERFORM 1
+    FROM public.cross_tenant_access_grants_projection
+    WHERE id = v_grant_id;
+    IF NOT FOUND THEN
+        SELECT processing_error INTO v_processing_error
+        FROM public.domain_events WHERE id = v_event_id;
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' ||
+                    COALESCE(v_processing_error, 'projection read-back returned no row')
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    -- Check 2: processing_error on captured event_id (race-safe)
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' || v_processing_error
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    -- =====================================================================
+    -- SUCCESS ENVELOPE
+    -- =====================================================================
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'eventId', v_event_id,
+        'grant',   jsonb_build_object(
+            'id',                      v_grant_id,
+            'consultantOrgId',         p_consultant_org_id,
+            'consultantUserId',        p_consultant_user_id,
+            'providerOrgId',           p_provider_org_id,
+            'scope',                   p_scope,
+            'scopeId',                 p_scope_id,
+            'authorizationType',       p_authorization_type,
+            'authorizationReference',  p_authorization_reference,
+            'permissions',             v_permissions_jsonb,
+            'terms',                   v_final_terms,
+            'expiresAt',               p_expires_at,
+            'grantedBy',               v_caller_id,
+            'grantedAt',               v_now
+        )
+    );
+END;
+$$;
+
+-- GRANT posture: authenticated only (called from provider-admin UI / future
+-- Edge Function). NOT consultant-callable (provider-admin authority is the
+-- HIPAA gate — only the provider org can issue grants over its own data).
+REVOKE ALL ON FUNCTION api.create_access_grant(
+    uuid, uuid, text, uuid, text, text,
+    uuid, uuid, text, text[], jsonb, timestamptz, text
+) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.create_access_grant(
+    uuid, uuid, text, uuid, text, text,
+    uuid, uuid, text, text[], jsonb, timestamptz, text
+) TO authenticated;
+
+-- NOTE: COMMENT ON FUNCTION with M3 + reachability tags is folded
+-- with the rest of the batch at Step 17 to keep the tag wave atomic.
+
+-- ============================================================================
+-- End Chunk 4 (Step 8 api.create_access_grant — largest single RPC).
+-- Next chunks: 5 (revoke flow incl. multi-event partial-failure),
+--              6 (5 VAR emit RPCs incl. Step 13 cascade-revoke),
+--              7 (read RPC + COMMENT ON FUNCTION tag wave).
 -- ============================================================================
