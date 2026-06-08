@@ -1396,7 +1396,442 @@ GRANT EXECUTE ON FUNCTION api.create_access_grant(
 
 -- ============================================================================
 -- End Chunk 4 (Step 8 api.create_access_grant — largest single RPC).
--- Next chunks: 5 (revoke flow incl. multi-event partial-failure),
---              6 (5 VAR emit RPCs incl. Step 13 cascade-revoke),
---              7 (read RPC + COMMENT ON FUNCTION tag wave).
+-- ============================================================================
+
+-- ============================================================================
+-- CHUNK 5 — Steps 9-10: revocation flow
+-- ============================================================================
+-- Step 9:  api.revoke_access_grant (single-event Pattern A v2)
+-- Step 10: api.revoke_permission_across_grants (multi-event Pattern A v2
+--          with partial-failure envelope, per F3+I+S5 fold-ins).
+--
+-- Architectural notes:
+--   - Step 9 is provider-scoped: any provider admin with grant.revoke at
+--     the grant's provider_org_id can revoke a specific grant.
+--   - Step 10 is platform-scoped: ONLY platform admins can issue cross-
+--     grant policy overrides (ADR sub-decision B; HIPAA cross-tenant
+--     enforcement happens at the platform tier — provider admins use
+--     Step 9 per-grant).
+--   - JWT staleness window (ADR L361-367): revocation does NOT terminate
+--     active sessions; in-flight requests during the staleness window
+--     remain authorized. Operational SLA: cold-revoke is effective within
+--     access_token_expiry_seconds. Emergency-revoke + auth.admin.signOut
+--     pairing is documented in ADR; Phase 2 ships cold-revoke only.
+-- ----------------------------------------------------------------------------
+
+-- =====================================================================
+-- Step 9 — api.revoke_access_grant (single-event Pattern A v2)
+-- =====================================================================
+-- ADR C.5 single-grant revocation. Handler at
+-- handlers/routers/process_access_grant_event.sql:41-50 reads
+-- event_data: grant_id, revoked_by, revocation_reason, revocation_details.
+--
+-- Pattern A v2: stream_id := p_grant_id (the access_grant stream); the
+-- handler also reads grant_id from event_data for symmetry with other
+-- arms.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.revoke_access_grant(
+    p_grant_id           uuid,
+    p_reason             text,
+    p_revocation_details text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims           jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id        uuid  := public.get_current_user_id();
+    v_org_id           uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked   boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_provider_org_id  uuid;
+    v_provider_path    extensions.ltree;
+    v_current_status   text;
+    v_event_id         uuid;
+    v_processing_error text;
+BEGIN
+    -- =====================================================================
+    -- PRE-EMIT GUARDS (RAISE EXCEPTION; no audit row yet)
+    -- =====================================================================
+
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_grant_id IS NULL THEN
+        RAISE EXCEPTION 'grant_id is required' USING ERRCODE = '22004';
+    END IF;
+    IF p_reason IS NULL OR p_reason = '' THEN
+        RAISE EXCEPTION 'reason is required for HIPAA audit trail'
+            USING ERRCODE = '22004';
+    END IF;
+
+    -- =====================================================================
+    -- LOOKUP + TENANCY GUARD (envelope, not RAISE — symmetric with
+    -- api.deactivate_user pattern at 20260512194836:113-118)
+    -- =====================================================================
+    -- Same envelope shape as not-found to avoid leaking grant-existence
+    -- across tenants (a provider admin from a different org should see
+    -- the same response as if the grant didn't exist).
+
+    SELECT provider_org_id, status
+    INTO v_provider_org_id, v_current_status
+    FROM public.cross_tenant_access_grants_projection
+    WHERE id = p_grant_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'GRANT_NOT_FOUND',
+            'errorDetails', jsonb_build_object(
+                'code',    'GRANT_NOT_FOUND',
+                'message', 'grant not found'
+            )
+        );
+    END IF;
+
+    -- Provider-org path lookup for HIPAA gate
+    SELECT path INTO v_provider_path
+    FROM public.organizations_projection
+    WHERE id = v_provider_org_id AND deleted_at IS NULL;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Provider organization not found or deleted'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- HIPAA permission gate (mirror Step 8 shape; grant.revoke permission
+    -- seeded by Phase 1 Step 10)
+    IF NOT (
+        public.has_platform_privilege()
+        OR public.has_effective_permission('grant.revoke', v_provider_path)
+    ) THEN
+        RAISE EXCEPTION 'Permission denied: grant.revoke at provider organization scope'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- Idempotency: already-revoked or already-expired grants return
+    -- success-false envelope (mirrors api.deactivate_user idempotency
+    -- pattern). 'suspended' is NOT short-circuited — revoking a suspended
+    -- grant is a legitimate state transition.
+    IF v_current_status IN ('revoked', 'expired') THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'ALREADY_INACTIVE',
+            'errorDetails', jsonb_build_object(
+                'code',    'ALREADY_INACTIVE',
+                'message', format('grant is already %s; cannot revoke', v_current_status)
+            )
+        );
+    END IF;
+
+    -- =====================================================================
+    -- EMIT access_grant.revoked EVENT
+    -- =====================================================================
+
+    v_event_id := api.emit_domain_event(
+        p_stream_id   := p_grant_id,
+        p_stream_type := 'access_grant',
+        p_event_type  := 'access_grant.revoked',
+        p_event_data  := jsonb_build_object(
+            'grant_id',           p_grant_id,
+            'revoked_by',         v_caller_id,
+            'revocation_reason',  p_reason,
+            'revocation_details', p_revocation_details
+        ),
+        p_event_metadata := jsonb_build_object(
+            'user_id',         v_caller_id,
+            'organization_id', v_org_id,
+            'source',          'api.revoke_access_grant',
+            'reason',          p_reason
+        )
+    );
+
+    -- =====================================================================
+    -- PATTERN A v2 READ-BACK (BOTH checks)
+    -- =====================================================================
+
+    -- Check 1: IF NOT FOUND on projection read-back. Predicate requires
+    -- status='revoked' — absence means handler didn't update.
+    PERFORM 1
+    FROM public.cross_tenant_access_grants_projection
+    WHERE id = p_grant_id AND status = 'revoked';
+    IF NOT FOUND THEN
+        SELECT processing_error INTO v_processing_error
+        FROM public.domain_events WHERE id = v_event_id;
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' ||
+                    COALESCE(v_processing_error, 'projection read-back returned no row')
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    -- Check 2: processing_error on captured event_id (race-safe)
+    SELECT processing_error INTO v_processing_error
+    FROM public.domain_events WHERE id = v_event_id;
+    IF v_processing_error IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error',   'PROCESSING_FAILED',
+            'errorDetails', jsonb_build_object(
+                'code',    'PROCESSING_FAILED',
+                'message', 'Event processing failed: ' || v_processing_error
+            ),
+            'eventId', v_event_id
+        );
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'eventId', v_event_id,
+        'grantId', p_grant_id
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.revoke_access_grant(uuid, text, text)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION api.revoke_access_grant(uuid, text, text)
+    TO authenticated;
+
+
+-- =====================================================================
+-- Step 10 — api.revoke_permission_across_grants (multi-event Pattern A v2
+--           with partial-failure envelope)
+-- =====================================================================
+-- ADR C.5 + sub-decision B + F3 + I + S5 fold-ins:
+--   F3:  Handler (Phase 1) UPDATEs unconditionally — RPC MUST use
+--        RPC-side filter (I-fold) to avoid emitting no-op events that
+--        bloat domain_events.
+--   I:   RPC-side filter — emit only when state will change. Computed
+--        by EXISTS-on-jsonb_array_elements predicate + ACTIVE-only gate.
+--   S5:  Partial-failure pattern (i) — per-event processing_error check
+--        inside loop with short-circuit on first failure. Envelope
+--        includes failedGrantId field.
+--
+-- Sub-decision B partial-failure shape (mirrors PR #44 modify_user_roles):
+--   { success: false, partial: true, error: 'PARTIAL_FAILURE',
+--     appliedGrantEventIds[], failureIndex, processingError,
+--     failedGrantId, auditEventId }
+--
+-- Audit emit (sub-decision B): emit audit.high_risk_action.logged in the
+-- partial-failure branch BEFORE returning the envelope, so ops alerting
+-- has the event regardless of caller-side handling. stream_type =
+-- 'platform_admin' (the catch-all absorbed admin type per dispatcher
+-- process_domain_event.sql); no projection update needed.
+--
+-- Platform-only HIPAA gate: cross-grant policy override is a platform-
+-- tier authority. Per-grant revocation by provider admins uses Step 9.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION api.revoke_permission_across_grants(
+    p_permission_name  text,
+    p_override_reason  text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $$
+DECLARE
+    v_claims              jsonb := current_setting('request.jwt.claims', true)::jsonb;
+    v_caller_id           uuid  := public.get_current_user_id();
+    v_org_id              uuid  := NULLIF(v_claims ->> 'org_id', '')::uuid;
+    v_access_blocked      boolean := COALESCE((v_claims ->> 'access_blocked')::boolean, false);
+    v_affected            record;
+    v_new_permissions     jsonb;
+    v_event_id            uuid;
+    v_applied_event_ids   uuid[] := '{}'::uuid[];
+    v_processing_error    text;
+    v_loop_index          int := 0;
+    v_failed_grant_id     uuid;
+    v_audit_event_id      uuid;
+BEGIN
+    -- =====================================================================
+    -- PRE-EMIT GUARDS (RAISE EXCEPTION)
+    -- =====================================================================
+
+    IF v_caller_id IS NULL OR v_org_id IS NULL THEN
+        RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+    IF v_access_blocked THEN
+        RAISE EXCEPTION 'Access blocked: organization is deactivated'
+            USING ERRCODE = '42501';
+    END IF;
+    IF p_permission_name IS NULL OR p_permission_name = '' THEN
+        RAISE EXCEPTION 'permission_name is required' USING ERRCODE = '22004';
+    END IF;
+    IF p_override_reason IS NULL OR p_override_reason = '' THEN
+        RAISE EXCEPTION 'override_reason is required for HIPAA audit trail'
+            USING ERRCODE = '22004';
+    END IF;
+
+    -- HIPAA gate: platform-only. Cross-grant policy override is a
+    -- platform-tier authority by ADR design (sub-decision B). Provider
+    -- admins use api.revoke_access_grant (Step 9) per-grant.
+    IF NOT public.has_platform_privilege() THEN
+        RAISE EXCEPTION 'Permission denied: platform-level authority required for cross-grant policy override'
+            USING ERRCODE = '42501';
+    END IF;
+
+    -- =====================================================================
+    -- I FOLD-IN: RPC-SIDE FILTER (emit only when state will change)
+    -- =====================================================================
+    -- Affected = active grants whose permissions array contains an element
+    -- with p = p_permission_name. EXISTS form avoids the ANY((SELECT))
+    -- scalar-subquery trap (codified pitfall #3). new_permissions is
+    -- pre-computed per grant via jsonb_agg filter; NULL → '[]' below.
+    -- Deterministic ORDER BY g.id for replay-stability.
+
+    FOR v_affected IN
+        SELECT
+            g.id AS grant_id,
+            (
+                SELECT jsonb_agg(p)
+                FROM jsonb_array_elements(g.permissions) p
+                WHERE p->>'p' <> p_permission_name
+            ) AS new_permissions
+        FROM public.cross_tenant_access_grants_projection g
+        WHERE g.status = 'active'
+          AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements(g.permissions) pe
+              WHERE pe->>'p' = p_permission_name
+          )
+        ORDER BY g.id
+    LOOP
+        -- jsonb_agg returns NULL when no rows remain after the filter
+        -- (e.g., the grant carried ONLY the targeted permission). The
+        -- handler at process_access_grant_event.sql:97-101 requires a
+        -- jsonb array — coalesce to empty array.
+        v_new_permissions := COALESCE(v_affected.new_permissions, '[]'::jsonb);
+
+        BEGIN
+            v_event_id := api.emit_domain_event(
+                p_stream_id   := v_affected.grant_id,
+                p_stream_type := 'access_grant',
+                p_event_type  := 'access_grant.policy_override_applied',
+                p_event_data  := jsonb_build_object(
+                    'grant_id',         v_affected.grant_id,
+                    'permissions',      v_new_permissions,
+                    'override_reason',  p_override_reason,
+                    'applied_by',       v_caller_id
+                ),
+                p_event_metadata := jsonb_build_object(
+                    'user_id',         v_caller_id,
+                    'organization_id', v_org_id,
+                    'source',          'api.revoke_permission_across_grants',
+                    'reason',          p_override_reason
+                )
+            );
+
+            -- S5 fold-in: per-event processing_error check inside loop
+            -- with short-circuit on first failure. The trigger persists
+            -- processing_error on the audit row if the handler raised;
+            -- check that captured event_id and bail if non-NULL.
+            SELECT processing_error INTO v_processing_error
+            FROM public.domain_events WHERE id = v_event_id;
+            IF v_processing_error IS NOT NULL THEN
+                v_failed_grant_id := v_affected.grant_id;
+                EXIT;  -- short-circuit; fall through to partial-failure branch
+            END IF;
+
+            v_applied_event_ids := v_applied_event_ids || v_event_id;
+            v_loop_index := v_loop_index + 1;
+        EXCEPTION WHEN OTHERS THEN
+            -- emit raised (rare; would mean api.emit_domain_event itself
+            -- failed before persisting an audit row). Capture and short-
+            -- circuit; do NOT RAISE (would roll back any partially-
+            -- persisted audit rows).
+            v_failed_grant_id  := v_affected.grant_id;
+            v_processing_error := SQLERRM;
+            EXIT;
+        END;
+    END LOOP;
+
+    -- =====================================================================
+    -- PARTIAL-FAILURE BRANCH
+    -- =====================================================================
+
+    IF v_failed_grant_id IS NOT NULL THEN
+        -- Sub-decision B: emit audit.high_risk_action.logged BEFORE
+        -- returning the envelope (ops alerting has the event regardless
+        -- of caller-side handling). stream_type='platform_admin' is the
+        -- absorbed admin type per dispatcher (no projection update).
+        -- Use a fresh BEGIN/EXCEPTION block — audit emit failure must
+        -- NOT mask the original partial-failure signal to the caller.
+        BEGIN
+            v_audit_event_id := api.emit_domain_event(
+                p_stream_id   := gen_random_uuid(),
+                p_stream_type := 'platform_admin',
+                p_event_type  := 'audit.high_risk_action.logged',
+                p_event_data  := jsonb_build_object(
+                    'action',            'revoke_permission_across_grants_partial_failure',
+                    'permission_name',   p_permission_name,
+                    'override_reason',   p_override_reason,
+                    'failed_grant_id',   v_failed_grant_id,
+                    'applied_event_ids', to_jsonb(v_applied_event_ids),
+                    'failure_index',     v_loop_index,
+                    'processing_error',  v_processing_error
+                ),
+                p_event_metadata := jsonb_build_object(
+                    'user_id',         v_caller_id,
+                    'organization_id', v_org_id,
+                    'source',          'api.revoke_permission_across_grants',
+                    'reason',          'High-risk action: partial-failure during cross-grant policy override'
+                )
+            );
+        EXCEPTION WHEN OTHERS THEN
+            -- audit emit failure does not mask original partial-failure;
+            -- ops will see the gap in the audit log and investigate.
+            NULL;
+        END;
+
+        RETURN jsonb_build_object(
+            'success',              false,
+            'partial',              true,
+            'error',                'PARTIAL_FAILURE',
+            'permissionName',       p_permission_name,
+            'appliedGrantEventIds', to_jsonb(v_applied_event_ids),
+            'failureIndex',         v_loop_index,
+            'failedGrantId',        v_failed_grant_id,
+            'processingError',      v_processing_error,
+            'auditEventId',         v_audit_event_id
+        );
+    END IF;
+
+    -- =====================================================================
+    -- SUCCESS ENVELOPE
+    -- =====================================================================
+    -- appliedGrantCount may be 0 when no active grants carry the
+    -- permission — this is success (RPC-side filter shortcut), not error.
+
+    RETURN jsonb_build_object(
+        'success',              true,
+        'permissionName',       p_permission_name,
+        'appliedGrantEventIds', to_jsonb(v_applied_event_ids),
+        'appliedGrantCount',    COALESCE(array_length(v_applied_event_ids, 1), 0)
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION api.revoke_permission_across_grants(text, text)
+    FROM PUBLIC, anon;
+-- Platform-only authority enforced by has_platform_privilege() SQL guard;
+-- expose to authenticated so platform admins (logged in) can call it.
+-- Non-platform-admins receive 42501 at the SQL gate.
+GRANT EXECUTE ON FUNCTION api.revoke_permission_across_grants(text, text)
+    TO authenticated;
+
+-- NOTE: COMMENT ON FUNCTION with M3 + reachability tags folded at Step 17.
+
+-- ============================================================================
+-- End Chunk 5 (Steps 9-10 revocation flow).
 -- ============================================================================
