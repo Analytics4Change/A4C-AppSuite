@@ -1,5 +1,16 @@
 # Seed `grant.create` + `grant.revoke` + `grant.view` into `provider_admin` role template
 
+> **Status (2026-06-09)**: ARCHIVED — SHIPPED via PR #73 merge commit `5bf0b54a`
+> (migration `20260609212115_seed_grant_perms_into_provider_admin_and_fix_failed_events_detail_gate.sql`
+> Section A). The 3 grant.* permissions are now in the provider_admin
+> `role_permission_templates` (3 rows) and backfilled to existing role instances
+> (3 × N rows for N provider_admin instances). Architect-verified end-to-end:
+> `compute_effective_permissions(provider_admin_user, org_id)` returns
+> `grant.create`/`grant.revoke`/`grant.view` scoped to the provider org path, so
+> the right-hand side of `(has_platform_privilege() OR has_effective_permission('grant.*', path))`
+> in `api.create_access_grant` / `api.revoke_access_grant` finally matches.
+> Card preserved for historical context. See [[pr-73-close-out]] (when written).
+
 **Status**: seed (not yet planned)
 **Priority**: High (production defect; the entire Phase 2 grant write-side is unreachable by the intended `provider_admin` role — only platform-privilege fallback works)
 **Origin**: Phase 2 UAT planning probe 2026-06-09 (post-PR-#71-merge dev verification by claude during UAT card update)
