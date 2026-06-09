@@ -1,0 +1,296 @@
+components:
+  messages:
+    VarPartnershipCreated:
+      name: var_partnership.created
+      title: VAR Partnership Created
+      summary: Value-Added Reseller (VAR) partnership established between a
+        partner organization and a provider organization
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VarPartnershipCreatedEvent'
+
+    VarPartnershipUpdated:
+      name: var_partnership.updated
+      title: VAR Partnership Updated
+      summary: VAR partnership mutable fields updated (PATCH semantics — only
+        non-null event_data keys overwrite)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VarPartnershipUpdatedEvent'
+
+    VarPartnershipTerminated:
+      name: var_partnership.terminated
+      title: VAR Partnership Terminated
+      summary: VAR partnership permanently terminated (cascade-revokes all
+        active var_contract grants citing this partnership first)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VarPartnershipTerminatedEvent'
+
+    VarPartnershipSuspended:
+      name: var_partnership.suspended
+      title: VAR Partnership Suspended
+      summary: VAR partnership temporarily suspended (reversible; citing grants
+        stay active but new grant issuance against this partnership is blocked)
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VarPartnershipSuspendedEvent'
+
+    VarPartnershipReactivated:
+      name: var_partnership.reactivated
+      title: VAR Partnership Reactivated
+      summary: Previously suspended VAR partnership restored to active status
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/VarPartnershipReactivatedEvent'
+
+  schemas:
+    VarPartnershipCreatedEvent:
+      title: VarPartnershipCreatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: VAR partnership UUID
+        stream_type:
+          type: string
+          const: var_partnership
+        event_type:
+          type: string
+          const: var_partnership.created
+        event_data:
+          $ref: '#/components/schemas/VarPartnershipCreationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    VarPartnershipCreationData:
+      title: VarPartnershipCreationData
+      type: object
+      required:
+        - partner_org_id
+        - partner_org_name
+        - provider_org_id
+        - provider_org_name
+        - partnership_type
+        - contract_start_date
+      properties:
+        partner_org_id:
+          type: string
+          format: uuid
+          description: Organization ID of the VAR partner (provider_partner type)
+        partner_org_name:
+          type: string
+          description: Snapshot of partner org name at partnership-creation time
+        provider_org_id:
+          type: string
+          format: uuid
+          description: Organization ID of the provider whose data the partner
+            is authorized to resell/support
+        provider_org_name:
+          type: string
+          description: Snapshot of provider org name at partnership-creation time
+        partnership_type:
+          type: string
+          description: VAR partnership type/tier (e.g., reseller, integrator,
+            referral)
+        contract_number:
+          type: string
+          description: External contract reference number
+        contract_start_date:
+          type: string
+          format: date
+          description: Contract effective start date (immutable post-creation)
+        contract_end_date:
+          type: string
+          format: date
+          description: Contract effective end date (mutable via update event)
+        revenue_share_percentage:
+          type: number
+          description: Revenue share percentage (0.0–100.0) per contract terms
+        support_level:
+          type: string
+          description: Support level tier (e.g., basic, standard, premium)
+        terms:
+          type: object
+          description: Additional partnership terms and conditions
+
+    VarPartnershipUpdatedEvent:
+      title: VarPartnershipUpdatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: var_partnership
+        event_type:
+          type: string
+          const: var_partnership.updated
+        event_data:
+          $ref: '#/components/schemas/VarPartnershipUpdateData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    VarPartnershipUpdateData:
+      title: VarPartnershipUpdateData
+      type: object
+      description: PATCH semantics — only non-null keys overwrite. Immutable
+        fields (id, partner_org_id, provider_org_id, contract_start_date) are
+        not present in this payload. Reserved keys partner_org_name and
+        provider_org_name are intentionally omitted (org names are derived
+        from the canonical projection, not snapshot-mutable).
+      properties:
+        partnership_type:
+          type: string
+        contract_number:
+          type: string
+        contract_end_date:
+          type: string
+          format: date
+        revenue_share_percentage:
+          type: number
+        support_level:
+          type: string
+        terms:
+          type: object
+
+    VarPartnershipTerminatedEvent:
+      title: VarPartnershipTerminatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: var_partnership
+        event_type:
+          type: string
+          const: var_partnership.terminated
+        event_data:
+          $ref: '#/components/schemas/VarPartnershipTerminationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    VarPartnershipTerminationData:
+      title: VarPartnershipTerminationData
+      type: object
+      required:
+        - terminated_by
+        - termination_reason
+      properties:
+        terminated_by:
+          type: string
+          format: uuid
+          description: User ID of the platform/provider admin terminating the
+            partnership
+        termination_reason:
+          type: string
+          description: Business reason for termination (e.g., contract_expired,
+            partner_dissolution, compliance_violation)
+
+    VarPartnershipSuspendedEvent:
+      title: VarPartnershipSuspendedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: var_partnership
+        event_type:
+          type: string
+          const: var_partnership.suspended
+        event_data:
+          $ref: '#/components/schemas/VarPartnershipSuspensionData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    VarPartnershipSuspensionData:
+      title: VarPartnershipSuspensionData
+      type: object
+      required:
+        - suspended_by
+        - suspension_reason
+      properties:
+        suspended_by:
+          type: string
+          format: uuid
+          description: User ID of the platform/provider admin suspending the
+            partnership
+        suspension_reason:
+          type: string
+          description: Business reason for suspension (e.g., investigation,
+            payment_overdue, contract_dispute)
+        expected_resolution_date:
+          type: string
+          format: date
+          description: Expected date when suspension will be resolved
+
+    VarPartnershipReactivatedEvent:
+      title: VarPartnershipReactivatedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        stream_type:
+          type: string
+          const: var_partnership
+        event_type:
+          type: string
+          const: var_partnership.reactivated
+        event_data:
+          $ref: '#/components/schemas/VarPartnershipReactivationData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    VarPartnershipReactivationData:
+      title: VarPartnershipReactivationData
+      type: object
+      required:
+        - reactivated_by
+      properties:
+        reactivated_by:
+          type: string
+          format: uuid
+          description: User ID of the platform/provider admin reactivating the
+            partnership
+        new_contract_end_date:
+          type: string
+          format: date
+          description: Updated contract end date if changed during reactivation
+            (must be on or after the immutable contract_start_date)

@@ -189,6 +189,47 @@ grep -rnE "current_organization_id\s*=\s*(consultant_org_id|p_org_id|v_org_id)" 
 ```
 Every match needs review; replace with the `accessible_organizations @>` form.
 
+### Underscore-prefix convention for `public._*` private helpers (Phase 2)
+
+Helper functions in `public` schema that are intended for internal use by `api.*` RPCs (validation guards, scope-derivation helpers, etc.) MUST be named with a leading underscore (`public._validate_...`, `public._check_...`, etc.) AND carry a mandatory grant-tightening ritual:
+
+```sql
+CREATE OR REPLACE FUNCTION public._validate_authorization_var_contract(...) RETURNS ...;
+
+REVOKE ALL ON FUNCTION public._validate_authorization_var_contract(...) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._validate_authorization_var_contract(...) TO service_role;
+```
+
+**Why**: PostgreSQL `CREATE FUNCTION` defaults to `GRANT EXECUTE TO PUBLIC`. Without the REVOKE+GRANT ritual, every authenticated user (and `anon`) can invoke a helper that may bypass intended `api.*` gates. The underscore-prefix marker (a) signals "internal — call from `api.*` only" to future readers, and (b) makes the audit grep trivial (`grep -nE 'public\._[a-z]+\(' migrations/*.sql`).
+
+**Scope of the convention**: Phase 2 introduced two `public._*` helpers — `_validate_authorization_var_contract` and `_validate_authorization_emergency_access` — per ADR Decision C.1 dispatcher pattern. The `safe_jsonb_extract_*` family predates the convention and remains unprefixed (broad use across handlers); going forward, new internal helpers carry the underscore prefix. Codegens that filter the RPC registry exclude `public._*` from the M3 shape-comment audit (see `gen-rpc-registry.cjs` SQL filter) — these are NOT `api.*` RPCs and have no shape contract.
+
+**Audit query** for future migrations adding `public._*` helpers:
+```bash
+# Every match should be paired with REVOKE+GRANT lines in the same migration
+grep -nE "CREATE OR REPLACE FUNCTION public\._[a-z_]+" \
+  infrastructure/supabase/supabase/migrations/
+```
+
+Originating context: Phase 2 cross-tenant-grant write-side (2026-06-04) sub-decision A; locked at Stage B pre-flight after grep confirmed zero existing `public._*` matches.
+
+### Event-type naming addendum: 2-level form for cross-cutting event families
+
+The existing "Event type naming convention" rule (dots separate hierarchy levels; underscores for compound names within a level) applies to per-aggregate events of the shape `<aggregate>.<action>` (e.g., `user.synced_from_auth`) or `<aggregate>.<sub_aggregate>.<action>` (e.g., `user.phone.added`).
+
+**Addendum (Phase 2, audit.* family precedent)**: Cross-cutting event families that are NOT bound to a single aggregate (e.g., `audit.high_risk_action_logged`) use the **2-level form** `<family>.<compound_event_name>` matching the `organization.direct_care_settings_updated` precedent. The `<compound_event_name>` may contain underscores for multi-word names but NOT additional dots.
+
+**Examples**:
+
+| ✅ Correct                                  | ❌ Wrong                                    | Stream type             |
+|---------------------------------------------|---------------------------------------------|-------------------------|
+| `audit.high_risk_action_logged`             | `audit.high.risk.action.logged`             | `platform_admin`        |
+| `organization.direct_care_settings_updated` | `organization.direct_care_settings.updated` | `organization`          |
+
+The stream_type for cross-cutting events is `platform_admin` (the dispatcher's absorbed administrative type — no projection update needed; the audit row lives entirely in `domain_events`). Stream id is a fresh `gen_random_uuid()` per audit row, not threaded through any aggregate stream.
+
+Originating context: Phase 2 cross-tenant-grant write-side (2026-06-08) Chunk 5 F1 architect fold-in. `audit.high_risk_action_logged` is the first emitter of the `audit.*` family; the 2-level form becomes the precedent for all future cross-grant / cross-tenant audit events.
+
 ## PL/pgSQL Validation (plpgsql_check)
 
 CI/CD validates all PL/pgSQL functions before deploying migrations. Catches column name mismatches, type errors, and other issues before reaching production.

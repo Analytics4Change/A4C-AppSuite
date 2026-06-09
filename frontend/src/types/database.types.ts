@@ -221,6 +221,24 @@ export type Database = {
           user_id: string
         }[]
       }
+      create_access_grant: {
+        Args: {
+          p_authorization_reference?: string
+          p_authorization_type: string
+          p_consultant_org_id: string
+          p_consultant_user_id?: string
+          p_expires_at?: string
+          p_grant_role_template_name: string
+          p_legal_reference?: string
+          p_permission_overrides?: string[]
+          p_provider_org_id: string
+          p_reason?: string
+          p_scope: string
+          p_scope_id: string
+          p_terms?: Json
+        }
+        Returns: Json
+      }
       create_field_category: {
         Args: {
           p_correlation_id?: string
@@ -284,6 +302,21 @@ export type Database = {
           p_org_unit_id?: string
           p_schedule: Json
           p_user_ids?: string[]
+        }
+        Returns: Json
+      }
+      create_var_partnership: {
+        Args: {
+          p_contract_end_date?: string
+          p_contract_number?: string
+          p_contract_start_date: string
+          p_partner_org_id: string
+          p_partnership_type: string
+          p_provider_org_id: string
+          p_reason?: string
+          p_revenue_share_percentage?: number
+          p_support_level?: string
+          p_terms?: Json
         }
         Returns: Json
       }
@@ -595,6 +628,14 @@ export type Database = {
         Returns: Json
       }
       get_field_usage_count: { Args: { p_field_key: string }; Returns: Json }
+      get_grant_role_templates: {
+        Args: { p_authorization_type: string }
+        Returns: {
+          default_terms: Json
+          permission_name: string
+          template_name: string
+        }[]
+      }
       get_invitation_by_id: {
         Args: { p_invitation_id: string }
         Returns: {
@@ -1254,6 +1295,14 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: Json
       }
+      reactivate_var_partnership: {
+        Args: {
+          p_new_contract_end_date?: string
+          p_partnership_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       register_client: {
         Args: {
           p_client_data: Json
@@ -1332,8 +1381,20 @@ export type Database = {
       }
       retry_deletion_workflow: { Args: { p_org_id: string }; Returns: Json }
       retry_failed_event: { Args: { p_event_id: string }; Returns: Json }
+      revoke_access_grant: {
+        Args: {
+          p_grant_id: string
+          p_reason: string
+          p_revocation_details?: string
+        }
+        Returns: Json
+      }
       revoke_invitation: {
         Args: { p_invitation_id: string; p_reason?: string }
+        Returns: Json
+      }
+      revoke_permission_across_grants: {
+        Args: { p_override_reason: string; p_permission_name: string }
         Returns: Json
       }
       safety_net_deactivate_organization: {
@@ -1351,6 +1412,15 @@ export type Database = {
       soft_delete_organization_phones: {
         Args: { p_deleted_at?: string; p_org_id: string }
         Returns: number
+      }
+      suspend_var_partnership: {
+        Args: {
+          p_expected_resolution_date?: string
+          p_partnership_id: string
+          p_reason?: string
+          p_suspension_reason: string
+        }
+        Returns: Json
       }
       switch_org_unit: { Args: { p_org_unit_id: string }; Returns: undefined }
       sync_role_assignments: {
@@ -1371,6 +1441,14 @@ export type Database = {
           p_template_id: string
           p_user_ids_to_add: string[]
           p_user_ids_to_remove: string[]
+        }
+        Returns: Json
+      }
+      terminate_var_partnership: {
+        Args: {
+          p_partnership_id: string
+          p_reason?: string
+          p_termination_reason: string
         }
         Returns: Json
       }
@@ -1608,6 +1686,19 @@ export type Database = {
           p_reason?: string
           p_sms_capable?: boolean
           p_type?: string
+        }
+        Returns: Json
+      }
+      update_var_partnership: {
+        Args: {
+          p_contract_end_date?: string
+          p_contract_number?: string
+          p_partnership_id: string
+          p_partnership_type?: string
+          p_reason?: string
+          p_revenue_share_percentage?: number
+          p_support_level?: string
+          p_terms?: Json
         }
         Returns: Json
       }
@@ -4546,6 +4637,93 @@ export type Database = {
           },
         ]
       }
+      var_partnerships_projection: {
+        Row: {
+          contract_end_date: string | null
+          contract_number: string | null
+          contract_start_date: string
+          created_at: string
+          id: string
+          partner_org_id: string
+          partner_org_name: string
+          partnership_type: string
+          provider_org_id: string
+          provider_org_name: string
+          revenue_share_percentage: number | null
+          status: string
+          support_level: string | null
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
+          terminated_at: string | null
+          terminated_by: string | null
+          termination_reason: string | null
+          terms: Json | null
+          updated_at: string
+        }
+        Insert: {
+          contract_end_date?: string | null
+          contract_number?: string | null
+          contract_start_date: string
+          created_at?: string
+          id: string
+          partner_org_id: string
+          partner_org_name: string
+          partnership_type: string
+          provider_org_id: string
+          provider_org_name: string
+          revenue_share_percentage?: number | null
+          status?: string
+          support_level?: string | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
+          terminated_at?: string | null
+          terminated_by?: string | null
+          termination_reason?: string | null
+          terms?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          contract_end_date?: string | null
+          contract_number?: string | null
+          contract_start_date?: string
+          created_at?: string
+          id?: string
+          partner_org_id?: string
+          partner_org_name?: string
+          partnership_type?: string
+          provider_org_id?: string
+          provider_org_name?: string
+          revenue_share_percentage?: number | null
+          status?: string
+          support_level?: string | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
+          terminated_at?: string | null
+          terminated_by?: string | null
+          termination_reason?: string | null
+          terms?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "var_partnerships_projection_partner_org_id_fkey"
+            columns: ["partner_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "var_partnerships_projection_provider_org_id_fkey"
+            columns: ["provider_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_projection"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_queue_projection: {
         Row: {
           claimed_at: string | null
@@ -4710,6 +4888,22 @@ export type Database = {
               type: string
             }[]
           }
+      _validate_authorization_emergency_access: {
+        Args: {
+          p_consultant_org_id: string
+          p_provider_org_id: string
+          p_reference: string
+        }
+        Returns: boolean
+      }
+      _validate_authorization_var_contract: {
+        Args: {
+          p_consultant_org_id: string
+          p_provider_org_id: string
+          p_reference: string
+        }
+        Returns: boolean
+      }
       check_permissions_subset: {
         Args: { p_available: string[]; p_required: string[] }
         Returns: boolean
@@ -5701,6 +5895,10 @@ export type Database = {
         Args: { p_event: Record<string, unknown> }
         Returns: undefined
       }
+      process_var_partnership_event: {
+        Args: { p_event: Record<string, unknown> }
+        Returns: undefined
+      }
       recompute_user_accessible_organizations: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -5716,6 +5914,10 @@ export type Database = {
       safe_jsonb_extract_date: {
         Args: { p_data: Json; p_default?: string; p_key: string }
         Returns: string
+      }
+      safe_jsonb_extract_numeric: {
+        Args: { p_data: Json; p_default?: number; p_key: string }
+        Returns: number
       }
       safe_jsonb_extract_organization_id: {
         Args: { p_data: Json; p_key?: string }

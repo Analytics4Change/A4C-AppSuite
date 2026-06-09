@@ -42,6 +42,15 @@ components:
       payload:
         $ref: '#/components/schemas/AccessGrantReactivatedEvent'
 
+    AccessGrantPolicyOverrideApplied:
+      name: access_grant.policy_override_applied
+      title: Access Grant Policy Override Applied
+      summary: Cross-grant policy override applied — a single permission was
+        revoked across one or more active access grants by platform authority
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AccessGrantPolicyOverrideAppliedEvent'
+
   schemas:
     AccessGrantCreatedEvent:
       title: AccessGrantCreatedEvent
@@ -345,3 +354,70 @@ components:
           type: boolean
           default: false
           description: Whether grant terms were modified during reactivation
+
+    AccessGrantPolicyOverrideAppliedEvent:
+      title: AccessGrantPolicyOverrideAppliedEvent
+      type: object
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Access grant UUID (the grant whose permissions array
+            was filtered by this policy override)
+        stream_type:
+          type: string
+          const: access_grant
+        event_type:
+          type: string
+          const: access_grant.policy_override_applied
+        event_data:
+          $ref: '#/components/schemas/AccessGrantPolicyOverrideAppliedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AccessGrantPolicyOverrideAppliedData:
+      title: AccessGrantPolicyOverrideAppliedData
+      type: object
+      description: Emitted by api.revoke_permission_across_grants — a
+        platform-tier authority that revokes a single permission across all
+        active access grants carrying it. Per-grant event; permissions array
+        is the post-override remaining permission set for THIS grant
+        (empty array '[]' if the grant carried only the targeted permission).
+      required:
+        - grant_id
+        - permissions
+        - override_reason
+        - applied_by
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+          description: Access grant UUID (matches stream_id)
+        permissions:
+          type: array
+          items:
+            type: object
+            properties:
+              p:
+                type: string
+                description: Permission name (e.g., "client.view")
+              s:
+                type: string
+                description: Permission scope (ltree path)
+          description: Post-override remaining permission set for this grant
+            (empty array if the grant carried only the targeted permission)
+        override_reason:
+          type: string
+          description: HIPAA-required audit justification for the cross-grant
+            policy override (captured in domain_events processing_error
+            absence — caller-supplied)
+        applied_by:
+          type: string
+          format: uuid
+          description: User ID of the platform admin applying the override

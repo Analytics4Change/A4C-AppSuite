@@ -13457,6 +13457,920 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: access_grant.policy_override_applied
+            title: Access Grant Policy Override Applied
+            summary: >-
+              Cross-grant policy override applied — a single permission was
+              revoked across one or more active access grants by platform
+              authority
+            contentType: application/json
+            payload:
+              title: AccessGrantPolicyOverrideAppliedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Access grant UUID (the grant whose permissions array was
+                    filtered by this policy override)
+                stream_type:
+                  type: string
+                  const: access_grant
+                event_type:
+                  type: string
+                  const: access_grant.policy_override_applied
+                event_data:
+                  title: AccessGrantPolicyOverrideAppliedData
+                  type: object
+                  description: >-
+                    Emitted by api.revoke_permission_across_grants — a
+                    platform-tier authority that revokes a single permission
+                    across all active access grants carrying it. Per-grant
+                    event; permissions array is the post-override remaining
+                    permission set for THIS grant (empty array '[]' if the grant
+                    carried only the targeted permission).
+                  required:
+                    - grant_id
+                    - permissions
+                    - override_reason
+                    - applied_by
+                  properties:
+                    grant_id:
+                      type: string
+                      format: uuid
+                      description: Access grant UUID (matches stream_id)
+                    permissions:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          p:
+                            type: string
+                            description: Permission name (e.g., "client.view")
+                          s:
+                            type: string
+                            description: Permission scope (ltree path)
+                      description: >-
+                        Post-override remaining permission set for this grant
+                        (empty array if the grant carried only the targeted
+                        permission)
+                    override_reason:
+                      type: string
+                      description: >-
+                        HIPAA-required audit justification for the cross-grant
+                        policy override (captured in domain_events
+                        processing_error absence — caller-supplied)
+                    applied_by:
+                      type: string
+                      format: uuid
+                      description: User ID of the platform admin applying the override
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.created
+            title: VAR Partnership Created
+            summary: >-
+              Value-Added Reseller (VAR) partnership established between a
+              partner organization and a provider organization
+            contentType: application/json
+            payload:
+              title: VarPartnershipCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: VAR partnership UUID
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.created
+                event_data:
+                  title: VarPartnershipCreationData
+                  type: object
+                  required:
+                    - partner_org_id
+                    - partner_org_name
+                    - provider_org_id
+                    - provider_org_name
+                    - partnership_type
+                    - contract_start_date
+                  properties:
+                    partner_org_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Organization ID of the VAR partner (provider_partner
+                        type)
+                    partner_org_name:
+                      type: string
+                      description: >-
+                        Snapshot of partner org name at partnership-creation
+                        time
+                    provider_org_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Organization ID of the provider whose data the partner
+                        is authorized to resell/support
+                    provider_org_name:
+                      type: string
+                      description: >-
+                        Snapshot of provider org name at partnership-creation
+                        time
+                    partnership_type:
+                      type: string
+                      description: >-
+                        VAR partnership type/tier (e.g., reseller, integrator,
+                        referral)
+                    contract_number:
+                      type: string
+                      description: External contract reference number
+                    contract_start_date:
+                      type: string
+                      format: date
+                      description: Contract effective start date (immutable post-creation)
+                    contract_end_date:
+                      type: string
+                      format: date
+                      description: Contract effective end date (mutable via update event)
+                    revenue_share_percentage:
+                      type: number
+                      description: Revenue share percentage (0.0–100.0) per contract terms
+                    support_level:
+                      type: string
+                      description: Support level tier (e.g., basic, standard, premium)
+                    terms:
+                      type: object
+                      description: Additional partnership terms and conditions
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.updated
+            title: VAR Partnership Updated
+            summary: >-
+              VAR partnership mutable fields updated (PATCH semantics — only
+              non-null event_data keys overwrite)
+            contentType: application/json
+            payload:
+              title: VarPartnershipUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.updated
+                event_data:
+                  title: VarPartnershipUpdateData
+                  type: object
+                  description: >-
+                    PATCH semantics — only non-null keys overwrite. Immutable
+                    fields (id, partner_org_id, provider_org_id,
+                    contract_start_date) are not present in this payload.
+                    Reserved keys partner_org_name and provider_org_name are
+                    intentionally omitted (org names are derived from the
+                    canonical projection, not snapshot-mutable).
+                  properties:
+                    partnership_type:
+                      type: string
+                    contract_number:
+                      type: string
+                    contract_end_date:
+                      type: string
+                      format: date
+                    revenue_share_percentage:
+                      type: number
+                    support_level:
+                      type: string
+                    terms:
+                      type: object
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.terminated
+            title: VAR Partnership Terminated
+            summary: >-
+              VAR partnership permanently terminated (cascade-revokes all active
+              var_contract grants citing this partnership first)
+            contentType: application/json
+            payload:
+              title: VarPartnershipTerminatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.terminated
+                event_data:
+                  title: VarPartnershipTerminationData
+                  type: object
+                  required:
+                    - terminated_by
+                    - termination_reason
+                  properties:
+                    terminated_by:
+                      type: string
+                      format: uuid
+                      description: >-
+                        User ID of the platform/provider admin terminating the
+                        partnership
+                    termination_reason:
+                      type: string
+                      description: >-
+                        Business reason for termination (e.g., contract_expired,
+                        partner_dissolution, compliance_violation)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.suspended
+            title: VAR Partnership Suspended
+            summary: >-
+              VAR partnership temporarily suspended (reversible; citing grants
+              stay active but new grant issuance against this partnership is
+              blocked)
+            contentType: application/json
+            payload:
+              title: VarPartnershipSuspendedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.suspended
+                event_data:
+                  title: VarPartnershipSuspensionData
+                  type: object
+                  required:
+                    - suspended_by
+                    - suspension_reason
+                  properties:
+                    suspended_by:
+                      type: string
+                      format: uuid
+                      description: >-
+                        User ID of the platform/provider admin suspending the
+                        partnership
+                    suspension_reason:
+                      type: string
+                      description: >-
+                        Business reason for suspension (e.g., investigation,
+                        payment_overdue, contract_dispute)
+                    expected_resolution_date:
+                      type: string
+                      format: date
+                      description: Expected date when suspension will be resolved
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.reactivated
+            title: VAR Partnership Reactivated
+            summary: Previously suspended VAR partnership restored to active status
+            contentType: application/json
+            payload:
+              title: VarPartnershipReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.reactivated
+                event_data:
+                  title: VarPartnershipReactivationData
+                  type: object
+                  required:
+                    - reactivated_by
+                  properties:
+                    reactivated_by:
+                      type: string
+                      format: uuid
+                      description: >-
+                        User ID of the platform/provider admin reactivating the
+                        partnership
+                    new_contract_end_date:
+                      type: string
+                      format: date
+                      description: >-
+                        Updated contract end date if changed during reactivation
+                        (must be on or after the immutable contract_start_date)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: audit.high_risk_action_logged
+            title: High-Risk Action Logged
+            summary: >-
+              Cross-cutting audit event emitted by API RPCs when a
+              partial-failure or other high-risk condition occurs that warrants
+              operator visibility regardless of caller-side handling
+            contentType: application/json
+            payload:
+              title: AuditHighRiskActionLoggedEvent
+              type: object
+              description: >
+                First emitter of the `audit.*` event family. Uses the 2-level
+                form
+
+                `audit.high_risk_action_logged` (aggregate.compound_event_name)
+
+                matching the `organization.direct_care_settings_updated`
+                precedent
+
+                per the CLAUDE.md event-type naming convention (dots separate
+
+                hierarchy levels; underscores compound names within a level).
+
+
+                Stream type is `platform_admin` — the absorbed administrative
+                stream
+
+                type per the process_domain_event dispatcher (no projection
+                update;
+
+                audit-only). Stream id is a fresh `gen_random_uuid()` per audit
+                row
+
+                (one audit event per high-risk occurrence; never threaded
+                through
+
+                any aggregate stream).
+
+
+                This is the first emitter of the `audit.*` family; future cross-
+
+                grant / cross-tenant audit events should follow this 2-level
+                form
+
+                and the same stream_type=platform_admin convention.
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Fresh per-audit UUID (not tied to any aggregate stream)
+                stream_type:
+                  type: string
+                  const: platform_admin
+                event_type:
+                  type: string
+                  const: audit.high_risk_action_logged
+                event_data:
+                  title: AuditHighRiskActionLoggedData
+                  type: object
+                  description: >
+                    Open shape — emitters supply a stable `action` discriminator
+                    and
+
+                    any per-action diagnostic fields. Current emitters:
+
+
+                    - `api.revoke_permission_across_grants` (partial-failure
+                    branch):
+                      action='revoke_permission_across_grants_partial_failure', plus
+                      permission_name, override_reason, failed_grant_id,
+                      applied_event_ids, failure_index, processing_error.
+
+                    - `api.terminate_var_partnership` (partial-failure branch
+                    during
+                      cascade-revoke): action='terminate_var_partnership_partial_failure',
+                      plus partnership_id, termination_reason, failed_grant_id,
+                      cascade_event_ids, failure_index, processing_error.
+                  required:
+                    - action
+                  properties:
+                    action:
+                      type: string
+                      description: >-
+                        Stable discriminator naming the emitting RPC + failure
+                        mode (e.g.,
+                        revoke_permission_across_grants_partial_failure)
+                    partnership_id:
+                      type: string
+                      format: uuid
+                      description: VAR partnership id (when action concerns a partnership)
+                    permission_name:
+                      type: string
+                      description: >-
+                        Permission name being overridden (when action concerns a
+                        cross-grant policy override)
+                    override_reason:
+                      type: string
+                      description: >-
+                        HIPAA audit reason supplied to the originating RPC (when
+                        action concerns a policy override)
+                    termination_reason:
+                      type: string
+                      description: >-
+                        Business reason supplied to the originating RPC (when
+                        action concerns a partnership termination)
+                    failed_grant_id:
+                      type: string
+                      format: uuid
+                      description: Access grant id at which the partial-failure occurred
+                    applied_event_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: >-
+                        Grant events successfully emitted before the failure.
+                        ONLY emitted by revoke_permission_across_grants
+                        (action=revoke_permission_across_grants_partial_failure).
+                    cascade_event_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: >-
+                        Cascade-revoke grant events emitted before the failure.
+                        ONLY emitted by terminate_var_partnership
+                        (action=terminate_var_partnership_partial_failure).
+                    failure_index:
+                      type: integer
+                      description: Zero-based loop index at which the failure occurred
+                    processing_error:
+                      type: string
+                      description: >-
+                        Captured processing_error or SQLERRM from the failing
+                        event emission (PII-sanitized per Rule 16)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: client_field_definition.created
             title: Client Field Definition Created
             summary: >-
@@ -30802,6 +31716,920 @@ channels:
                       type: string
                       maxLength: 2000
                       description: Additional context or notes
+          - name: access_grant.policy_override_applied
+            title: Access Grant Policy Override Applied
+            summary: >-
+              Cross-grant policy override applied — a single permission was
+              revoked across one or more active access grants by platform
+              authority
+            contentType: application/json
+            payload:
+              title: AccessGrantPolicyOverrideAppliedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: >-
+                    Access grant UUID (the grant whose permissions array was
+                    filtered by this policy override)
+                stream_type:
+                  type: string
+                  const: access_grant
+                event_type:
+                  type: string
+                  const: access_grant.policy_override_applied
+                event_data:
+                  title: AccessGrantPolicyOverrideAppliedData
+                  type: object
+                  description: >-
+                    Emitted by api.revoke_permission_across_grants — a
+                    platform-tier authority that revokes a single permission
+                    across all active access grants carrying it. Per-grant
+                    event; permissions array is the post-override remaining
+                    permission set for THIS grant (empty array '[]' if the grant
+                    carried only the targeted permission).
+                  required:
+                    - grant_id
+                    - permissions
+                    - override_reason
+                    - applied_by
+                  properties:
+                    grant_id:
+                      type: string
+                      format: uuid
+                      description: Access grant UUID (matches stream_id)
+                    permissions:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          p:
+                            type: string
+                            description: Permission name (e.g., "client.view")
+                          s:
+                            type: string
+                            description: Permission scope (ltree path)
+                      description: >-
+                        Post-override remaining permission set for this grant
+                        (empty array if the grant carried only the targeted
+                        permission)
+                    override_reason:
+                      type: string
+                      description: >-
+                        HIPAA-required audit justification for the cross-grant
+                        policy override (captured in domain_events
+                        processing_error absence — caller-supplied)
+                    applied_by:
+                      type: string
+                      format: uuid
+                      description: User ID of the platform admin applying the override
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.created
+            title: VAR Partnership Created
+            summary: >-
+              Value-Added Reseller (VAR) partnership established between a
+              partner organization and a provider organization
+            contentType: application/json
+            payload:
+              title: VarPartnershipCreatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: VAR partnership UUID
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.created
+                event_data:
+                  title: VarPartnershipCreationData
+                  type: object
+                  required:
+                    - partner_org_id
+                    - partner_org_name
+                    - provider_org_id
+                    - provider_org_name
+                    - partnership_type
+                    - contract_start_date
+                  properties:
+                    partner_org_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Organization ID of the VAR partner (provider_partner
+                        type)
+                    partner_org_name:
+                      type: string
+                      description: >-
+                        Snapshot of partner org name at partnership-creation
+                        time
+                    provider_org_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        Organization ID of the provider whose data the partner
+                        is authorized to resell/support
+                    provider_org_name:
+                      type: string
+                      description: >-
+                        Snapshot of provider org name at partnership-creation
+                        time
+                    partnership_type:
+                      type: string
+                      description: >-
+                        VAR partnership type/tier (e.g., reseller, integrator,
+                        referral)
+                    contract_number:
+                      type: string
+                      description: External contract reference number
+                    contract_start_date:
+                      type: string
+                      format: date
+                      description: Contract effective start date (immutable post-creation)
+                    contract_end_date:
+                      type: string
+                      format: date
+                      description: Contract effective end date (mutable via update event)
+                    revenue_share_percentage:
+                      type: number
+                      description: Revenue share percentage (0.0–100.0) per contract terms
+                    support_level:
+                      type: string
+                      description: Support level tier (e.g., basic, standard, premium)
+                    terms:
+                      type: object
+                      description: Additional partnership terms and conditions
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.updated
+            title: VAR Partnership Updated
+            summary: >-
+              VAR partnership mutable fields updated (PATCH semantics — only
+              non-null event_data keys overwrite)
+            contentType: application/json
+            payload:
+              title: VarPartnershipUpdatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.updated
+                event_data:
+                  title: VarPartnershipUpdateData
+                  type: object
+                  description: >-
+                    PATCH semantics — only non-null keys overwrite. Immutable
+                    fields (id, partner_org_id, provider_org_id,
+                    contract_start_date) are not present in this payload.
+                    Reserved keys partner_org_name and provider_org_name are
+                    intentionally omitted (org names are derived from the
+                    canonical projection, not snapshot-mutable).
+                  properties:
+                    partnership_type:
+                      type: string
+                    contract_number:
+                      type: string
+                    contract_end_date:
+                      type: string
+                      format: date
+                    revenue_share_percentage:
+                      type: number
+                    support_level:
+                      type: string
+                    terms:
+                      type: object
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.terminated
+            title: VAR Partnership Terminated
+            summary: >-
+              VAR partnership permanently terminated (cascade-revokes all active
+              var_contract grants citing this partnership first)
+            contentType: application/json
+            payload:
+              title: VarPartnershipTerminatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.terminated
+                event_data:
+                  title: VarPartnershipTerminationData
+                  type: object
+                  required:
+                    - terminated_by
+                    - termination_reason
+                  properties:
+                    terminated_by:
+                      type: string
+                      format: uuid
+                      description: >-
+                        User ID of the platform/provider admin terminating the
+                        partnership
+                    termination_reason:
+                      type: string
+                      description: >-
+                        Business reason for termination (e.g., contract_expired,
+                        partner_dissolution, compliance_violation)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.suspended
+            title: VAR Partnership Suspended
+            summary: >-
+              VAR partnership temporarily suspended (reversible; citing grants
+              stay active but new grant issuance against this partnership is
+              blocked)
+            contentType: application/json
+            payload:
+              title: VarPartnershipSuspendedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.suspended
+                event_data:
+                  title: VarPartnershipSuspensionData
+                  type: object
+                  required:
+                    - suspended_by
+                    - suspension_reason
+                  properties:
+                    suspended_by:
+                      type: string
+                      format: uuid
+                      description: >-
+                        User ID of the platform/provider admin suspending the
+                        partnership
+                    suspension_reason:
+                      type: string
+                      description: >-
+                        Business reason for suspension (e.g., investigation,
+                        payment_overdue, contract_dispute)
+                    expected_resolution_date:
+                      type: string
+                      format: date
+                      description: Expected date when suspension will be resolved
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: var_partnership.reactivated
+            title: VAR Partnership Reactivated
+            summary: Previously suspended VAR partnership restored to active status
+            contentType: application/json
+            payload:
+              title: VarPartnershipReactivatedEvent
+              type: object
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                stream_type:
+                  type: string
+                  const: var_partnership
+                event_type:
+                  type: string
+                  const: var_partnership.reactivated
+                event_data:
+                  title: VarPartnershipReactivationData
+                  type: object
+                  required:
+                    - reactivated_by
+                  properties:
+                    reactivated_by:
+                      type: string
+                      format: uuid
+                      description: >-
+                        User ID of the platform/provider admin reactivating the
+                        partnership
+                    new_contract_end_date:
+                      type: string
+                      format: date
+                      description: >-
+                        Updated contract end date if changed during reactivation
+                        (must be on or after the immutable contract_start_date)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
+          - name: audit.high_risk_action_logged
+            title: High-Risk Action Logged
+            summary: >-
+              Cross-cutting audit event emitted by API RPCs when a
+              partial-failure or other high-risk condition occurs that warrants
+              operator visibility regardless of caller-side handling
+            contentType: application/json
+            payload:
+              title: AuditHighRiskActionLoggedEvent
+              type: object
+              description: >
+                First emitter of the `audit.*` event family. Uses the 2-level
+                form
+
+                `audit.high_risk_action_logged` (aggregate.compound_event_name)
+
+                matching the `organization.direct_care_settings_updated`
+                precedent
+
+                per the CLAUDE.md event-type naming convention (dots separate
+
+                hierarchy levels; underscores compound names within a level).
+
+
+                Stream type is `platform_admin` — the absorbed administrative
+                stream
+
+                type per the process_domain_event dispatcher (no projection
+                update;
+
+                audit-only). Stream id is a fresh `gen_random_uuid()` per audit
+                row
+
+                (one audit event per high-risk occurrence; never threaded
+                through
+
+                any aggregate stream).
+
+
+                This is the first emitter of the `audit.*` family; future cross-
+
+                grant / cross-tenant audit events should follow this 2-level
+                form
+
+                and the same stream_type=platform_admin convention.
+              required:
+                - stream_id
+                - stream_type
+                - event_type
+                - event_data
+                - event_metadata
+              properties:
+                stream_id:
+                  type: string
+                  format: uuid
+                  description: Fresh per-audit UUID (not tied to any aggregate stream)
+                stream_type:
+                  type: string
+                  const: platform_admin
+                event_type:
+                  type: string
+                  const: audit.high_risk_action_logged
+                event_data:
+                  title: AuditHighRiskActionLoggedData
+                  type: object
+                  description: >
+                    Open shape — emitters supply a stable `action` discriminator
+                    and
+
+                    any per-action diagnostic fields. Current emitters:
+
+
+                    - `api.revoke_permission_across_grants` (partial-failure
+                    branch):
+                      action='revoke_permission_across_grants_partial_failure', plus
+                      permission_name, override_reason, failed_grant_id,
+                      applied_event_ids, failure_index, processing_error.
+
+                    - `api.terminate_var_partnership` (partial-failure branch
+                    during
+                      cascade-revoke): action='terminate_var_partnership_partial_failure',
+                      plus partnership_id, termination_reason, failed_grant_id,
+                      cascade_event_ids, failure_index, processing_error.
+                  required:
+                    - action
+                  properties:
+                    action:
+                      type: string
+                      description: >-
+                        Stable discriminator naming the emitting RPC + failure
+                        mode (e.g.,
+                        revoke_permission_across_grants_partial_failure)
+                    partnership_id:
+                      type: string
+                      format: uuid
+                      description: VAR partnership id (when action concerns a partnership)
+                    permission_name:
+                      type: string
+                      description: >-
+                        Permission name being overridden (when action concerns a
+                        cross-grant policy override)
+                    override_reason:
+                      type: string
+                      description: >-
+                        HIPAA audit reason supplied to the originating RPC (when
+                        action concerns a policy override)
+                    termination_reason:
+                      type: string
+                      description: >-
+                        Business reason supplied to the originating RPC (when
+                        action concerns a partnership termination)
+                    failed_grant_id:
+                      type: string
+                      format: uuid
+                      description: Access grant id at which the partial-failure occurred
+                    applied_event_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: >-
+                        Grant events successfully emitted before the failure.
+                        ONLY emitted by revoke_permission_across_grants
+                        (action=revoke_permission_across_grants_partial_failure).
+                    cascade_event_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: >-
+                        Cascade-revoke grant events emitted before the failure.
+                        ONLY emitted by terminate_var_partnership
+                        (action=terminate_var_partnership_partial_failure).
+                    failure_index:
+                      type: integer
+                      description: Zero-based loop index at which the failure occurred
+                    processing_error:
+                      type: string
+                      description: >-
+                        Captured processing_error or SQLERRM from the failing
+                        event emission (PII-sanitized per Rule 16)
+                event_metadata:
+                  title: EventMetadata
+                  type: object
+                  required:
+                    - user_id
+                    - reason
+                  properties:
+                    user_id:
+                      type: string
+                      format: uuid
+                      description: ID of the user who initiated this event
+                    organization_id:
+                      type: string
+                      format: uuid
+                      description: >-
+                        ID of the organization context for this event
+                        (multi-tenant isolation)
+                    reason:
+                      type: string
+                      minLength: 10
+                      maxLength: 500
+                      description: >
+                        Business justification for this action. This field
+                        captures the "WHY"
+
+                        behind every change and is REQUIRED for all events.
+                      examples:
+                        - >-
+                          Patient showed allergic reaction to previous
+                          medication
+                        - >-
+                          Dosage adjustment per physician consultation on
+                          2024-01-15
+                        - >-
+                          Regular intake from emergency department referral
+                          #12345
+                    user_email:
+                      type: string
+                      format: email
+                      description: Email of the user who initiated this event
+                    user_name:
+                      type: string
+                      description: Name of the user who initiated this event
+                    correlation_id:
+                      type: string
+                      format: uuid
+                      description: ID to correlate related events across the system
+                    causation_id:
+                      type: string
+                      format: uuid
+                      description: ID of the event that caused this event
+                    ip_address:
+                      type: string
+                      format: ipv4
+                      description: IP address of the client
+                    user_agent:
+                      type: string
+                      description: User agent string of the client
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: Additional context or notes
           - name: client_field_definition.created
             title: Client Field Definition Created
             summary: >-
@@ -34760,6 +36588,7 @@ components:
             - client
             - client_field_definition
             - client_field_category
+            - var_partnership
           description: Type of entity this event affects
         stream_version:
           type: integer

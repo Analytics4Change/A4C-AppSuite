@@ -146,6 +146,8 @@ $cmt$;
 | `@a4c-consultant-callable-reason:` | free text | required for `no` / `pending-*`; codegen+CI enforce |
 | `@a4c-phase-target:` | `1` \| `3` \| `4` \| `none` | new — single grep finds all RPCs needing work in a given phase |
 
+> **Addendum (Phase 2 clarification — `@a4c-phase-target` convention for bucket-B RPCs)** — Phase 2 Chunk 7 F1+F2 architect fold-in (2026-06-08) corrected an early-Phase-2 misreading of this tag's meaning. The convention: `@a4c-phase-target` names the phase at which the RPC needs **further work** (rewrite, RLS audit, refactor). For bucket-B RPCs (provider-admin-only writes, no JWT-tenancy binding to a consultant), the correct value is `none` once the RPC ships — bucket B does NOT have a Phase 3/4 consultant-readability gate. Phase 2 shipped 8 emit RPCs initially tagged `@a4c-phase-target: 2` (the phase that built them) and 1 read RPC initially tagged similarly; Chunk 7 F2 corrected all 9 to `@a4c-phase-target: none` per the bucket-B convention established in Phase 1 (which set `none` on 36 of 36 bucket-B RPCs). Phase 2 Chunk 7 F1 separately corrected `api.revoke_permission_across_grants` from bucket `B` to bucket `E` (no JWT-tenancy binding — platform-only authority). The codegen `gen-rpc-reachability-matrix.cjs` does not enforce `@a4c-phase-target = none` for bucket B (cardinality varies per bucket); architect review is the gating check.
+
 The full 15-step Phase 1 manifest (steps 1-10 from JWT-shape work + steps 11-13 from Phase 0.3 + steps 14-15 from Phase 0.4; post-PR-#68-cohesion-fix renumber) is enumerated in **Consequences → Phase 1 migration manifest** below — single canonical location to avoid drift.
 
 ## Phase 0.4 — Grant Write-Side
@@ -238,6 +240,8 @@ CREATE INDEX idx_grant_role_templates_authtype
     ON grant_role_templates (authorization_type) WHERE is_active = true;
 ```
 
+> **Addendum (Phase 1 deployed shape; supersedes 2-column UNIQUE above)** — Phase 1 architect N2 fold-in (2026-06-02) tightened the UNIQUE to a 3-column form `(template_name, authorization_type, permission_name)` to allow the same `permission_name` under distinct `authorization_type` values within the same template (e.g., a future `family_default` template carrying both `client.view` under `family_participation` and `partner.view_analytics` under `var_contract`). The 2-column form above is the original ADR snapshot; the deployed form is 3-column. Phase 2 `api.get_grant_role_templates` returns `template_name` in its TABLE shape (Step 16) to disambiguate consumer rows under the 3-column key. (Forward note: a future ADR revision may rewrite this section directly; the addendum form preserves the original architect decision provenance.)
+
 RLS mirrors `role_permission_templates`: public read; service_role read; super_admin-only write.
 
 Phase 1 seed (v1 = VAR only):
@@ -285,6 +289,8 @@ CREATE TABLE public.var_partnerships_projection (
     UNIQUE (partner_org_id, provider_org_id)
 );
 ```
+
+> **Addendum (Phase 2 deployed shape; supersedes full UNIQUE above)** — Phase 2 sub-decision G (2026-06-04) tightened the UNIQUE to a **partial form** `UNIQUE (partner_org_id, provider_org_id) WHERE status IN ('active', 'suspended')` mirroring the `idx_grant_role_templates_active` partial-index precedent. The full UNIQUE shown above is the original ADR snapshot; the deployed form is partial. **Why partial**: allows re-establishment of a terminated/expired partnership between the same two orgs via a new row (new contract cycle) while preserving the audit trail of the prior terminated row. The full UNIQUE would have blocked re-creation entirely. The `api.create_var_partnership` emit RPC enforces a pre-emit guard against `('active', 'suspended')` rows; the projection-layer partial UNIQUE is the belt-and-suspenders defense.
 
 Doc reconciliation: arch doc L498-514 already has the denormalized name columns; needs `contract_number`, 4-value status CHECK, and suspension/termination audit columns added in lockstep with this ADR addendum.
 
