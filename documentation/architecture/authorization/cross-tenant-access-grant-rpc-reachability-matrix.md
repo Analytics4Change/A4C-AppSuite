@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-06-03
+last_updated: 2026-06-09
 ---
 
 <!-- TL;DR-START -->
@@ -273,6 +273,7 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `update_user_access_dates` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
 | `update_user_notification_preferences` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `update_user_phone` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
+| `update_var_partnership` | B | no | none | Provider-admin authority + partnership.manage permission; consultant variant N/A. |
 | `validate_role_assignment` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
 <!-- GENERATED:PER-RPC-TABLE:END -->
 
