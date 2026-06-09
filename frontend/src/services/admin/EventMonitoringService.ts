@@ -182,8 +182,9 @@ export class EventMonitoringService {
         // PII mask: row.processing_error is MESSAGE_TEXT only post-migration, but the field
         // historically carried PG_EXCEPTION_DETAIL row data. Mask defensively for the admin
         // dashboard so /admin/events sees the same sanitized text every other consumer sees.
-        // Forensic detail (raw PG_EXCEPTION_DETAIL) is available only via
-        // api.get_failed_events_with_detail() gated on platform.view_event_details.
+        // Forensic detail (raw PG_EXCEPTION_DETAIL) is available via
+        // api.get_failed_events_with_detail() — platform-admin gated via has_platform_privilege()
+        // post-2026-06-09 consolidation (granular platform.view_event_details retired).
         processing_error: maskPii(row.processing_error),
         created_at: row.created_at,
         processed_at: row.processed_at,

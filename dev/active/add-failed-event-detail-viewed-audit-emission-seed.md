@@ -29,11 +29,11 @@ Reference the existing `api.get_failed_events` emit pattern verbatim — same st
 3. Confirm a router/handler exists that no-ops or projects this event type (likely `process_platform_admin_event` or similar). If no router exists, audit how the sibling event is currently handled — it may be `WHEN ... THEN NULL` (audit-only).
 4. Create migration: `supabase migration new add_failed_event_detail_viewed_audit_emission`. CREATE OR REPLACE the RPC with the new emit statement. Function signature unchanged → OID stable → `@a4c-rpc-shape: envelope` COMMENT preserved.
 5. Generate types if any new fields exposed (likely not).
-6. UAT: as platform admin with `platform.view_event_details`, call the RPC; query `domain_events WHERE event_type = 'platform.admin.failed_event_detail_viewed' AND event_metadata->>'user_id' = '<your_user_id>'` to confirm.
+6. UAT: as a platform admin (any caller for whom `has_platform_privilege()` returns TRUE; on dev that's `super_admin`), call the RPC; query `domain_events WHERE event_type = 'platform.admin.failed_event_detail_viewed' AND event_metadata->>'user_id' = '<your_user_id>'` to confirm.
 
 ## Out of scope
 
-- Adding `platform.view_event_details` to a role template (separate seed: `seed-platform-view-event-details-permission-seed.md`). Until that seed lands, this card's UAT requires a manually-granted permission via direct event emission.
+- ~~Adding `platform.view_event_details` to a role template~~ — **resolved by 2026-06-09 consolidation migration** (`20260609212115_seed_grant_perms_into_provider_admin_and_fix_failed_events_detail_gate.sql`): the granular `platform.view_event_details` permission was retired as YAGNI; the RPC gate now uses `has_platform_privilege()` uniformly. The companion seed card `seed-platform-view-event-details-permission-seed.md` was archived as part of the same change.
 
 ## Files involved
 
