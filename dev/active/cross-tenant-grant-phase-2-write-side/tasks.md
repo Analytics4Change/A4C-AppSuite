@@ -64,12 +64,13 @@
 
 ## Stage D — Post-migration deliverables (same Phase 2 PR)
 
-- [ ] **HARD BLOCKER before Chunk 4 (emit RPCs) merges** (Chunk 2 architect review 2026-06-04): `infrastructure/supabase/contracts/asyncapi/domains/var_partnership.yaml` (NEW, 5 messages with stream_id/stream_type/event_type/event_data/event_metadata structure per access_grant.yaml precedent; payloads enumerate keys per plan.md § "Event payload schemas") + `infrastructure/supabase/contracts/asyncapi/domains/access_grant.yaml` (add `AccessGrantPolicyOverrideApplied` per PR #70 N1) + `infrastructure/supabase/contracts/asyncapi/asyncapi.yaml` (var_partnership channel + stream_type enum L252). The router (Step 4, shipped Chunk 2) currently handles 5 event types with NO AsyncAPI schemas — emit RPCs at Steps 11-15 make these externally observable, so AsyncAPI must land before/with that chunk.
-- [ ] `npm run generate:types` + commit regen + `cp` to `frontend/src/types/generated/generated-events.ts`
-- [ ] `infrastructure/supabase/handlers/routers/process_var_partnership_event.sql` (NEW reference file, inline pattern)
-- [ ] `infrastructure/supabase/handlers/trigger/process_domain_event.sql` (add var_partnership branch)
-- [ ] `infrastructure/supabase/CLAUDE.md` (codify underscore-prefix private-helper convention)
-- [ ] `documentation/architecture/data/provider-partners-architecture.md` (verify no drift from ADR C.3; PR #68 cohesion review noted stale L376-433 — confirm fixed)
+- [x] **HARD BLOCKER before Chunk 4 (emit RPCs) merges** (Chunk 2 architect review 2026-06-04): `infrastructure/supabase/contracts/asyncapi/domains/var_partnership.yaml` (NEW, 5 messages) + `access_grant.yaml` (added `AccessGrantPolicyOverrideApplied` per PR #70 N1) + `audit.yaml` (NEW for `AuditHighRiskActionLogged` per Chunk 5 F1 — 2-level event family on stream_type=`platform_admin`) + `asyncapi.yaml` (wired 7 new channel refs + added `var_partnership` to stream_type enum). Bundle validates 0 errors / 147 pre-existing messageId warnings.
+- [x] `npm run generate:types` (38 enums + 296 interfaces; 22 new VarPartnership/AccessGrantPolicyOverride/AuditHighRisk type refs) + cp to `frontend/src/types/generated/generated-events.ts` + workflows `npm run sync-schemas` (workflows/src/shared/types/generated/events.ts). Frontend typecheck + workflows build both green.
+- [x] `infrastructure/supabase/handlers/routers/process_var_partnership_event.sql` reference file synced to migration body (verbatim CASE arms + architect-review provenance comments preserved).
+- [x] `infrastructure/supabase/handlers/trigger/process_domain_event.sql` reference file already contains `WHEN 'var_partnership' THEN PERFORM process_var_partnership_event(NEW)` branch (committed during Chunk 2).
+- [x] `infrastructure/supabase/CLAUDE.md`: codified underscore-prefix `public._*` private-helper convention (sub-decision A) with REVOKE/GRANT ritual; added event-type 2-level form addendum (`audit.*` family per Chunk 5 F1).
+- [x] `documentation/architecture/data/provider-partners-architecture.md`: removed stale full UNIQUE at L482 + added Phase 2 deployed partial UNIQUE INDEX form (matches deployed `idx_var_partnerships_pair_active WHERE status IN ('active','suspended')`). Authorization Type Patterns L376-432 already reconciled in PR #68 (no drift remaining there).
+- [x] ADR addendums in `adr-cross-tenant-access-grant-jwt-shape.md`: (a) C.2 — 3-column UNIQUE `(template_name, authorization_type, permission_name)` per Phase 1 N2 fold-in; (b) C.3 — partial UNIQUE `WHERE status IN ('active','suspended')` per sub-decision G; (c) Comment vocabulary — `@a4c-phase-target=none` for bucket-B RPCs once shipped (Chunk 7 F2 correction).
 
 ## Stage E — Smoke & UAT (per plan.md § Stage E smoke probes — 21 probes)
 
@@ -98,9 +99,9 @@
 
 ## Current Status
 
-**Stage**: C (drafting) — **COMPLETE 2026-06-08**. Stages A + B closed 2026-06-04. All 7 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5; S1+S2+N1 for Chunk 6; F1+F2+S1+S2+N1 for Chunk 7).
-**Status**: Migration at ~3,300 lines / 56 top-level statements. Stage C COMPLETE; ready for Stage D.
-**Next action**: Stage D — post-migration deliverables (same Phase 2 PR). Hard blockers before merge:
+**Stage**: D (post-migration deliverables) — **COMPLETE 2026-06-09**. Stages A + B closed 2026-06-04. Stage C COMPLETE 2026-06-08. All 7 chunks reviewed + folded same-day (F1+F2+F3+S2+S3 for Chunk 1; F1+F2+S1+S2+N1+N2 for Chunk 2; F1+S1.a+N2 for Chunk 3; S1+S2+S3+N3+N4 for Chunk 4; F1+S1+S2+S3+N1+N2 for Chunk 5; S1+S2+N1 for Chunk 6; F1+F2+S1+S2+N1 for Chunk 7).
+**Status**: Stage D shipped 6/6 hard blockers (see checklist above); migration at ~3,300 lines / 56 top-level statements. Ready for Stage E (deploy + smoke + UAT).
+**Next action**: Stage E — `supabase db push --linked` to dev, then 21+ smoke probes + auth-hook latency re-measure + type regen + M3 RPC registry regen + reachability matrix regen + DoD gates. Historical "Next action" notes preserved below for traceability:
 1. AsyncAPI updates: `var_partnership.yaml` (NEW, 5 messages) + `access_grant.yaml` (+`AccessGrantPolicyOverrideApplied` per PR #70 N1) + `audit.yaml` (NEW for `AuditHighRiskActionLogged` per Chunk 5 F1 precedent) + `asyncapi.yaml` channel wiring + stream_type enum (add `var_partnership`).
 2. `npm run generate:types` + commit + cp to `frontend/src/types/generated/`.
 3. Verify `infrastructure/supabase/handlers/routers/process_var_partnership_event.sql` matches migration body (N2 carry-forward ritual).

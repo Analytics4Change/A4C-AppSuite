@@ -7,11 +7,19 @@ BEGIN
   CASE p_event.event_type
 
     WHEN 'var_partnership.created' THEN
-      -- F1 (Phase 2 architect Chunk 2 review 2026-06-04): idempotency
-      -- guard on stream_id replay. Step 11 emit RPC enforces the
-      -- duplicate-business-key precondition (partner_org_id,
-      -- provider_org_id) via partial UNIQUE; this guard handles the
-      -- orthogonal axis (same stream_id under retry / baseline rebuild).
+      -- F1 architect fold-in 2026-06-04: idempotency guard on stream_id
+      -- replay. The Step 11 emit RPC enforces the duplicate-business-key
+      -- precondition (partner_org_id, provider_org_id) via partial UNIQUE;
+      -- this guard handles the orthogonal axis (same stream_id replay
+      -- under retry / baseline rebuild). Without this, retry produces a
+      -- stale failed event per codified pitfall #4 (EXCEPTION WHEN
+      -- unique_violation is dead code).
+      --
+      -- N1 architect fold-in: created_at + updated_at use p_event.created_at
+      -- per access_grant.created precedent (handlers/routers/
+      -- process_access_grant_event.sql:36). Column DEFAULT now() at Step 1
+      -- is a belt-and-suspenders guard against the never-permitted
+      -- direct-INSERT path.
       IF EXISTS (
         SELECT 1 FROM public.var_partnerships_projection
         WHERE id = p_event.stream_id
@@ -47,8 +55,16 @@ BEGIN
 
     WHEN 'var_partnership.updated' THEN
       -- PATCH semantics: only non-null keys overwrite. Immutable fields
-      -- (id, partner_org_id, provider_org_id, contract_start_date)
-      -- excluded.
+      -- (id, partner_org_id, provider_org_id, contract_start_date) are
+      -- not included.
+      --
+      -- S1 architect fold-in 2026-06-04: an `updated` event with no
+      -- mutable keys still advances updated_at = p_event.created_at. This
+      -- is intentional — the event itself IS the change-record; the
+      -- projection's substantive columns may legitimately be stable
+      -- (e.g., audit-only update). The Step 12 api.update_var_partnership
+      -- emit RPC SHOULD reject empty-payload calls at the precondition
+      -- layer.
       UPDATE public.var_partnerships_projection
       SET
         partner_org_name = COALESCE(
@@ -140,6 +156,10 @@ BEGIN
       END IF;
 
     ELSE
+      -- Codified pattern: router ELSE must RAISE EXCEPTION (NOT WARNING).
+      -- WHEN OTHERS in process_domain_event catches this and persists the
+      -- error to domain_events.processing_error. ERRCODE P9001 follows
+      -- the access_grant router precedent.
       RAISE EXCEPTION 'Unhandled event type "%" in process_var_partnership_event',
         p_event.event_type
         USING ERRCODE = 'P9001';

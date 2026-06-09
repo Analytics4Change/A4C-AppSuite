@@ -157,6 +157,19 @@ channels:
           - $ref: './domains/rbac.yaml#/components/messages/UserRoleRevoked'
           - $ref: './domains/rbac.yaml#/components/messages/AccessGrantCreated'
           - $ref: './domains/rbac.yaml#/components/messages/AccessGrantRevoked'
+          # Access grant policy-override events (Phase 2 cross-tenant-grant
+          # write-side; PR #70 N1 carry-forward — see access_grant.yaml)
+          - $ref: './domains/access_grant.yaml#/components/messages/AccessGrantPolicyOverrideApplied'
+          # VAR partnership lifecycle events (Phase 2 cross-tenant-grant
+          # write-side; stream_type='var_partnership')
+          - $ref: './domains/var_partnership.yaml#/components/messages/VarPartnershipCreated'
+          - $ref: './domains/var_partnership.yaml#/components/messages/VarPartnershipUpdated'
+          - $ref: './domains/var_partnership.yaml#/components/messages/VarPartnershipTerminated'
+          - $ref: './domains/var_partnership.yaml#/components/messages/VarPartnershipSuspended'
+          - $ref: './domains/var_partnership.yaml#/components/messages/VarPartnershipReactivated'
+          # Audit events (cross-cutting, emitted by API RPCs on partial-
+          # failure / high-risk conditions; stream_type='platform_admin')
+          - $ref: './domains/audit.yaml#/components/messages/AuditHighRiskActionLogged'
           # Client field definition events (field configuration registry)
           - $ref: './domains/client-field-definition.yaml#/components/messages/ClientFieldDefinitionCreated'
           - $ref: './domains/client-field-definition.yaml#/components/messages/ClientFieldDefinitionUpdated'
@@ -250,6 +263,7 @@ components:
             - client
             - client_field_definition
             - client_field_category
+            - var_partnership
           description: Type of entity this event affects
         stream_version:
           type: integer

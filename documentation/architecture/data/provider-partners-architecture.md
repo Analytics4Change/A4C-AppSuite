@@ -478,9 +478,21 @@ CREATE TABLE var_partnerships_projection (
   termination_reason TEXT,
   suspended_at TIMESTAMPTZ,                                                    -- Phase 0.4: suspension audit
   suspended_by UUID,
-  suspension_reason TEXT,
-  UNIQUE (partner_org_id, provider_org_id)
+  suspension_reason TEXT
+  -- UNIQUE constraint: Phase 2 sub-decision G (2026-06-04) ships this as a
+  -- partial UNIQUE INDEX (deployed separately, not as a table-inline constraint).
 );
+
+-- Phase 2 deployed UNIQUE form (sub-decision G, 2026-06-04): partial UNIQUE
+-- allows re-establishment of a terminated/expired partnership between the
+-- same two orgs via a new row, preserving audit trail of the prior
+-- terminated row. Mirrors the idx_grant_role_templates_active partial-index
+-- precedent. The api.create_var_partnership emit RPC enforces a pre-emit
+-- guard against rows with status IN ('active', 'suspended'); this partial
+-- UNIQUE INDEX is the belt-and-suspenders defense at the projection layer.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_var_partnerships_pair_active
+    ON var_partnerships_projection (partner_org_id, provider_org_id)
+    WHERE status IN ('active', 'suspended');
 
 COMMENT ON TABLE var_partnerships_projection IS 'CQRS projection: VAR partnership contracts (subset of provider partner relationships). Fed by var_partnership.* event family per Phase 0.4 Decision C.3.';
 ```

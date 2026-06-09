@@ -1,0 +1,117 @@
+components:
+  messages:
+    AuditHighRiskActionLogged:
+      name: audit.high_risk_action_logged
+      title: High-Risk Action Logged
+      summary: Cross-cutting audit event emitted by API RPCs when a
+        partial-failure or other high-risk condition occurs that warrants
+        operator visibility regardless of caller-side handling
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AuditHighRiskActionLoggedEvent'
+
+  schemas:
+    AuditHighRiskActionLoggedEvent:
+      title: AuditHighRiskActionLoggedEvent
+      type: object
+      description: |
+        First emitter of the `audit.*` event family. Uses the 2-level form
+        `audit.high_risk_action_logged` (aggregate.compound_event_name)
+        matching the `organization.direct_care_settings_updated` precedent
+        per the CLAUDE.md event-type naming convention (dots separate
+        hierarchy levels; underscores compound names within a level).
+
+        Stream type is `platform_admin` — the absorbed administrative stream
+        type per the process_domain_event dispatcher (no projection update;
+        audit-only). Stream id is a fresh `gen_random_uuid()` per audit row
+        (one audit event per high-risk occurrence; never threaded through
+        any aggregate stream).
+
+        This is the first emitter of the `audit.*` family; future cross-
+        grant / cross-tenant audit events should follow this 2-level form
+        and the same stream_type=platform_admin convention.
+      required:
+        - stream_id
+        - stream_type
+        - event_type
+        - event_data
+        - event_metadata
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+          description: Fresh per-audit UUID (not tied to any aggregate stream)
+        stream_type:
+          type: string
+          const: platform_admin
+        event_type:
+          type: string
+          const: audit.high_risk_action_logged
+        event_data:
+          $ref: '#/components/schemas/AuditHighRiskActionLoggedData'
+        event_metadata:
+          $ref: '../components/schemas.yaml#/components/schemas/EventMetadata'
+
+    AuditHighRiskActionLoggedData:
+      title: AuditHighRiskActionLoggedData
+      type: object
+      description: |
+        Open shape — emitters supply a stable `action` discriminator and
+        any per-action diagnostic fields. Current emitters:
+
+        - `api.revoke_permission_across_grants` (partial-failure branch):
+          action='revoke_permission_across_grants_partial_failure', plus
+          permission_name, override_reason, failed_grant_id,
+          applied_event_ids, failure_index, processing_error.
+
+        - `api.terminate_var_partnership` (partial-failure branch during
+          cascade-revoke): action='terminate_var_partnership_partial_failure',
+          plus partnership_id, termination_reason, failed_grant_id,
+          cascade_event_ids, failure_index, processing_error.
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          description: Stable discriminator naming the emitting RPC + failure
+            mode (e.g., revoke_permission_across_grants_partial_failure)
+        partnership_id:
+          type: string
+          format: uuid
+          description: VAR partnership id (when action concerns a partnership)
+        permission_name:
+          type: string
+          description: Permission name being overridden (when action concerns
+            a cross-grant policy override)
+        override_reason:
+          type: string
+          description: HIPAA audit reason supplied to the originating RPC
+            (when action concerns a policy override)
+        termination_reason:
+          type: string
+          description: Business reason supplied to the originating RPC
+            (when action concerns a partnership termination)
+        failed_grant_id:
+          type: string
+          format: uuid
+          description: Access grant id at which the partial-failure occurred
+        applied_event_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Grant events successfully emitted before the failure
+        cascade_event_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Cascade-revoke grant events emitted before the failure
+            (terminate_var_partnership variant)
+        failure_index:
+          type: integer
+          description: Zero-based loop index at which the failure occurred
+        processing_error:
+          type: string
+          description: Captured processing_error or SQLERRM from the failing
+            event emission (PII-sanitized per Rule 16)

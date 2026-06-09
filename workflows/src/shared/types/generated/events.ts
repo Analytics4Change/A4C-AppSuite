@@ -10,7 +10,7 @@
  * 2. cd infrastructure/supabase/contracts && npm run generate:types
  * 3. cd workflows && npm run sync-schemas
  *
- * Last synced: 2026-05-06T20:18:59.966Z
+ * Last synced: 2026-06-09T16:06:25.775Z
  */
 
 // =============================================================================
@@ -233,7 +233,7 @@ export enum RoleScope {
   UNIT = "unit",
 }
 
-export enum AnonymousSchema_5504 {
+export enum AnonymousSchema_5814 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -243,7 +243,7 @@ export enum AnonymousSchema_5504 {
   JSONB = "jsonb",
 }
 
-export enum AnonymousSchema_5532 {
+export enum AnonymousSchema_5842 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -257,7 +257,7 @@ export enum AnonymousSchema_5532 {
 // Interfaces
 // =============================================================================
 
-export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | ContactDesignationCreatedEvent | ContactDesignationDeactivatedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldDefinitionReactivatedEvent | ClientFieldDefinitionDeletedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryUpdatedEvent | ClientFieldCategoryDeactivatedEvent | ClientFieldCategoryReactivatedEvent | ClientFieldCategoryDeletedEvent | ClientRegisteredEvent | ClientInformationUpdatedEvent | ClientAdmittedEvent | ClientDischargedEvent | ClientPhoneAddedEvent | ClientPhoneUpdatedEvent | ClientPhoneRemovedEvent | ClientEmailAddedEvent | ClientEmailUpdatedEvent | ClientEmailRemovedEvent | ClientAddressAddedEvent | ClientAddressUpdatedEvent | ClientAddressRemovedEvent | ClientInsuranceAddedEvent | ClientInsuranceUpdatedEvent | ClientInsuranceRemovedEvent | ClientPlacementChangedEvent | ClientPlacementEndedEvent | ClientFundingSourceAddedEvent | ClientFundingSourceUpdatedEvent | ClientFundingSourceRemovedEvent | ClientContactAssignedEvent | ClientContactUnassignedEvent;
+export type DomainEvents = UserSyncedFromAuthEvent | UserCreatedEvent | UserProfileUpdatedEvent | UserOrgSwitchedEvent | UserAccessDatesUpdatedEvent | UserNotificationPreferencesUpdatedEvent | UserAddressAddedEvent | UserAddressUpdatedEvent | UserAddressRemovedEvent | UserPhoneAddedEvent | UserPhoneUpdatedEvent | UserDeactivatedEvent | UserReactivatedEvent | UserDeletedEvent | ScheduleCreatedEvent | ScheduleUpdatedEvent | ScheduleDeactivatedEvent | ScheduleReactivatedEvent | ScheduleDeletedEvent | ScheduleUserAssignedEvent | ScheduleUserUnassignedEvent | UserClientAssignedEvent | UserClientUnassignedEvent | UserInvitedEvent | InvitationRevokedEvent | InvitationAcceptedEvent | InvitationExpiredEvent | InvitationResentEvent | InvitationEmailSentEvent | OrganizationCreatedEvent | OrganizationUpdatedEvent | OrganizationActivatedEvent | OrganizationDeactivatedEvent | OrganizationReactivatedEvent | OrganizationDeletedEvent | OrganizationDeletionInitiatedEvent | OrganizationDeletionCompletedEvent | OrganizationSubdomainDnsCreatedEvent | OrganizationSubdomainVerifiedEvent | OrganizationDnsRemovedEvent | OrganizationDirectCareSettingsUpdatedEvent | OrganizationBootstrapInitiatedEvent | OrganizationBootstrapCompletedEvent | OrganizationBootstrapFailedEvent | OrganizationBootstrapCancelledEvent | OrganizationBootstrapStepCompletedEvent | ProgramCreatedEvent | OrganizationUnitCreatedEvent | OrganizationUnitUpdatedEvent | OrganizationUnitDeactivatedEvent | OrganizationUnitReactivatedEvent | OrganizationUnitDeletedEvent | OrganizationUnitMovedEvent | PlatformAdminFailedEventsViewedEvent | PlatformAdminEventRetryAttemptedEvent | PlatformAdminProcessingStatsViewedEvent | PlatformAdminEventDismissedEvent | PlatformAdminEventUndismissedEvent | EmailCreatedEvent | EmailUpdatedEvent | EmailDeletedEvent | ContactCreatedEvent | ContactUpdatedEvent | ContactDeletedEvent | ContactUserLinkedEvent | ContactUserUnlinkedEvent | ContactDesignationCreatedEvent | ContactDesignationDeactivatedEvent | PhoneCreatedEvent | PhoneUpdatedEvent | PhoneDeletedEvent | AddressCreatedEvent | AddressUpdatedEvent | AddressDeletedEvent | OrganizationContactLinkedEvent | OrganizationContactUnlinkedEvent | OrganizationAddressLinkedEvent | OrganizationAddressUnlinkedEvent | OrganizationPhoneLinkedEvent | OrganizationPhoneUnlinkedEvent | OrganizationEmailLinkedEvent | OrganizationEmailUnlinkedEvent | ContactPhoneLinkedEvent | ContactPhoneUnlinkedEvent | ContactAddressLinkedEvent | ContactAddressUnlinkedEvent | ContactEmailLinkedEvent | ContactEmailUnlinkedEvent | PhoneAddressLinkedEvent | PhoneAddressUnlinkedEvent | PermissionDefinedEvent | PermissionUpdatedEvent | RoleCreatedEvent | RolePermissionGrantedEvent | RolePermissionRevokedEvent | RoleUpdatedEvent | RoleDeactivatedEvent | RoleReactivatedEvent | RoleDeletedEvent | UserRoleAssignedEvent | UserRoleRevokedEvent | AccessGrantCreatedEvent | AccessGrantRevokedEvent | AccessGrantPolicyOverrideAppliedEvent | VarPartnershipCreatedEvent | VarPartnershipUpdatedEvent | VarPartnershipTerminatedEvent | VarPartnershipSuspendedEvent | VarPartnershipReactivatedEvent | AuditHighRiskActionLoggedEvent | ClientFieldDefinitionCreatedEvent | ClientFieldDefinitionUpdatedEvent | ClientFieldDefinitionDeactivatedEvent | ClientFieldDefinitionReactivatedEvent | ClientFieldDefinitionDeletedEvent | ClientFieldCategoryCreatedEvent | ClientFieldCategoryUpdatedEvent | ClientFieldCategoryDeactivatedEvent | ClientFieldCategoryReactivatedEvent | ClientFieldCategoryDeletedEvent | ClientRegisteredEvent | ClientInformationUpdatedEvent | ClientAdmittedEvent | ClientDischargedEvent | ClientPhoneAddedEvent | ClientPhoneUpdatedEvent | ClientPhoneRemovedEvent | ClientEmailAddedEvent | ClientEmailUpdatedEvent | ClientEmailRemovedEvent | ClientAddressAddedEvent | ClientAddressUpdatedEvent | ClientAddressRemovedEvent | ClientInsuranceAddedEvent | ClientInsuranceUpdatedEvent | ClientInsuranceRemovedEvent | ClientPlacementChangedEvent | ClientPlacementEndedEvent | ClientFundingSourceAddedEvent | ClientFundingSourceUpdatedEvent | ClientFundingSourceRemovedEvent | ClientContactAssignedEvent | ClientContactUnassignedEvent;
 
 export interface UserSyncedFromAuthEvent {
   'stream_id': string;
@@ -427,12 +427,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_3317;
+  'event_data': AnonymousSchema_3472;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3317 {
+export interface AnonymousSchema_3472 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -454,12 +454,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_3349;
+  'event_data': AnonymousSchema_3504;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3349 {
+export interface AnonymousSchema_3504 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -495,12 +495,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_3398;
+  'event_data': AnonymousSchema_3553;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3398 {
+export interface AnonymousSchema_3553 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -2236,6 +2236,141 @@ export interface AccessGrantRevokedData {
   'additionalProperties'?: Map<string, any>;
 }
 
+export interface AccessGrantPolicyOverrideAppliedEvent {
+  'stream_id': string;
+  'stream_type': 'access_grant';
+  'event_type': 'access_grant.policy_override_applied';
+  'event_data': AccessGrantPolicyOverrideAppliedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AccessGrantPolicyOverrideAppliedData {
+  'grant_id': string;
+  'permissions': AnonymousSchema_5656[];
+  'override_reason': string;
+  'applied_by': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AnonymousSchema_5656 {
+  'p'?: string;
+  's'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipCreatedEvent {
+  'stream_id': string;
+  'stream_type': 'var_partnership';
+  'event_type': 'var_partnership.created';
+  'event_data': VarPartnershipCreationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipCreationData {
+  'partner_org_id': string;
+  'partner_org_name': string;
+  'provider_org_id': string;
+  'provider_org_name': string;
+  'partnership_type': string;
+  'contract_number'?: string;
+  'contract_start_date': string;
+  'contract_end_date'?: string;
+  'revenue_share_percentage'?: number;
+  'support_level'?: string;
+  'terms'?: Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipUpdatedEvent {
+  'stream_id': string;
+  'stream_type': 'var_partnership';
+  'event_type': 'var_partnership.updated';
+  'event_data': VarPartnershipUpdateData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipUpdateData {
+  'partnership_type'?: string;
+  'contract_number'?: string;
+  'contract_end_date'?: string;
+  'revenue_share_percentage'?: number;
+  'support_level'?: string;
+  'terms'?: Map<string, any>;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipTerminatedEvent {
+  'stream_id': string;
+  'stream_type': 'var_partnership';
+  'event_type': 'var_partnership.terminated';
+  'event_data': VarPartnershipTerminationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipTerminationData {
+  'terminated_by': string;
+  'termination_reason': string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipSuspendedEvent {
+  'stream_id': string;
+  'stream_type': 'var_partnership';
+  'event_type': 'var_partnership.suspended';
+  'event_data': VarPartnershipSuspensionData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipSuspensionData {
+  'suspended_by': string;
+  'suspension_reason': string;
+  'expected_resolution_date'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipReactivatedEvent {
+  'stream_id': string;
+  'stream_type': 'var_partnership';
+  'event_type': 'var_partnership.reactivated';
+  'event_data': VarPartnershipReactivationData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface VarPartnershipReactivationData {
+  'reactivated_by': string;
+  'new_contract_end_date'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AuditHighRiskActionLoggedEvent {
+  'stream_id': string;
+  'stream_type': 'platform_admin';
+  'event_type': 'audit.high_risk_action_logged';
+  'event_data': AuditHighRiskActionLoggedData;
+  'event_metadata': EventMetadata;
+  'additionalProperties'?: Map<string, any>;
+}
+
+export interface AuditHighRiskActionLoggedData {
+  'action': string;
+  'partnership_id'?: string;
+  'permission_name'?: string;
+  'override_reason'?: string;
+  'termination_reason'?: string;
+  'failed_grant_id'?: string;
+  'applied_event_ids'?: string[];
+  'cascade_event_ids'?: string[];
+  'failure_index'?: number;
+  'processing_error'?: string;
+  'additionalProperties'?: Map<string, any>;
+}
+
 export interface ClientFieldDefinitionCreatedEvent {
   'stream_id': string;
   'stream_type': 'client_field_definition';
@@ -2251,7 +2386,7 @@ export interface ClientFieldDefinitionCreatedData {
   'category_id': string;
   'field_key': string;
   'display_name': string;
-  'field_type'?: AnonymousSchema_5504;
+  'field_type'?: AnonymousSchema_5814;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2276,7 +2411,7 @@ export interface ClientFieldDefinitionUpdatedData {
   'organization_id': string;
   'display_name'?: string;
   'category_id'?: string;
-  'field_type'?: AnonymousSchema_5532;
+  'field_type'?: AnonymousSchema_5842;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
