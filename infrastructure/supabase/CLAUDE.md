@@ -145,6 +145,34 @@ Discovered as a BLOCKING finding in PR #70 Step 10 architect review (2026-06-02)
 
 Function-attribute `SET search_path TO 'public', 'extensions', ...` applies INSIDE the function body but **NOT during `CREATE OR REPLACE FUNCTION` parameter-type parsing**. Any migration that uses extension-typed parameters in a signature (`ltree`, `vector`, `pg_trgm`, etc.) will fail with `type "<type>" does not exist (SQLSTATE 42704)` unless the migration session's search_path includes `extensions`. Add a session-level `SET search_path = public, extensions, pg_temp;` at the top of the migration file before any such `CREATE OR REPLACE FUNCTION` statements. (Discovered in PR #67 when migration with `p_scope_path ltree` parameter failed first push.)
 
+### BEFORE `CREATE OR REPLACE FUNCTION` of a pre-existing function, fetch the deployed body
+
+Any migration that `CREATE OR REPLACE`s a pre-existing function (e.g., dispatcher, router, hook) MUST verify the new body preserves every load-bearing semantic of the deployed body. Rewriting from architectural memory silently drops invariants. Discovered as Chunk 2 codified pitfall during PR #71 (Phase 2 write-side) — first draft of the dispatcher `process_domain_event` `CREATE OR REPLACE` (to add the `var_partnership` branch) dropped:
+
+- `processed_at` idempotency guard at top
+- PII three-layer model (PR #43): MESSAGE_TEXT → `processing_error`, PG_EXCEPTION_DETAIL → `processing_error_detail` (gated read)
+- `RAISE WARNING` in `EXCEPTION WHEN OTHERS` for operator debug visibility
+- `clock_timestamp()` (NOT `now()` — `now()` is transaction-start; `clock_timestamp()` is the wall-clock reading)
+- ERRCODE `P9002` for unknown stream_type (distinct from router-internal `P9001`)
+
+**Rule**: ALWAYS fetch the deployed body via Mgmt API SQL endpoint before drafting a `CREATE OR REPLACE`. Diff against the draft. Preserve every load-bearing line not deliberately being changed.
+
+```bash
+# Fetch deployed body for diff
+curl -sS -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
+  -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"SELECT pg_get_functiondef('public.process_domain_event()'::regprocedure);\"}"
+```
+
+Or via plain psql with `SUPABASE_DB_URL`:
+
+```bash
+psql "$SUPABASE_DB_URL" -c "SELECT pg_get_functiondef('public.process_domain_event()'::regprocedure);"
+```
+
+The same applies to any handler `handle_*` you're modifying — the canonical reference file at `handlers/<domain>/<handler>.sql` is the source-of-truth post-migration but the **deployed** body is the source-of-truth pre-migration. Always diff both ways.
+
 ### `list_users*` family pattern — three-step skeleton
 
 The four `api.list_users*` RPCs share a normalized three-step skeleton (established across PR #66 and PR #67):

@@ -368,3 +368,37 @@ After Phase 0 PR merges to main:
 - `var_partnerships_projection` table + emit RPCs (Phase 2 manifest above).
 - Single-grant revoke RPC `api.revoke_access_grant` (Phase 2 manifest above).
 - Phase 3 (`list_users` + `list_invitations` A-variant refactor) + Phase 4 (35 strict-D + 1 D-variant RLS audit) handoffs already locked at Phase 0.3.
+
+## Phase 2 — Outcomes (SHIPPED 2026-06-09)
+
+**PR #71** — merged commit `6b0f86ac` 2026-06-09 (no-squash per PR #68/#70 precedent; preserved per-step + architect-fold-in progression across Stage C chunks 1-7 + Stage D + Stage E + Stage F architect fold-in + matrix completion fix + seed cards). All 3 post-merge deploys green at 19:31:06Z: `Deploy Database Migrations`, `Deploy Frontend`, `Deploy Temporal Workers`. Production state verified via Mgmt API: `var_partnerships_projection` exists; 9 new `api.*` RPCs in `pg_proc`; `process_var_partnership_event` router exists; dispatcher has `WHEN 'var_partnership'` branch.
+
+**17-step manifest** — all delivered per Phase 0.4 ADR locks. Single transactional migration `20260604210910_cross_tenant_grant_phase_2_write_side.sql` (~3,330 lines, 56 top-level statements). Phase 2 write-side surface:
+
+1. ✅ `var_partnerships_projection` (21-col schema; 4-value status CHECK; partial UNIQUE `WHERE status IN ('active','suspended')` per sub-decision G; 3 RLS SELECT + 0 write policies; 4 secondary indexes + PK).
+2. ✅ `process_var_partnership_event` router (5-arm CASE + ELSE `RAISE EXCEPTION P9001`; inline pattern per sub-decision F mirroring `process_access_grant_event`).
+3. ✅ Dispatcher branch `WHEN 'var_partnership' THEN PERFORM process_var_partnership_event(NEW)` extends baseline dispatcher; preserves PII three-layer model + idempotency guard + clock_timestamp + P9002 unknown-stream-type ERRCODE.
+4. ✅ Two `public._*` private helpers (`_validate_authorization_var_contract`, `_validate_authorization_emergency_access`) with REVOKE/GRANT ritual per sub-decision A — codified as the underscore-prefix convention in `infrastructure/supabase/CLAUDE.md`.
+5. ✅ `partnership.manage` permission seeded via `permission.defined` event + granted to `provider_admin` role template + backfilled to existing assignments (Step 7b).
+6. ✅ 9 new `api.*` RPCs all Pattern A v2: 5 VAR partnership lifecycle (`create/update/terminate/suspend/reactivate_var_partnership`), 3 access-grant lifecycle (`create_access_grant`, `revoke_access_grant`, `revoke_permission_across_grants`), 1 read (`get_grant_role_templates`).
+7. ✅ `terminate_var_partnership` cascade-revoke (sub-decision H): cascade-FIRST ordering HIPAA-load-bearing (locked with rationale in migration body at L2396-2409). Partial-failure envelope emits `audit.high_risk_action_logged`.
+8. ✅ `revoke_permission_across_grants` cross-grant policy override: platform-only authority gate (`has_platform_privilege()`); per-grant `access_grant.policy_override_applied` emission; partial-failure envelope emits `audit.high_risk_action_logged`.
+9. ✅ `audit.*` event family precedent — FIRST emitter `audit.high_risk_action_logged` on `stream_type='platform_admin'` (absorbed admin stream; no projection); 2-level form codified in `infrastructure/supabase/CLAUDE.md` event-naming addendum.
+
+**F5 HIPAA least-authority guarantee verified** (Stage E + post-deploy): `var_default` template ships exactly 4 literal `partner.*` permissions (`export_reports`, `view_analytics`, `view_billing_reports`, `view_support_tickets`), all with `phi_restricted=true` default_terms; INTERSECT at Step 8 excludes implication-chains.
+
+**Stage E smoke — 22/22 idempotent PASS** against dev (10 structural + 12 dynamic-idempotent via Mgmt API SQL endpoint). Lifecycle E2E (Batch 2) + cascade (Batch 3) deferred to post-merge UAT per provider_partner-org fixture absence on dev. Auth-hook latency p95=1.496ms exceeded ≤0.25ms target — architect-cleared as **not Phase 2-caused** (Phase 2 makes zero changes to compute_effective_permissions, the auth hook, hook-read indexes, or RLS on hook-read tables); investigation card `investigate-auth-hook-latency-regression-seed.md` opened. UAT card `phase-2-uat-var-partnership-lifecycle-seed.md` opened.
+
+**8 architect review passes** during Stage C drafting (Chunk 1 + 2 + 3 + 4 + 5 + 6 + 7) + **final-PR review verdict APPROVE WITH IN-PR FIXES** (mirrors PR #70 verdict pattern; S1+N1+N3 folded same-day; N2 deferred to UAT). One BLOCKING finding (Chunk 7 F1 = `revoke_permission_across_grants` bucket B→E correction per Phase 1 taxonomy: no JWT-tenancy binding → bucket E) folded same-day.
+
+**M3 reachability matrix totals post-Phase-2**: B 56→63 (+7 emit), C 31, D 36, D-variant 1, E 43→45 (+1 read + `revoke_permission_across_grants` per Chunk 7 F1), A 1, A-variant 1, E-variant 1; **Total 170 → 179 RPCs**; C-legacy still 0 (Phase 1 normalization preserved).
+
+**Stage F learning** (post-PR-open):
+- Hand-editing reachability matrix from CI diff was lossy — first fold-in missed `update_var_partnership` row + `last_updated:` frontmatter bump. Followup matrix-completion commit fixed both. **Forward note**: run `npm run gen:rpc-reachability-matrix` against a local container instead of hand-applying CI diffs; the codegen produces atomic + consistent output.
+
+**Carry-forwards into Phase 3/4/N + post-merge UAT**:
+- **`phase-2-uat-var-partnership-lifecycle-seed.md`** — Batch 2 lifecycle E2E (8 probes) + Batch 3 cascade (2 probes) + cross-grant policy override partial-failure (O1); folds in N2 architect finding (grantedAt drift). Requires provider_partner-org fixture seeding.
+- **`investigate-auth-hook-latency-regression-seed.md`** — separate investigation of 12× p95 regression (1.496ms vs 0.126ms Phase 1 baseline). Phase 0 reproduce → Phase 1 bisect → Phase 2 mitigate; acceptance = re-baseline OR fix to ≤0.5ms.
+- **`audit.*` event family** AsyncAPI is registered for `audit.high_risk_action_logged`; future cross-grant / cross-tenant audit events follow the 2-level form precedent.
+- Phase 3 (2-RPC `list_users` / `list_invitations` A-variant refactor) + Phase 4 (35 strict-D + 1 D-variant RLS audit) handoffs locked at Phase 0.3, unblocked by Phase 1 + 2 completion.
+- **Phase N (court/agency/family)** can follow Phase 2's pattern verbatim: type-specific projection (`court_authorizations_projection` etc.) + `<aggregate>.*` event family + emit RPCs + dispatcher CASE branch. ADR Decision C.3's "pattern transferability" note applies.
