@@ -173,6 +173,33 @@ psql "$SUPABASE_DB_URL" -c "SELECT pg_get_functiondef('public.process_domain_eve
 
 The same applies to any handler `handle_*` you're modifying — the canonical reference file at `handlers/<domain>/<handler>.sql` is the source-of-truth post-migration but the **deployed** body is the source-of-truth pre-migration. Always diff both ways.
 
+### Permission retirement: direct DELETE only under all five preconditions; event family otherwise
+
+There is no `permission.deleted` event family in `process_rbac_event` (only `permission.defined` + `permission.updated`). Future need to retire a permission row from `permissions_projection` has two valid paths:
+
+**Direct `DELETE FROM permissions_projection`** — acceptable ONLY when ALL FIVE of these hold:
+- **(a)** The permission has never been granted to any role template (`role_permission_templates` empty for it).
+- **(b)** Zero implications reference it (neither `permission_id` nor `implies_permission_id` in `permission_implications`).
+- **(c)** Zero `role_permissions_projection` rows depend on it (no current grants on role instances).
+- **(d)** All `has_permission(...)` / `has_effective_permission(...)` gate references have been refactored in the same migration to not reference the permission (i.e., the gate is moved to `has_platform_privilege()` or another retained permission).
+- **(e)** The migration commit message + inline migration comment document the audit trail and explicitly enumerate (a)-(d).
+
+Use this pattern for "registry-tier YAGNI cleanup" — permissions that were defined-but-never-wired. The migration commit IS the audit trail. Pattern is analogous to dropping an unused enum value or column.
+
+**`permission.deleted` event family** — required when ANY of (a)-(d) fails. Adding this means:
+1. New event_type `permission.deleted` in AsyncAPI contracts.
+2. New handler `handle_permission_deleted(p_event)` that:
+   - DELETEs the permission row from `permissions_projection`
+   - DELETEs all dependent `role_permissions_projection` rows (cascade cleanup)
+   - DELETEs all dependent `permission_implications` rows (cascade cleanup)
+   - Audit trail lives in `domain_events` with `event_data = {permission_id, applet, action, reason}` per Rule 10.
+3. New `WHEN 'permission.deleted'` CASE branch in `process_rbac_event` router.
+4. Optionally: a soft-delete column (`deleted_at`) on `permissions_projection` so dependent grants degrade gracefully rather than disappear.
+
+The five preconditions above are **load-bearing invariants**, not preferences. A direct DELETE that violates any of them silently strands dependent data — and unlike a row in a regular projection table, permission-registry orphaning corrupts the authz graph (a `role_permissions_projection` row pointing at a deleted permission renders `compute_effective_permissions` unable to derive the permission name; grants become invisible). Document the preconditions inline in the migration body so future readers can audit; the assertion harness should fail-loud if any of (a)-(d) becomes false mid-migration.
+
+Originating context: PR #73 Section B (2026-06-09) retired `platform.view_event_details` via direct DELETE. All five preconditions held; migration body L213-226 enumerates them inline. Codified per PR #73 architect N1 fold-in.
+
 ### `list_users*` family pattern — three-step skeleton
 
 The four `api.list_users*` RPCs share a normalized three-step skeleton (established across PR #66 and PR #67):

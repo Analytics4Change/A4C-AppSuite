@@ -260,6 +260,24 @@ BEGIN
     RAISE EXCEPTION 'Section B.2 assertion failed: @a4c-rpc-shape tag lost during COMMENT refresh (M3 regression)'
       USING ERRCODE = 'P9099';
   END IF;
+  -- B.3 — COMMENT ON COLUMN refresh verified (S2 architect fold-in 2026-06-09):
+  -- symmetric to the COMMENT ON FUNCTION assertions above. If a future copy-paste
+  -- or downstream migration accidentally re-applies the PR #43 column comment,
+  -- this assertion fails-loud rather than letting the stale prose silently re-appear
+  -- in pg_description.
+  IF col_description(
+       (SELECT oid FROM pg_class
+         WHERE relnamespace=(SELECT oid FROM pg_namespace WHERE nspname='public')
+           AND relname='domain_events'),
+       (SELECT attnum FROM pg_attribute
+         WHERE attrelid=(SELECT oid FROM pg_class
+                          WHERE relnamespace=(SELECT oid FROM pg_namespace WHERE nspname='public')
+                            AND relname='domain_events')
+           AND attname='processing_error_detail')
+     ) ~ 'platform\.view_event_details' THEN
+    RAISE EXCEPTION 'Section B.3 assertion failed: COMMENT ON COLUMN processing_error_detail still references retired permission'
+      USING ERRCODE = 'P9099';
+  END IF;
   -- Permission removed from registry
   IF EXISTS (SELECT 1 FROM public.permissions_projection
              WHERE applet='platform' AND action='view_event_details') THEN
