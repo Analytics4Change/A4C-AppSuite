@@ -24,9 +24,75 @@ Plus the architect's **N2** finding (PR #71 review): Step 8 `api.create_access_g
 
 ### Setup (one-time per environment)
 
-1. Seed a test `provider_partner` org via the standard partner-org bootstrap (or direct SQL fixture if bootstrap is too heavy for UAT — document either way).
-2. Seed a provider-admin user holding `partnership.manage` at the provider org path AND `grant.create` / `grant.revoke`.
-3. Capture both orgs + the provider-admin user UUIDs for the test harness.
+**Fixture requirements**:
+- A provider org (one already exists on dev: `2d0829ae-224b-4a79-ac3a-726b00d6c172` "TestOrg-20260329", and `43ede501-5d88-44b5-a84b-53edeec0781f` "Live for Life").
+- A `provider_partner` org (NONE exist on dev as of 2026-06-09).
+- A user with permission to call the 3 RPCs under test (`create_var_partnership`, `create_access_grant`, `revoke_access_grant`, etc.). See "Permission gate fork" below.
+
+#### Step 1 — Seed a `provider_partner` org
+
+Two equivalent paths exist (the create-path is fully supported; nobody has just exercised it on dev yet):
+
+**Path A (canonical)** — Run the existing Temporal `organization-bootstrap` workflow with `type='provider_partner'` + `partner_type='var'`. Trigger example: `workflows/src/examples/trigger-workflow.ts:34`. From a worker-connected shell:
+
+```bash
+cd workflows
+TEMPORAL_ADDRESS=localhost:7233 npx ts-node src/examples/trigger-workflow.ts
+# Edit the example or pass org args to set type='provider_partner' + partner_type='var'
+# Workflow handles DNS provisioning (if is_subdomain_required(type, partner_type) returns true),
+# auth-admin minting, and the organization.created event emission.
+```
+
+**Path B (pragmatic)** — Bypass the workflow and emit `organization.created` directly via `api.emit_domain_event` (event-sourced shortcut; the projection handler does the rest). Faster than Path A for write-side RPC UAT because we don't need DNS or auth-admin minting:
+
+```sql
+SELECT api.emit_domain_event(
+  p_stream_id   := gen_random_uuid(),
+  p_stream_type := 'organization',
+  p_event_type  := 'organization.created',
+  p_event_data  := jsonb_build_object(
+    'name',                'UAT-Partner-' || to_char(now(), 'YYYYMMDD-HH24MI'),
+    'type',                'provider_partner',
+    'partner_type',        'var',
+    'parent_id',           NULL,  -- partner orgs are tenancy-root in their own subtree
+    'created_by',          (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')::uuid
+  ),
+  p_event_metadata := jsonb_build_object(
+    'user_id',         (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')::uuid,
+    'organization_id', (current_setting('request.jwt.claims', true)::jsonb ->> 'org_id')::uuid,
+    'reason',          'Phase 2 UAT fixture seed'
+  )
+);
+```
+
+Then `SELECT id FROM organizations_projection WHERE name LIKE 'UAT-Partner-%' ORDER BY created_at DESC LIMIT 1;` to capture the partner_org_id.
+
+**Teardown for Path B**: emit `organization.deleted` for the partner_org_id at the end of UAT, or soft-delete via `api.deactivate_organization` if a non-destructive trail is preferred.
+
+#### Step 2 — Identify a calling user (permission gate fork)
+
+The 3 grant-tier RPCs and the 5 VAR-partnership RPCs are gated as:
+
+| RPC | Gate |
+|---|---|
+| `api.create_var_partnership` (+ 4 sister RPCs: update/terminate/suspend/reactivate) | `has_platform_privilege() OR has_effective_permission('partnership.manage', v_provider_path)` |
+| `api.create_access_grant` | `has_platform_privilege() OR has_effective_permission('grant.create', v_provider_path)` |
+| `api.revoke_access_grant` | `has_platform_privilege() OR has_effective_permission('grant.revoke', v_provider_path)` |
+| `api.revoke_permission_across_grants` | **platform-only** (`has_platform_privilege()`; no provider fallback) |
+
+**Sub-decision (UAT path)**: use a **platform-admin user** for the entire UAT — the `has_platform_privilege()` short-circuit covers every RPC, including the platform-only `revoke_permission_across_grants`. Dev already has the Phase 1 baseline reference user `093c0e7b-5ace-49df-9632-d49858d54ef5` (which is platform-privileged per the latency benchmark history); reuse it. No additional permission seeding required to run UAT.
+
+**Production-readiness gap discovered during this UAT planning** (NOT a UAT blocker, but a real defect): per dev probe 2026-06-09, `provider_admin` role template has only `partnership.manage` granted; **`grant.create`, `grant.revoke`, `grant.view` are NOT granted to any role**. The reachability matrix entries for these RPCs say "Provider-admin authority" but no provider_admin can actually invoke them today — only the platform-privilege fallback path works. Tracked in a separate seed card: `seed-grant-create-grant-revoke-into-provider-admin-role-seed.md`. Phase 1 (PR #70) defined the 3 grant.* permissions in `permissions_projection` but did not extend `role_permission_templates`; Phase 2 (PR #71) extended only `partnership.manage`. Decide whether to fold the role-template seed into the UAT migration prep or treat as a separate ship.
+
+#### Step 3 — Capture fixture identifiers
+
+```sql
+-- Capture for test harness
+SELECT
+  (SELECT id FROM organizations_projection WHERE type='provider' AND name='TestOrg-20260329') AS provider_org_id,
+  (SELECT id FROM organizations_projection WHERE type='provider_partner' ORDER BY created_at DESC LIMIT 1) AS partner_org_id,
+  '093c0e7b-5ace-49df-9632-d49858d54ef5'::uuid AS calling_user_id;
+```
 
 ### Batch 2 — VAR partnership + access grant lifecycle (8 probes)
 
