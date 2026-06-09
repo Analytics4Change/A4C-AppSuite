@@ -2926,6 +2926,8 @@ export type Database = {
           consultant_user_id: string | null
           created_at: string | null
           expected_resolution_date: string | null
+          expiration_type: string | null
+          expired_at: string | null
           expires_at: string | null
           granted_at: string
           granted_by: string
@@ -2935,10 +2937,11 @@ export type Database = {
           provider_org_id: string
           reactivated_at: string | null
           reactivated_by: string | null
-          reactivation_notes: string | null
+          resolution_details: string | null
+          revocation_details: string | null
+          revocation_reason: string | null
           revoked_at: string | null
           revoked_by: string | null
-          revoked_reason: string | null
           scope: string
           scope_id: string | null
           status: string | null
@@ -2956,6 +2959,8 @@ export type Database = {
           consultant_user_id?: string | null
           created_at?: string | null
           expected_resolution_date?: string | null
+          expiration_type?: string | null
+          expired_at?: string | null
           expires_at?: string | null
           granted_at: string
           granted_by: string
@@ -2965,10 +2970,11 @@ export type Database = {
           provider_org_id: string
           reactivated_at?: string | null
           reactivated_by?: string | null
-          reactivation_notes?: string | null
+          resolution_details?: string | null
+          revocation_details?: string | null
+          revocation_reason?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
-          revoked_reason?: string | null
           scope: string
           scope_id?: string | null
           status?: string | null
@@ -2986,6 +2992,8 @@ export type Database = {
           consultant_user_id?: string | null
           created_at?: string | null
           expected_resolution_date?: string | null
+          expiration_type?: string | null
+          expired_at?: string | null
           expires_at?: string | null
           granted_at?: string
           granted_by?: string
@@ -2995,10 +3003,11 @@ export type Database = {
           provider_org_id?: string
           reactivated_at?: string | null
           reactivated_by?: string | null
-          reactivation_notes?: string | null
+          resolution_details?: string | null
+          revocation_details?: string | null
+          revocation_reason?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
-          revoked_reason?: string | null
           scope?: string
           scope_id?: string | null
           status?: string | null
