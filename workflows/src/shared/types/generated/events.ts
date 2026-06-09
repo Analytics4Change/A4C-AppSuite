@@ -10,7 +10,7 @@
  * 2. cd infrastructure/supabase/contracts && npm run generate:types
  * 3. cd workflows && npm run sync-schemas
  *
- * Last synced: 2026-06-09T16:06:25.775Z
+ * Last synced: 2026-06-09T19:04:00.578Z
  */
 
 // =============================================================================

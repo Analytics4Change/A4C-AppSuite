@@ -100,14 +100,17 @@ components:
           items:
             type: string
             format: uuid
-          description: Grant events successfully emitted before the failure
+          description: Grant events successfully emitted before the failure.
+            ONLY emitted by revoke_permission_across_grants
+            (action=revoke_permission_across_grants_partial_failure).
         cascade_event_ids:
           type: array
           items:
             type: string
             format: uuid
-          description: Cascade-revoke grant events emitted before the failure
-            (terminate_var_partnership variant)
+          description: Cascade-revoke grant events emitted before the failure.
+            ONLY emitted by terminate_var_partnership
+            (action=terminate_var_partnership_partial_failure).
         failure_index:
           type: integer
           description: Zero-based loop index at which the failure occurred

@@ -2318,14 +2318,21 @@ BEGIN
         v_event_data := v_event_data || jsonb_build_object('terms', p_terms);
     END IF;
 
-    -- Reject empty-update (no mutable fields supplied)
+    -- Reject empty-update (no mutable fields supplied).
+    -- N1 architect fold-in 2026-06-09: surface the PATCH NULL-clear
+    -- limitation in the envelope message so frontend devs trying to
+    -- clear a nullable field (e.g., reset contract_end_date to NULL to
+    -- convert a fixed-term contract to open-ended) get a hint that PATCH
+    -- is by-design unable to do this — terminate + recreate is the
+    -- workflow for that case. Underlying limitation is documented in
+    -- observations.md (Chunk 6 S1 carry-forward).
     IF v_event_data = '{}'::jsonb THEN
         RETURN jsonb_build_object(
             'success', false,
             'error',   'EMPTY_UPDATE',
             'errorDetails', jsonb_build_object(
                 'code',    'EMPTY_UPDATE',
-                'message', 'no mutable fields provided'
+                'message', 'no mutable fields provided (note: PATCH cannot clear fields to NULL — use terminate + recreate for that workflow)'
             )
         );
     END IF;

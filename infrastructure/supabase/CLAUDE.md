@@ -202,7 +202,7 @@ GRANT EXECUTE ON FUNCTION public._validate_authorization_var_contract(...) TO se
 
 **Why**: PostgreSQL `CREATE FUNCTION` defaults to `GRANT EXECUTE TO PUBLIC`. Without the REVOKE+GRANT ritual, every authenticated user (and `anon`) can invoke a helper that may bypass intended `api.*` gates. The underscore-prefix marker (a) signals "internal — call from `api.*` only" to future readers, and (b) makes the audit grep trivial (`grep -nE 'public\._[a-z]+\(' migrations/*.sql`).
 
-**Scope of the convention**: Phase 2 introduced six `public._*` helpers (`_validate_authorization_*`, `_check_*` family, `safe_jsonb_extract_numeric`). The `safe_jsonb_extract_*` helpers predate the convention and remain unprefixed (broad use across handlers); going forward, new internal helpers carry the underscore prefix. Codegens that filter the RPC registry exclude `public._*` from the M3 shape-comment audit (see `gen-rpc-registry.cjs` SQL filter) — these are NOT `api.*` RPCs and have no shape contract.
+**Scope of the convention**: Phase 2 introduced two `public._*` helpers — `_validate_authorization_var_contract` and `_validate_authorization_emergency_access` — per ADR Decision C.1 dispatcher pattern. The `safe_jsonb_extract_*` family predates the convention and remains unprefixed (broad use across handlers); going forward, new internal helpers carry the underscore prefix. Codegens that filter the RPC registry exclude `public._*` from the M3 shape-comment audit (see `gen-rpc-registry.cjs` SQL filter) — these are NOT `api.*` RPCs and have no shape contract.
 
 **Audit query** for future migrations adding `public._*` helpers:
 ```bash

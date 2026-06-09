@@ -87,9 +87,12 @@
 
 ## Stage F — PR + ship
 
-- [ ] Pre-PR-open ritual: paste smoke evidence into card (log lines from dev)
-- [ ] Open PR; CI gates: `Deploy Database Migrations` validate, `RPC Shape Registry Sync`, `RPC Reachability Matrix Sync`
-- [ ] Architect-review the PR (`software-architect-dbc`); address in-PR fixes per `memory/feedback-no-deferral-to-cards.md`
+- [x] Pre-PR-open ritual: smoke evidence pasted into PR body
+- [x] PR #71 opened 2026-06-09: https://github.com/Analytics4Change/A4C-AppSuite/pull/71
+- [x] CI gates first push: ✅ Contract Validation, ✅ Temporal Build, ❌ RPC Shape Registry Sync (expected — deferred from Stage E), ❌ RPC Reachability Matrix Sync (expected — deferred from Stage E), ⏳ Validate PL/pgSQL Functions
+- [x] **Architect full-PR review 2026-06-09** — **APPROVE WITH IN-PR FIXES** (mirrors PR #70 verdict pattern). S1 (CLAUDE.md addendum mis-counts `public._*` helpers — 6 claimed, 2 actual; remove false `_check_*` family reference) + N1 (Step 12 `EMPTY_UPDATE` message surfaces PATCH NULL-clear limitation) + N3 (`audit.yaml` `cascade_event_ids` description binds explicitly to terminate_var_partnership variant for consistency with applied_event_ids) folded same-day. N2 (Step 8 `grantedAt: v_now` vs handler `created_at` drift) deferred to UAT verification — no in-PR change. Auth-hook latency direction: **investigate separately, don't block** (Phase 2 makes zero changes to compute_effective_permissions, the auth hook, users/cross_tenant_access_grants_projection, RLS on any pre-Phase-2 projections, or hook-read indexes; most likely pre-existing project-side regression between 2026-06-03 and 2026-06-09).
+- [x] **Architect-fold-in commit** including CI regen artifacts: rpc-registry.generated.ts (+9 RPCs), reachability matrix doc (+9 rows, B 56→63, E 43→45, Total 170→179)
+- [ ] CI green after fold-in push
 - [ ] Merge no-squash per PR #68/#70 precedent (preserve per-step + architect-fold-in progression)
 - [ ] Post-merge: 3 deploy gates green (Database Migrations, Frontend, Temporal Workers); no production alerts on auth-hook latency
 - [ ] Prod state verification via Mgmt API: `var_partnerships_projection` exists; 9 new api.* RPCs in pg_proc; process_var_partnership_event exists; dispatcher branch present

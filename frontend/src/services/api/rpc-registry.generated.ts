@@ -24,6 +24,7 @@ export type EnvelopeRpcs =
   | 'assign_user_to_schedule'
   | 'batch_update_field_definitions'
   | 'change_client_placement'
+  | 'create_access_grant'
   | 'create_field_category'
   | 'create_field_definition'
   | 'create_organization_address'
@@ -32,6 +33,7 @@ export type EnvelopeRpcs =
   | 'create_organization_unit'
   | 'create_role'
   | 'create_schedule_template'
+  | 'create_var_partnership'
   | 'deactivate_field_category'
   | 'deactivate_field_definition'
   | 'deactivate_organization'
@@ -68,6 +70,7 @@ export type EnvelopeRpcs =
   | 'reactivate_organization_unit'
   | 'reactivate_role'
   | 'reactivate_schedule_template'
+  | 'reactivate_var_partnership'
   | 'register_client'
   | 'remove_client_address'
   | 'remove_client_email'
@@ -77,7 +80,11 @@ export type EnvelopeRpcs =
   | 'remove_user_phone'
   | 'retry_deletion_workflow'
   | 'retry_failed_event'
+  | 'revoke_access_grant'
   | 'revoke_invitation'
+  | 'revoke_permission_across_grants'
+  | 'suspend_var_partnership'
+  | 'terminate_var_partnership'
   | 'unassign_client_contact'
   | 'unassign_client_from_user'
   | 'unassign_user_from_schedule'
@@ -100,7 +107,8 @@ export type EnvelopeRpcs =
   | 'update_schedule_template'
   | 'update_user'
   | 'update_user_notification_preferences'
-  | 'update_user_phone';
+  | 'update_user_phone'
+  | 'update_var_partnership';
 
 export type ReadRpcs =
   | 'bulk_assign_role'
@@ -127,6 +135,7 @@ export type ReadRpcs =
   | 'get_events_by_correlation'
   | 'get_events_by_session'
   | 'get_failed_events'
+  | 'get_grant_role_templates'
   | 'get_invitation_by_id'
   | 'get_invitation_by_org_and_email'
   | 'get_invitation_by_token'
