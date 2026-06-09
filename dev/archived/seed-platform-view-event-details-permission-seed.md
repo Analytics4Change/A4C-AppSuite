@@ -1,5 +1,14 @@
 # Seed `platform.view_event_details` permission into `platform_admin` role
 
+> **Status (2026-06-09)**: ARCHIVED — superseded by PR #73 architectural consolidation
+> (migration `20260609212115_seed_grant_perms_into_provider_admin_and_fix_failed_events_detail_gate.sql`
+> Section B). The granular `platform.view_event_details` permission was retired as YAGNI;
+> the `api.get_failed_events_with_detail` gate consolidated to `has_platform_privilege()`
+> uniformly to match sibling platform-tier RPCs. The "two options" (A: seed to template,
+> B: implication chain) enumerated below are no longer reachable — preserved for historical
+> context only. See [[pr-73-close-out]] (when written) + PR #73 architect review for the
+> rationale on retiring vs seeding.
+
 **Status**: seed (not yet planned)
 **Priority**: Medium (test-plan blocker; gates the failed-event detail dashboard for platform admins)
 **Origin**: PR #48 architect-review Note #3 (software-architect-dbc, 2026-05-06)

@@ -160,7 +160,7 @@ HTTP status: always 200 OK. The PostgREST response shape is `{success, ...}`; co
 
 **Three-layer model**:
 
-1. **Persistence layer** — `process_domain_event()` trigger now writes `processing_error = MESSAGE_TEXT` only; raw `PG_EXCEPTION_DETAIL` is preserved in NEW column `processing_error_detail` accessible only via a permission-gated RPC (`api.get_failed_events_with_detail()` gated on `platform.view_event_details`). Forensic parity with pre-migration behavior preserved; no operator-debug regression. `RAISE WARNING` in PG logs unchanged.
+1. **Persistence layer** — `process_domain_event()` trigger now writes `processing_error = MESSAGE_TEXT` only; raw `PG_EXCEPTION_DETAIL` is preserved in NEW column `processing_error_detail` accessible via a permission-gated RPC (`api.get_failed_events_with_detail()` — platform-admin gated via `has_platform_privilege()` per 2026-06-09 consolidation; the original PR #43 design used a granular `platform.view_event_details` permission but that permission was retired as YAGNI in favor of uniform platform-tier gating consistent with `revoke_permission_across_grants` / `get_orphaned_deletions` / `retry_deletion_workflow`). Forensic parity with pre-migration behavior preserved; no operator-debug regression. `RAISE WARNING` in PG logs unchanged.
 
 2. **SDK boundary (frontend)** — `frontend/src/services/api/envelope.ts` provides `unwrapApiEnvelope<T>(rpcResult): ApiEnvelope<T>` as the only sanctioned way to read `error` off an `api.*` envelope. Helper applies `frontend/src/utils/maskPii.ts` exactly once. `supabaseService.apiRpcEnvelope<T>()` is the typed entry point. `apiRpc<T>` is also augmented to mask `PostgrestError.{message, details, hint}` for read-shape RPCs.
 

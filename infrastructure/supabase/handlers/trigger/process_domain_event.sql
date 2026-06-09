@@ -56,7 +56,7 @@ BEGIN
             -- RAISE WARNING preserves operator-debug visibility in PG logs.
             RAISE WARNING 'Event processing error for event %: % - %', NEW.id, v_error_msg, COALESCE(v_error_detail, '');
             -- Persisted columns: MESSAGE_TEXT visible to platform.admin via api.get_failed_events;
-            -- PG_EXCEPTION_DETAIL gated behind platform.view_event_details via api.get_failed_events_with_detail.
+            -- PG_EXCEPTION_DETAIL accessible via api.get_failed_events_with_detail (platform-admin gated via has_platform_privilege()).
             NEW.processing_error = v_error_msg;
             NEW.processing_error_detail = v_error_detail;
     END;
