@@ -43,26 +43,40 @@ TEMPORAL_ADDRESS=localhost:7233 npx ts-node src/examples/trigger-workflow.ts
 # auth-admin minting, and the organization.created event emission.
 ```
 
-**Path B (pragmatic)** — Bypass the workflow and emit `organization.created` directly via `api.emit_domain_event` (event-sourced shortcut; the projection handler does the rest). Faster than Path A for write-side RPC UAT because we don't need DNS or auth-admin minting:
+**Path B (pragmatic)** — Bypass the workflow and emit `organization.created` directly via `api.emit_domain_event` (event-sourced shortcut; the projection handler does the rest). Faster than Path A for write-side RPC UAT because we don't need DNS or auth-admin minting. **Path B caveats** (S3 architect fold-in 2026-06-09):
+
+1. **`event_data` MUST include `slug` + `path` + `parent_path`** — `handle_organization_created` reads these fields and the projection columns may have NOT NULL constraints / UNIQUE indexes (`slug` in particular). Defaulting to the stream_id-as-string for `path`/`parent_path` is sane for a tenancy-root partner org.
+2. **Path B bypasses Temporal workflow auth-admin minting** — no `organization_admin` user is created for the seeded partner org. Acceptable for Phase 2's UAT scope (provider-admin-initiated grant ops AGAINST the partner_org, where the calling user lives at the provider org side, not the partner). NOT acceptable if a future UAT probe needs a user-as-tenant test against the partner org (e.g., consultant-callability probe at the partner subtree); use Path A for that.
 
 ```sql
+WITH partner AS (
+  SELECT
+    gen_random_uuid() AS stream_id,
+    'UAT-Partner-' || to_char(now(), 'YYYYMMDD-HH24MI') AS partner_name,
+    lower(replace('uat-partner-' || to_char(now(), 'YYYYMMDD-HH24MI'), ' ', '-')) AS partner_slug
+)
 SELECT api.emit_domain_event(
-  p_stream_id   := gen_random_uuid(),
+  p_stream_id   := partner.stream_id,
   p_stream_type := 'organization',
   p_event_type  := 'organization.created',
   p_event_data  := jsonb_build_object(
-    'name',                'UAT-Partner-' || to_char(now(), 'YYYYMMDD-HH24MI'),
+    'name',                partner.partner_name,
+    'slug',                partner.partner_slug,                   -- S3 fold-in: required by handler
     'type',                'provider_partner',
     'partner_type',        'var',
-    'parent_id',           NULL,  -- partner orgs are tenancy-root in their own subtree
+    'path',                partner.stream_id::text,                -- S3 fold-in: tenancy-root partner; path = stream_id
+    'parent_path',         partner.stream_id::text,                -- S3 fold-in: ditto (self-parent for tenancy-root)
+    'parent_id',           NULL,                                   -- partner orgs are tenancy-root in their own subtree
+    'subdomain_status',    'skipped',                              -- Path B doesn't provision DNS
     'created_by',          (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')::uuid
   ),
   p_event_metadata := jsonb_build_object(
     'user_id',         (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')::uuid,
     'organization_id', (current_setting('request.jwt.claims', true)::jsonb ->> 'org_id')::uuid,
-    'reason',          'Phase 2 UAT fixture seed'
+    'reason',          'Phase 2 UAT fixture seed (Path B — direct emit; no DNS / no auth-admin minting)'
   )
-);
+)
+FROM partner;
 ```
 
 Then `SELECT id FROM organizations_projection WHERE name LIKE 'UAT-Partner-%' ORDER BY created_at DESC LIMIT 1;` to capture the partner_org_id.

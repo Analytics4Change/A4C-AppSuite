@@ -36,7 +36,45 @@ The descriptions are aspirational; the runtime gate-effect today is "platform-pr
 
 1. **Production-functional gap**: provider admins are the role the architecture says SHOULD manage their cross-tenant grants. Today they CAN'T. Platform admins can but that's not the long-term design.
 2. **UAT blast radius**: any UAT that wants to verify the "real" provider-admin user-journey path (vs the platform-privilege fallback) is forced to manually grant the permissions to a test user first. Adds friction; makes the test non-repeatable across environments without cleanup.
-3. **Architect-cohesion-review miss**: the PR #71 final-PR architect review verified that `partnership.manage` was seeded (Step 7b) but did not flag the missing parallel seed for the 3 `grant.*` permissions. The cohesion review checklist should grow a probe like: "every RPC whose gate is `has_effective_permission('<perm>', ...)` has `<perm>` granted in at least one role template via a `permission.granted_to_role` (or equivalent) audit-trail event."
+3. **Architect-cohesion-review miss**: the PR #71 final-PR architect review verified that `partnership.manage` was seeded (Step 7b) but did not flag the missing parallel seed for the 3 `grant.*` permissions. The cohesion review checklist should grow the following probe (S2 architect fold-in 2026-06-09 — strengthened from the original draft to cover three structural edge cases):
+
+   > **Permission-gate-vs-role-template cohesion probe (cross-aggregate authz invariant)**
+   >
+   > For every `api.*` RPC whose body references a permission via `has_effective_permission('<perm>', <scope_path>)` **OR `has_permission('<perm>')`**, that `<perm>` MUST be granted in at least one row of `role_permission_templates` (or, equivalently, have an active `permission_implications` chain leading from another role-granted permission).
+   >
+   > **Carve-outs**:
+   >
+   > 1. **Intentionally platform-only RPCs** — if the gate is `has_platform_privilege()` with NO `OR has_effective_permission/has_permission` clause (e.g., `api.revoke_permission_across_grants`), the RPC is platform-admin-only by design and should NOT have a corresponding role-template entry. The probe MUST recognize this shape and skip those RPCs.
+   >
+   > 2. **`scope_type` catalog ⇄ runtime gate divergence** — if the permission's `permissions_projection.scope_type` is `'global'` but the gating RPC uses the scope-typed form `has_effective_permission(perm, <ltree_path>)`, this is a catalog/runtime divergence (works today because `compute_effective_permissions` derives scope from `user_roles_projection.scope_path`, but the conceptual mismatch is real). Either reclassify the catalog `scope_type` to `org`/`org_unit`, or document the structural rationale for why a global-typed permission is being scope-checked at runtime. The Phase 1 `grant.*` permissions match this divergent shape and warrant the explicit documentation (the gate's scope-typed check enforces tenancy at the provider org path even though the permission is catalog-global).
+   >
+   > **Audit query** (parametric for future architect-cohesion reviews):
+   >
+   > ```sql
+   > WITH gate_refs AS (
+   >   -- regex-extract has_effective_permission('<perm>', ...) AND has_permission('<perm>') from api.* bodies
+   >   SELECT p.proname AS rpc,
+   >          (regexp_matches(pg_get_functiondef(p.oid),
+   >                          'has_(?:effective_)?permission\s*\(\s*''([^'']+)''', 'g'))[1] AS perm,
+   >          CASE WHEN pg_get_functiondef(p.oid) ~ 'has_effective_permission\s*\(\s*''([^'']+)'''
+   >               THEN 'has_effective_permission' ELSE 'has_permission' END AS gate_kind
+   >   FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
+   >   WHERE n.nspname='api'
+   > ),
+   > platform_only AS (
+   >   SELECT p.proname AS rpc FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
+   >   WHERE n.nspname='api'
+   >     AND pg_get_functiondef(p.oid) ~ 'has_platform_privilege\s*\(\)'
+   >     AND pg_get_functiondef(p.oid) !~ 'OR\s+has_(?:effective_)?permission'
+   > )
+   > SELECT g.rpc, g.perm, g.gate_kind, pp.scope_type AS catalog_scope_type
+   > FROM gate_refs g
+   > LEFT JOIN public.permissions_projection pp ON pp.name = g.perm
+   > WHERE NOT EXISTS (SELECT 1 FROM public.role_permission_templates rpt
+   >                   WHERE rpt.is_active=true AND rpt.permission_name = g.perm)
+   >   AND NOT EXISTS (SELECT 1 FROM platform_only po WHERE po.rpc = g.rpc);
+   > -- Every result row is a candidate defect (gate-perm in zero templates AND RPC isn't platform-only).
+   > ```
 4. **Phase 0.4 Decision C.1 cross-check**: the ADR locks "provider-admin authority" for grant emit — but the implementation is half-done. The ADR doesn't directly speak to role-template seeding, so this is an ADR ⇄ implementation cohesion gap.
 
 ## Options
@@ -70,11 +108,33 @@ Create a new `grant_admin` role that exists alongside `provider_admin`, with `gr
 
 ## Steps (Option A)
 
-1. **Create migration**: `supabase migration new seed_grant_perms_into_provider_admin_role`. Migration body:
-   - `INSERT INTO public.role_permission_templates (role_name, permission_name, is_active) VALUES ('provider_admin', 'grant.create', true), ('provider_admin', 'grant.revoke', true), ('provider_admin', 'grant.view', true) ON CONFLICT (role_name, permission_name) DO NOTHING;` (idempotent).
-   - Backfill DO block: for each existing `provider_admin` role instance (`SELECT id FROM roles_projection WHERE name='provider_admin'`), emit 3 `role.permission.granted` events via `api.emit_domain_event` with `event_data = {role_id, permission_name, granted_at}` + `event_metadata = {user_id: '00...00', reason: 'Backfill: seed grant.* into provider_admin (Phase 2 PR #71 follow-up)'}`. Handler at `handle_rbac_role_permission_granted` projects to `role_permissions_projection` idempotently (codified pitfall #4 `IF NOT EXISTS` precondition).
-2. **Stage E probe**: re-run the 2026-06-09 probe — expect provider_admin template with 4 permissions (`grant.create, grant.revoke, grant.view, partnership.manage`) and role_permissions_projection with 8 rows across 2 existing provider_admin instances (4 perms × 2 instances).
+1. **Create migration**: `supabase migration new seed_grant_perms_into_provider_admin_role`. Migration body mirrors PR #71 Step 7b precedent **verbatim** (S1 architect fold-in 2026-06-09 — the prior draft incorrectly proposed event-emit backfill; precedent uses direct INSERT). Step 7b reference: migration `20260604210910...sql:879-894`.
+
+   ```sql
+   -- 1a — Extend the template (idempotent)
+   INSERT INTO public.role_permission_templates (role_name, permission_name, is_active)
+   VALUES
+     ('provider_admin', 'grant.create', true),
+     ('provider_admin', 'grant.revoke', true),
+     ('provider_admin', 'grant.view',   true)
+   ON CONFLICT (role_name, permission_name) DO NOTHING;
+
+   -- 1b — Backfill: direct INSERT into role_permissions_projection (NOT event-emit).
+   -- Mirrors PR #71 Step 7b L879-894 precedent. Audit trail is the migration commit
+   -- itself; events are the wrong layer for this kind of bulk-template-extension.
+   INSERT INTO public.role_permissions_projection (role_id, permission_id, granted_at)
+   SELECT rp.id AS role_id, pp.id AS permission_id, now() AS granted_at
+   FROM public.roles_projection rp
+   CROSS JOIN public.permissions_projection pp
+   WHERE rp.name = 'provider_admin' AND rp.deleted_at IS NULL
+     AND pp.applet = 'grant' AND pp.action IN ('create', 'revoke', 'view')
+   ON CONFLICT (role_id, permission_id) DO NOTHING;
+   ```
+
+2. **Stage E probe** (parametric per N2 fold-in 2026-06-09): assert `expected_rows = (perm_count_in_template × provider_admin_instance_count)`. Snapshot of dev 2026-06-09: 2 provider_admin instances pre-migration with 2 rows (`partnership.manage` × 2); Option A adds 6 new rows (3 perms × 2 instances); total post-migration 8 rows. Production may have different instance counts — write the probe as the parametric assertion above, not the snapshot count. Idempotency: re-running the migration produces zero new rows.
+
 3. **UAT validation**: re-run Phase 2 UAT lifecycle E2E using a provider_admin user (NOT a platform-admin) to prove the "intended authority" path works end-to-end.
+
 4. **Reachability matrix update**: the matrix entries don't change (bucket B + "Provider-admin authority"), but the implementation now matches the description.
 
 ## Out of scope
@@ -82,6 +142,7 @@ Create a new `grant_admin` role that exists alongside `provider_admin`, with `gr
 - Phase 3/4/N rollout work (parent card `cross-tenant-access-grant-rollout/`).
 - Frontend integration UI for grant management (separate concern; the RPCs work — the gate just needs the permission).
 - Seeding `grant.*` for other role templates (e.g., `super_admin` already has `has_platform_privilege()` so the OR fallback covers them).
+- **Sibling defect with the same shape** (N1 architect fold-in 2026-06-09): `api.get_failed_events_with_detail` (PR #43-era) gates on `has_permission('platform.view_event_details')`. That permission exists in `permissions_projection` (`scope_type='global'`) but is in zero role templates, AND the gate has no `has_platform_privilege()` fallback — so the RPC is currently **uncallable by any caller, including platform admins**. Likely intended grant: `platform_admin` or `super_admin` role template. **Defer to a parallel seed card** (`seed-platform-view-event-details-into-platform-admin-role-seed.md` or similar — see `dev/active/seed-platform-view-event-details-permission-seed.md` for prior seeding work that landed the permission but not the role-template extension). Not folded here because this card's scope is `grant.*` × `provider_admin`; the sibling defect's role-template target is a different role.
 
 ## Files involved
 
