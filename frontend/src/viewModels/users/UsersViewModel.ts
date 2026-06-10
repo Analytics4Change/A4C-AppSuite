@@ -1610,13 +1610,6 @@ export class UsersViewModel {
           runInAction(() => {
             this.userPhones = [...this.userPhones, result.phone!];
           });
-        } else {
-          log.warn(
-            'addUserPhone success without phone read-back — falling back to refetch. ' +
-              'Migration 20260423232531 may not be deployed to this environment.',
-            { userId: request.userId, phoneId: result.phoneId }
-          );
-          await this.loadUserPhones(request.userId);
         }
       }
 
@@ -1675,15 +1668,6 @@ export class UsersViewModel {
             const updated = result.phone!;
             this.userPhones = this.userPhones.map((p) => (p.id === updated.id ? updated : p));
           });
-        } else {
-          log.warn(
-            'updateUserPhone success without phone read-back — falling back to refetch. ' +
-              'Backend RPC may be pre-Pattern-A-v2 or on a failed migration.',
-            { phoneId: request.phoneId }
-          );
-          if (this.selectedItemId) {
-            await this.loadUserPhones(this.selectedItemId);
-          }
         }
       }
 
@@ -1862,18 +1846,6 @@ export class UsersViewModel {
               updatedAt: new Date(),
             };
           });
-        } else {
-          log.warn(
-            'updateNotificationPreferences success without notificationPreferences — ' +
-              'v11 envelope MUST include the field on success. Falling back to refetch. ' +
-              'Edge Function may have regressed OR pre-v11 envelope still in rollout.',
-            {
-              userId: request.userId,
-              orgId: request.orgId,
-              contractViolation: true,
-            }
-          );
-          await this.loadUserOrgAccess(request.userId, request.orgId);
         }
       }
 
