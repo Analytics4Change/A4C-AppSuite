@@ -307,8 +307,8 @@ predated the 2026-05-06 git-crypt removal (`42533ce2`) and could not be checked 
 
 | Signal | Re-baseline plan | Status |
 |---|---|---|
-| **1** — frontend `contractViolation: true` | Re-run the aggregator query (see checklist §1) over the new window. Expected 0. | ☐ needs human (Sentry/Datadog) |
-| **2** — frontend fallback `log.warn` (3 sites) | Re-run (checklist §2) over the new window. Expected 0. | ☐ needs human (Sentry/Datadog) |
+| **1** — frontend `contractViolation: true` | **Un-queryable** — no log aggregator exists (see Contract audit). Re-dispositioned: proven unreachable by construction. | ✅ dispositioned by construction |
+| **2** — frontend fallback `log.warn` (3 sites) | **Un-queryable** — same. Re-dispositioned: proven unreachable by construction. | ✅ dispositioned by construction |
 | **3** — EF `handlerInvariantViolated: true` | **Dispositioned by code-absence**: `update_notification_preferences` was extracted from the Edge Function to SQL RPC `api.update_user_notification_preferences` (PR #33, migration `20260424194102`); the tag is no longer emitted by the current EF. No log retrieval needed. Backend cross-check below subsumes it. | ✅ N/A (extracted) |
 | **4** — `domain_events.processing_error` | **Re-run across the FULL 2026-04-24 → 2026-06-10 span** (append-only table, persistent). | ✅ effective-zero |
 
@@ -326,9 +326,36 @@ This gives continuous 6-week backend coverage showing the envelope-completeness 
 — a stronger result than the original 1-week window. Path B (substantive effective-zero) holds across
 the full span.
 
+### Contract audit — 2026-06-10 (Signals 1 & 2 re-dispositioned)
+
+Signals 1 & 2 were specified as "query Sentry/Datadog for the fallback `log.warn` / `contractViolation`
+tag." **That telemetry was never collected and cannot be queried:**
+
+- No Sentry/Datadog/LogRocket SDK in `frontend/package.json`.
+- `Logger.writeToRemote()` (`src/utils/logger.ts:399`) is an unimplemented `// TODO` (DEV→console, **PROD→no-op**).
+- Production logging is `output: 'console'` at `warn` level — the fallback `log.warn` only ever reached the
+  end-user's browser console, collected nowhere.
+
+So the original gate rested on infrastructure that does not exist. The signals were re-dispositioned by
+**proving the fallback `else`-branch is unreachable**. The branch fires only when
+`result.success === true && result.<entity> === undefined`. That combination cannot be produced:
+
+| Layer | Guarantee |
+|---|---|
+| Backend RPC (`add_user_phone`, `update_user_phone`, `update_user_notification_preferences`) | Pattern A v2 read-back-or-fail: the only path to `success:true` is past `IF v_phone IS NULL` / `IF NOT FOUND THEN RETURN {success:false}`. Entity always present + non-null on success. (Deployed bodies verified via `pg_get_functiondef`, 2026-06-10.) |
+| Service (`SupabaseUserCommandService`) | Faithful pass-through: `result.<entity>` is `undefined` **iff** the RPC envelope omits it — impossible on success per the row above. |
+| Tests | `src/services/users/__tests__/UserRpcContract.test.ts` parses the deployed migration SQL and asserts the success-envelope keys **and** the `IF v_phone IS NULL` read-back guard (regression-locked). |
+
+The only code path that yields success-without-entity is `MockUserCommandService` (`updateUserPhone`
+returns `phone: updated ?? undefined`) — **dev/mock-auth only, never production**. This is exactly the
+benign case the fallback over-guarded; removing it does not affect any reachable production path.
+
 ### Merge condition (re-baselined)
 
-Merge when **Signals 1 & 2 return zero (or substantively-zero per the disposition rule) over the
-new 7-day window**. Signal 3 is dispositioned by code-absence; Signal 4 is effective-zero with
-continuous 6-week coverage. The Path A (strict) / Path B (substantive) disposition rule above is
-unchanged. If Signals 1/2 surface target-class hits, follow the "target-class hits" procedure above.
+All four signals are now closed without needing the (non-existent) aggregator:
+**Signals 1 & 2** — dispositioned by construction (fallback unreachable; contract audit above);
+**Signal 3** — N/A (extracted to SQL RPC, PR #33);
+**Signal 4** — effective-zero across continuous 6-week backend coverage.
+The removal is safe to merge. (Optional belt-and-suspenders: a manual happy-path run of the three
+operations in a live session, confirming each succeeds with the entity reflected and no console
+`falling back to refetch` warning.)
