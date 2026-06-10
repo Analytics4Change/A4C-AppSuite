@@ -200,6 +200,37 @@ The five preconditions above are **load-bearing invariants**, not preferences. A
 
 Originating context: PR #73 Section B (2026-06-09) retired `platform.view_event_details` via direct DELETE. All five preconditions held; migration body L213-226 enumerates them inline. Codified per PR #73 architect N1 fold-in.
 
+### Handler-vs-schema column-name drift: parametric existence assertion at handler-deploy
+
+When a handler `INSERT`s or `UPDATE`s columns on a projection table, those column names are not validated at function-creation time — PL/pgSQL late-binds column references. A handler that writes to a column that doesn't exist on the projection will deploy successfully and only fail at event-process time, where it surfaces as a `processing_error` on `domain_events` (a Pattern A v2 envelope returns `PROCESSING_FAILED` to the caller, but the failure happens AFTER the audit row is durable).
+
+**Forensic example**: 3 of 5 arms of `process_access_grant_event` wrote to columns that did not exist on `cross_tenant_access_grants_projection` from baseline_v4 ship date (2026-02-12) until detection by Phase 2 UAT probe L8 (2026-06-09). Latent for ~4 months because the only path that emitted `access_grant.revoked` at scale was Phase 2's cascade-revoke.
+
+**Defense-in-depth**: any migration that ships or refreshes a handler with new column writes MUST add a fail-loud assertion block at the bottom that enumerates the columns the handler writes and verifies their existence on the target projection:
+
+```sql
+DO $$
+DECLARE
+  v_handler_writes_columns text[] := ARRAY['col_a', 'col_b', '...'];
+  v_col text;
+  v_missing text[] := '{}';
+BEGIN
+  FOREACH v_col IN ARRAY v_handler_writes_columns LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='<proj>' AND column_name=v_col
+    ) THEN v_missing := array_append(v_missing, v_col); END IF;
+  END LOOP;
+  IF array_length(v_missing, 1) > 0 THEN
+    RAISE EXCEPTION 'Handler writes to non-existent columns: %', v_missing USING ERRCODE='P9099';
+  END IF;
+END $$;
+```
+
+This complements (does NOT replace) the existing `plpgsql_check` CI step, which validates handler bodies at deploy-time. `plpgsql_check` catches *static* column references; `EXECUTE`-driven or dynamic-SQL handlers and column references inside `safe_jsonb_extract_*` wrappers are NOT caught by it. The parametric assertion is the catch-all.
+
+Originating context: PR #74 (2026-06-09) hotfix aligned `cross_tenant_access_grants_projection` to the deployed `process_access_grant_event` handler. Migration body Section 2.1 contains the canonical 5-arm enumeration pattern. Codified per PR #74 architect S1 fold-in.
+
 ### `list_users*` family pattern — three-step skeleton
 
 The four `api.list_users*` RPCs share a normalized three-step skeleton (established across PR #66 and PR #67):
