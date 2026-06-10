@@ -299,6 +299,24 @@ curl -sS -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/d
 
 `api.create_access_grant` requires `grant_role_template_name` even for `emergency_access`. Only template seeded is `(var_default, var_contract)`. Architectural intent (per L1062 gate + CHECK constraint allowing `authorization_reference IS NULL`) was for emergency to bypass template/reference. Two fixes possible: (a) optional template when `authorization_type='emergency_access'`, OR (b) seed an `emergency_default` template. Decision in follow-up seed card: `seed-grant-role-templates-emergency-default.md` (to be written next).
 
-### Stage open
+## Stage E2 re-run — 2026-06-10 (post-PR-#74 merge)
 
-UAT is **not yet complete** — Batch 3 cascade happy-path (C1 re-probe) + L8 re-probe were validated against the PR #74 hotfix fixtures in isolation but the full Phase 2 UAT re-execution against the post-PR-#74 dev state remains as a follow-up. Recommended next: a Stage E2 re-run after PR #74 merges to verify all probes pass end-to-end without the schema-defect interference.
+PR #74 merged to `main` 2026-06-10 (no-squash `502ccff7`; DB-migrations deploy green). Stage E2 re-executed against dev (`tmrjlswbsxmbglmaclxu`) via Mgmt API SQL endpoint to verify the schema-defect-blocked probes pass end-to-end with the deployed fix. Caller `440df2ae` (provider_admin), JWT-claims simulated with `effective_permissions:[{p:platform.admin}]` to short-circuit gates (Step 2 sub-decision).
+
+**Fixtures (Path B):** 3 partner orgs (`UAT-Partner-E2-{L8,C1,C2}`, `provider_partner`/`var`/`subdomain_status='verified'`), 3 partnerships, 5 grants. One partner org per probe (partial-UNIQUE on active partnership per org-pair). Scope OU = Aspen (`testorg-20260329.south_valley.aspen`); template `var_default` (4 literal `partner.*` perms).
+
+| Probe | Result | Evidence |
+|---|---|---|
+| L8 | ✅ **PASS** | `revoke_access_grant` → envelope `success:true`; projection `status='revoked'` + `revoked_at`/`revoked_by`/`revocation_reason`/`revocation_details` populated; `access_grant.revoked` event `processing_error=NULL` (pre-PR-#74 this raised `column "revocation_reason" does not exist`) |
+| C1 | ✅ **FULL PASS** | `terminate_var_partnership` (2 active var_contract grants) → envelope `cascadedGrantCount:2, candidateGrantCount:2`; both grants `revoked` w/ `revocation_reason='var_partnership_terminated'`; partnership `terminated`. **Cascade-FIRST proven** via `domain_events.sequence_number`: revoked `4016`+`4017` precede terminated `4018` (NB: `created_at` is uniform `now()` across the txn — `sequence_number` is the real emission order) |
+| C2 | ✅ **FULL PASS** (forced injection) | Reversible `BEFORE UPDATE` trigger on `cross_tenant_access_grants_projection` RAISEing for a `terms->>'uat_c2_fail'` sentinel on the higher-id grant (cascade `ORDER BY id` → index 1). Envelope `partial:true, error:PARTIAL_FAILURE, failureIndex:1, failedGrantId, cascadedGrantEventIds:[1], auditEventId`. Partnership **stays `active`** (cascade-first); failed grant **stays `active`** (savepoint rollback in `process_domain_event` WHEN OTHERS); index-0 grant `revoked`; `audit.high_risk_action_logged` emitted (`stream_type=platform_admin`, `action='terminate_var_partnership_partial_failure'`). Trigger+function dropped and verified gone post-probe |
+| Stage Z | ✅ **clean** | Direct-DELETE cascade: 3 orgs + 5 grants + 3 partnerships deleted; 0 surviving `UAT-Partner-E2-*` rows; `domain_events` retained (append-only) |
+
+**Outcome:** the two first-pass BLOCKED probes (L8, Batch 3 cascade) are now green end-to-end against deployed-fix dev state. C2 (skipped first pass) executed via forced injection — completes the Batch 3 matrix. **Phase 2 UAT is functionally complete** for the var_contract lifecycle + cascade + policy-override paths. Methodology captured for Phase N reuse.
+
+### Methodology notes (reusable for Phase N grant-type UAT)
+
+- **MVCC caveat**: an RPC's own Pattern-A-v2 read-back returns `success:true`, but sibling CTEs/SELECTs in the SAME statement see the pre-mutation snapshot. Verify projections in a SEPARATE Mgmt API call after commit.
+- **Auth sim**: MATERIALIZED-CTE `set_config('request.jwt.claims',…,true)` + `set_config('app.current_user',…,true)` in the same statement as the RPC.
+- **Path B gotchas**: `organizations_projection.depth` is GENERATED (omit); `provider_partner`+`var` requires non-null `subdomain_status` (`chk_subdomain_conditional`).
+- **Mgmt API**: `python-urllib` UA → Cloudflare 403 error-1010; use `curl`.
