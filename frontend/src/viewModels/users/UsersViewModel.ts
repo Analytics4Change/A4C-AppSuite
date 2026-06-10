@@ -1602,9 +1602,8 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2 (migration 20260423232531): consume returned phone
-      // entity and append to the list. Fallback to loadUserPhones when
-      // missing — emits log.warn per logging-standards.md.
+      // Pattern A v2 (migration 20260423232531): the RPC guarantees the phone
+      // entity on success (read-back-or-fail), so consume it and append.
       if (result.success) {
         if (result.phone) {
           runInAction(() => {
@@ -1658,9 +1657,8 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2: consume the returned phone entity and patch in place.
-      // Fallback to loadUserPhones when the entity field is missing — emits
-      // log.warn for observability per logging-standards.md. See
+      // Pattern A v2: the RPC guarantees the phone entity on success
+      // (read-back-or-fail), so consume it and patch in place. See
       // documentation/frontend/patterns/rpc-readback-vm-patch.md.
       if (result.success) {
         if (result.phone) {
@@ -1828,13 +1826,10 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2 via Edge Function (manage-user v11+ ships a real
-      // read-back — see PR #32 remediation, architect a060ef3faaa5b630c):
-      // consume the returned notificationPreferences and patch `userOrgAccess`
-      // in place. Belt-and-suspenders fallback: on v11, success WITHOUT
-      // notificationPreferences is a contract violation (Edge Function
-      // regression OR pre-v11 envelope still in the rollout window) —
-      // `contractViolation: true` tag makes it filterable in production logs.
+      // Pattern A v2: extracted to SQL RPC api.update_user_notification_preferences
+      // (PR #33; previously the manage-user Edge Function v11 read-back). The RPC
+      // guarantees notificationPreferences on success, so consume it and patch
+      // `userOrgAccess` in place.
       if (result.success) {
         if (result.notificationPreferences && this.userOrgAccess) {
           const updatedPrefs = result.notificationPreferences;
