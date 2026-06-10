@@ -1602,21 +1602,13 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2 (migration 20260423232531): consume returned phone
-      // entity and append to the list. Fallback to loadUserPhones when
-      // missing — emits log.warn per logging-standards.md.
+      // Pattern A v2 (migration 20260423232531): the RPC guarantees the phone
+      // entity on success (read-back-or-fail), so consume it and append.
       if (result.success) {
         if (result.phone) {
           runInAction(() => {
             this.userPhones = [...this.userPhones, result.phone!];
           });
-        } else {
-          log.warn(
-            'addUserPhone success without phone read-back — falling back to refetch. ' +
-              'Migration 20260423232531 may not be deployed to this environment.',
-            { userId: request.userId, phoneId: result.phoneId }
-          );
-          await this.loadUserPhones(request.userId);
         }
       }
 
@@ -1665,9 +1657,8 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2: consume the returned phone entity and patch in place.
-      // Fallback to loadUserPhones when the entity field is missing — emits
-      // log.warn for observability per logging-standards.md. See
+      // Pattern A v2: the RPC guarantees the phone entity on success
+      // (read-back-or-fail), so consume it and patch in place. See
       // documentation/frontend/patterns/rpc-readback-vm-patch.md.
       if (result.success) {
         if (result.phone) {
@@ -1675,15 +1666,6 @@ export class UsersViewModel {
             const updated = result.phone!;
             this.userPhones = this.userPhones.map((p) => (p.id === updated.id ? updated : p));
           });
-        } else {
-          log.warn(
-            'updateUserPhone success without phone read-back — falling back to refetch. ' +
-              'Backend RPC may be pre-Pattern-A-v2 or on a failed migration.',
-            { phoneId: request.phoneId }
-          );
-          if (this.selectedItemId) {
-            await this.loadUserPhones(this.selectedItemId);
-          }
         }
       }
 
@@ -1844,13 +1826,10 @@ export class UsersViewModel {
         }
       });
 
-      // Pattern A v2 via Edge Function (manage-user v11+ ships a real
-      // read-back — see PR #32 remediation, architect a060ef3faaa5b630c):
-      // consume the returned notificationPreferences and patch `userOrgAccess`
-      // in place. Belt-and-suspenders fallback: on v11, success WITHOUT
-      // notificationPreferences is a contract violation (Edge Function
-      // regression OR pre-v11 envelope still in the rollout window) —
-      // `contractViolation: true` tag makes it filterable in production logs.
+      // Pattern A v2: extracted to SQL RPC api.update_user_notification_preferences
+      // (PR #33; previously the manage-user Edge Function v11 read-back). The RPC
+      // guarantees notificationPreferences on success, so consume it and patch
+      // `userOrgAccess` in place.
       if (result.success) {
         if (result.notificationPreferences && this.userOrgAccess) {
           const updatedPrefs = result.notificationPreferences;
@@ -1862,18 +1841,6 @@ export class UsersViewModel {
               updatedAt: new Date(),
             };
           });
-        } else {
-          log.warn(
-            'updateNotificationPreferences success without notificationPreferences — ' +
-              'v11 envelope MUST include the field on success. Falling back to refetch. ' +
-              'Edge Function may have regressed OR pre-v11 envelope still in rollout.',
-            {
-              userId: request.userId,
-              orgId: request.orgId,
-              contractViolation: true,
-            }
-          );
-          await this.loadUserOrgAccess(request.userId, request.orgId);
         }
       }
 
