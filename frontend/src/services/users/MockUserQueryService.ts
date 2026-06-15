@@ -234,7 +234,11 @@ function getInitialMockInvitations(): Invitation[] {
       acceptedAt: null,
       accessStartDate: null,
       accessExpirationDate: null,
-      notificationPreferences: { email: true, sms: { enabled: false, phoneId: null }, inApp: false },
+      notificationPreferences: {
+        email: true,
+        sms: { enabled: false, phoneId: null },
+        inApp: false,
+      },
       createdAt: twoDaysAgo,
       updatedAt: twoDaysAgo,
     },
@@ -291,7 +295,6 @@ function getInitialMockAddresses(): UserAddress[] {
     {
       id: 'addr-admin-home',
       userId: 'user-admin-001',
-      orgId: null,
       label: 'Home',
       type: 'physical',
       street1: '123 Main Street',
@@ -308,7 +311,6 @@ function getInitialMockAddresses(): UserAddress[] {
     {
       id: 'addr-clinician-home',
       userId: 'user-clinician-001',
-      orgId: null,
       label: 'Home',
       type: 'physical',
       street1: '456 Elm Avenue',
@@ -318,23 +320,6 @@ function getInitialMockAddresses(): UserAddress[] {
       zipCode: '84604',
       country: 'USA',
       isPrimary: true,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'addr-clinician-work-override',
-      userId: 'user-clinician-001',
-      orgId: 'org-acme-healthcare',
-      label: 'Work Location',
-      type: 'mailing',
-      street1: '789 Healthcare Drive',
-      street2: 'Suite 200',
-      city: 'Salt Lake City',
-      state: 'UT',
-      zipCode: '84111',
-      country: 'USA',
-      isPrimary: false,
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -351,7 +336,6 @@ function getInitialMockPhones(): UserPhone[] {
     {
       id: 'phone-admin-mobile',
       userId: 'user-admin-001',
-      orgId: null,
       label: 'Mobile',
       type: 'mobile',
       number: '555-123-4567',
@@ -366,7 +350,6 @@ function getInitialMockPhones(): UserPhone[] {
     {
       id: 'phone-admin-office',
       userId: 'user-admin-001',
-      orgId: null,
       label: 'Office',
       type: 'office',
       number: '555-234-5678',
@@ -381,7 +364,6 @@ function getInitialMockPhones(): UserPhone[] {
     {
       id: 'phone-clinician-mobile',
       userId: 'user-clinician-001',
-      orgId: null,
       label: 'Mobile',
       type: 'mobile',
       number: '555-345-6789',
@@ -390,21 +372,6 @@ function getInitialMockPhones(): UserPhone[] {
       isPrimary: true,
       isActive: true,
       smsCapable: true,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'phone-clinician-work-override',
-      userId: 'user-clinician-001',
-      orgId: 'org-acme-healthcare',
-      label: 'Work Line',
-      type: 'office',
-      number: '555-456-7890',
-      extension: '215',
-      countryCode: '+1',
-      isPrimary: false,
-      isActive: true,
-      smsCapable: false,
       createdAt: now,
       updatedAt: now,
     },
@@ -426,7 +393,11 @@ function getInitialMockUserOrgAccess(): UserOrgAccess[] {
       orgId: 'org-acme-healthcare',
       accessStartDate: null, // No restrictions
       accessExpirationDate: null, // No expiration
-      notificationPreferences: { email: true, sms: { enabled: true, phoneId: 'phone-admin-mobile' }, inApp: false },
+      notificationPreferences: {
+        email: true,
+        sms: { enabled: true, phoneId: 'phone-admin-mobile' },
+        inApp: false,
+      },
       createdAt: lastMonth,
       updatedAt: now,
     },
@@ -435,7 +406,11 @@ function getInitialMockUserOrgAccess(): UserOrgAccess[] {
       orgId: 'org-acme-healthcare',
       accessStartDate: null,
       accessExpirationDate: null,
-      notificationPreferences: { email: true, sms: { enabled: false, phoneId: null }, inApp: false },
+      notificationPreferences: {
+        email: true,
+        sms: { enabled: false, phoneId: null },
+        inApp: false,
+      },
       createdAt: lastMonth,
       updatedAt: now,
     },
@@ -453,7 +428,11 @@ function getInitialMockUserOrgAccess(): UserOrgAccess[] {
       orgId: 'org-acme-healthcare',
       accessStartDate: null,
       accessExpirationDate: threeMonthsFromNow.toISOString().split('T')[0], // Internship ending
-      notificationPreferences: { email: true, sms: { enabled: false, phoneId: null }, inApp: false },
+      notificationPreferences: {
+        email: true,
+        sms: { enabled: false, phoneId: null },
+        inApp: false,
+      },
       createdAt: now,
       updatedAt: now,
     },
@@ -551,7 +530,14 @@ export class MockUserQueryService implements IUserQueryService {
             }))
           : getInitialMockUserOrgAccess();
 
-        return { users, invitations, userRoles: getInitialUserRoles(), addresses, phones, userOrgAccess };
+        return {
+          users,
+          invitations,
+          userRoles: getInitialUserRoles(),
+          addresses,
+          phones,
+          userOrgAccess,
+        };
       }
     } catch (error) {
       log.warn('Failed to load mock users from localStorage, using defaults', { error });
@@ -824,8 +810,7 @@ export class MockUserQueryService implements IUserQueryService {
     // Check existing users in current org
     const userInOrg = this.users.find(
       (u) =>
-        u.email.toLowerCase() === emailLower &&
-        u.currentOrganizationId === 'org-acme-healthcare'
+        u.email.toLowerCase() === emailLower && u.currentOrganizationId === 'org-acme-healthcare'
     );
 
     if (userInOrg) {
@@ -899,10 +884,7 @@ export class MockUserQueryService implements IUserQueryService {
     await this.simulateDelay();
     log.debug('Mock: Fetching user addresses', { userId });
 
-    // Return both global addresses (orgId === null) and org-specific overrides for current org
-    const addresses = this.addresses.filter(
-      (a) => a.userId === userId && a.isActive && (a.orgId === null || a.orgId === 'org-acme-healthcare')
-    );
+    const addresses = this.addresses.filter((a) => a.userId === userId && a.isActive);
 
     log.info(`Mock: Returning ${addresses.length} addresses for user`, { userId });
     return addresses;
@@ -912,10 +894,7 @@ export class MockUserQueryService implements IUserQueryService {
     await this.simulateDelay();
     log.debug('Mock: Fetching user phones', { userId });
 
-    // Return both global phones (orgId === null) and org-specific overrides for current org
-    const phones = this.phones.filter(
-      (p) => p.userId === userId && p.isActive && (p.orgId === null || p.orgId === 'org-acme-healthcare')
-    );
+    const phones = this.phones.filter((p) => p.userId === userId && p.isActive);
 
     log.info(`Mock: Returning ${phones.length} phones for user`, { userId });
     return phones;
@@ -928,7 +907,11 @@ export class MockUserQueryService implements IUserQueryService {
     const access = this.userOrgAccess.find((a) => a.userId === userId && a.orgId === orgId);
 
     if (access) {
-      log.info('Mock: Found user org access', { userId, orgId, hasExpiration: !!access.accessExpirationDate });
+      log.info('Mock: Found user org access', {
+        userId,
+        orgId,
+        hasExpiration: !!access.accessExpirationDate,
+      });
     } else {
       log.debug('Mock: User org access not found', { userId, orgId });
     }

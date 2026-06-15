@@ -76,9 +76,10 @@
     - Robust implementation documented as aspirational
 
 13. **Extended Data Collection - Hybrid Scope Model** (2024-12-31):
-    - Addresses and phones use hybrid scope: global defaults + per-org overrides
-    - Two tables: `user_addresses` (global) + `user_org_address_overrides` (org-specific)
-    - Same pattern for phones: `user_phones` + `user_org_phone_overrides`
+    - ⚠️ **REVERSED 2026-06-15**: the per-org override half was removed (migration `20260615175954`). The override tables (`user_org_address_overrides`, `user_org_phone_overrides`) had no documented use case (structural symmetry only) and surfaced a notification-prefs FK bug. User phones/addresses are now **global-only** (`user_phones`/`user_addresses`). The org-level HQ contact subsystem (`phones_projection`/`addresses_projection` + `organization_*` junctions, keyed by `organization_id`) is unrelated and unchanged.
+    - ~~Addresses and phones use hybrid scope: global defaults + per-org overrides~~
+    - ~~Two tables: `user_addresses` (global) + `user_org_address_overrides` (org-specific)~~
+    - ~~Same pattern for phones: `user_phones` + `user_org_phone_overrides`~~
     - Access dates stored in `user_org_access` junction table (per-org window)
     - Notification preferences also in `user_org_access` (per-org settings)
     - Invitations include access dates and notification prefs for immediate setup

@@ -2,14 +2,14 @@
  * User Phone Form Component
  *
  * Form for adding or editing user phone numbers.
- * Supports both global phones and organization-specific overrides.
+ * All phones are global — per-org overrides were removed in
+ * migration 20260615175954_remove_user_org_contact_overrides.sql.
  *
  * Features:
  * - Field validation with error display
  * - Phone type selection (mobile, office, fax, emergency)
- * - Primary phone toggle (global phones only)
+ * - Primary phone toggle
  * - SMS capability toggle
- * - Organization override option
  * - WCAG 2.1 Level AA compliant
  *
  * @see AddUserPhoneRequest for request structure
@@ -40,7 +40,6 @@ export interface PhoneFormData {
   countryCode: string;
   isPrimary: boolean;
   smsCapable: boolean;
-  isOrgOverride: boolean;
 }
 
 /**
@@ -54,7 +53,6 @@ const DEFAULT_FORM_DATA: PhoneFormData = {
   countryCode: '+1',
   isPrimary: false,
   smsCapable: false,
-  isOrgOverride: false,
 };
 
 /**
@@ -75,9 +73,6 @@ export interface UserPhoneFormProps {
 
   /** Whether this is edit mode */
   isEditMode?: boolean;
-
-  /** Whether to show org override option */
-  allowOrgOverride?: boolean;
 
   /** Additional CSS classes */
   className?: string;
@@ -114,11 +109,7 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
       </Label>
       {children}
       {error && (
-        <p
-          id={errorId}
-          className="flex items-center gap-1 text-sm text-red-600"
-          role="alert"
-        >
+        <p id={errorId} className="flex items-center gap-1 text-sm text-red-600" role="alert">
           <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </p>
@@ -166,7 +157,6 @@ export const UserPhoneForm: React.FC<UserPhoneFormProps> = ({
   onCancel,
   isSubmitting = false,
   isEditMode = false,
-  allowOrgOverride = true,
   className,
 }) => {
   const baseId = useId();
@@ -182,7 +172,6 @@ export const UserPhoneForm: React.FC<UserPhoneFormProps> = ({
         countryCode: initialData.countryCode || '+1',
         isPrimary: initialData.isPrimary || false,
         smsCapable: initialData.smsCapable || false,
-        isOrgOverride: initialData.orgId !== null && initialData.orgId !== undefined,
       };
     }
     return { ...DEFAULT_FORM_DATA };
@@ -262,15 +251,10 @@ export const UserPhoneForm: React.FC<UserPhoneFormProps> = ({
     extension: `${baseId}-extension`,
     isPrimary: `${baseId}-primary`,
     smsCapable: `${baseId}-sms`,
-    isOrgOverride: `${baseId}-org-override`,
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn('space-y-4', className)}
-      noValidate
-    >
+    <form onSubmit={handleSubmit} className={cn('space-y-4', className)} noValidate>
       {/* Header */}
       <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
         <Phone className="w-5 h-5 text-gray-500" aria-hidden="true" />
@@ -391,9 +375,7 @@ export const UserPhoneForm: React.FC<UserPhoneFormProps> = ({
               maxLength={10}
               aria-invalid={!!errors.extension}
               aria-describedby={errors.extension ? `${ids.extension}-error` : undefined}
-              className={cn(
-                errors.extension && touched.has('extension') && 'border-red-500'
-              )}
+              className={cn(errors.extension && touched.has('extension') && 'border-red-500')}
             />
           </FieldWrapper>
         </div>
@@ -420,58 +402,24 @@ export const UserPhoneForm: React.FC<UserPhoneFormProps> = ({
           </div>
         </div>
 
-        {/* Primary phone (only for global phones) */}
-        {!formData.isOrgOverride && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={ids.isPrimary}
-              checked={formData.isPrimary}
-              onCheckedChange={(checked) => handleChange('isPrimary', !!checked)}
-              disabled={isSubmitting}
-              aria-describedby={`${ids.isPrimary}-help`}
-            />
-            <Label htmlFor={ids.isPrimary} className="text-sm text-gray-700 cursor-pointer">
-              Set as primary phone
-            </Label>
-          </div>
-        )}
-
-        {/* Organization override option */}
-        {allowOrgOverride && !isEditMode && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={ids.isOrgOverride}
-              checked={formData.isOrgOverride}
-              onCheckedChange={(checked) => {
-                handleChange('isOrgOverride', !!checked);
-                // Clear primary if switching to org override
-                if (checked) {
-                  handleChange('isPrimary', false);
-                }
-              }}
-              disabled={isSubmitting}
-              aria-describedby={`${ids.isOrgOverride}-help`}
-            />
-            <div>
-              <Label htmlFor={ids.isOrgOverride} className="text-sm text-gray-700 cursor-pointer">
-                Organization-specific phone
-              </Label>
-              <p id={`${ids.isOrgOverride}-help`} className="text-xs text-gray-500">
-                This phone only applies to the current organization
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Primary phone */}
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={ids.isPrimary}
+            checked={formData.isPrimary}
+            onCheckedChange={(checked) => handleChange('isPrimary', !!checked)}
+            disabled={isSubmitting}
+            aria-describedby={`${ids.isPrimary}-help`}
+          />
+          <Label htmlFor={ids.isPrimary} className="text-sm text-gray-700 cursor-pointer">
+            Set as primary phone
+          </Label>
+        </div>
       </div>
 
       {/* Action buttons */}
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>

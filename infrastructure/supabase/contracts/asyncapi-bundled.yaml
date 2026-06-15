@@ -261,7 +261,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -738,7 +738,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -769,7 +769,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -888,7 +888,9 @@ channels:
                       type: string
                       format: uuid
                       nullable: true
-                      description: If set, this is an org-specific override address
+                      description: >-
+                        Deprecated (org-override removed 2026-06): always null;
+                        retained for event-history compatibility.
                     label:
                       type: string
                       description: Human-readable label (e.g., "Home", "Work")
@@ -1033,7 +1035,9 @@ channels:
                           type: string
                           format: uuid
                           nullable: true
-                          description: If set, this is an org-specific override address
+                          description: >-
+                            Deprecated (org-override removed 2026-06): always
+                            null; retained for event-history compatibility.
                         label:
                           type: string
                           description: Human-readable label (e.g., "Home", "Work")
@@ -1176,7 +1180,9 @@ channels:
                       type: string
                       format: uuid
                       nullable: true
-                      description: If set, this was an org-specific override
+                      description: >-
+                        Deprecated (org-override removed 2026-06): always null;
+                        retained for event-history compatibility.
                     removal_type:
                       allOf:
                         - type: string
@@ -1296,7 +1302,9 @@ channels:
                       type: string
                       format: uuid
                       nullable: true
-                      description: If set, this is an org-specific override phone
+                      description: >-
+                        Deprecated (org-override removed 2026-06): always null;
+                        retained for event-history compatibility.
                     label:
                       type: string
                       description: Human-readable label (e.g., "Personal Cell", "Work")
@@ -1437,7 +1445,9 @@ channels:
                           type: string
                           format: uuid
                           nullable: true
-                          description: If set, this is an org-specific override phone
+                          description: >-
+                            Deprecated (org-override removed 2026-06): always
+                            null; retained for event-history compatibility.
                         label:
                           type: string
                           description: Human-readable label (e.g., "Personal Cell", "Work")
@@ -3718,7 +3728,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -4098,7 +4108,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -18520,7 +18530,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -18997,7 +19007,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -19028,7 +19038,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -19147,7 +19157,9 @@ channels:
                       type: string
                       format: uuid
                       nullable: true
-                      description: If set, this is an org-specific override address
+                      description: >-
+                        Deprecated (org-override removed 2026-06): always null;
+                        retained for event-history compatibility.
                     label:
                       type: string
                       description: Human-readable label (e.g., "Home", "Work")
@@ -19292,7 +19304,9 @@ channels:
                           type: string
                           format: uuid
                           nullable: true
-                          description: If set, this is an org-specific override address
+                          description: >-
+                            Deprecated (org-override removed 2026-06): always
+                            null; retained for event-history compatibility.
                         label:
                           type: string
                           description: Human-readable label (e.g., "Home", "Work")
@@ -19435,7 +19449,9 @@ channels:
                       type: string
                       format: uuid
                       nullable: true
-                      description: If set, this was an org-specific override
+                      description: >-
+                        Deprecated (org-override removed 2026-06): always null;
+                        retained for event-history compatibility.
                     removal_type:
                       allOf:
                         - type: string
@@ -19555,7 +19571,9 @@ channels:
                       type: string
                       format: uuid
                       nullable: true
-                      description: If set, this is an org-specific override phone
+                      description: >-
+                        Deprecated (org-override removed 2026-06): always null;
+                        retained for event-history compatibility.
                     label:
                       type: string
                       description: Human-readable label (e.g., "Personal Cell", "Work")
@@ -19696,7 +19714,9 @@ channels:
                           type: string
                           format: uuid
                           nullable: true
-                          description: If set, this is an org-specific override phone
+                          description: >-
+                            Deprecated (org-override removed 2026-06): always
+                            null; retained for event-history compatibility.
                         label:
                           type: string
                           description: Human-readable label (e.g., "Personal Cell", "Work")
@@ -21977,7 +21997,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false
@@ -22357,7 +22377,7 @@ channels:
                               nullable: true
                               description: >-
                                 UUID of the phone to use for SMS (from
-                                user_phones or user_org_phone_overrides)
+                                user_phones)
                         in_app:
                           type: boolean
                           default: false

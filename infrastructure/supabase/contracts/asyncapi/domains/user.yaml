@@ -604,7 +604,7 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: If set, this is an org-specific override address
+          description: "Deprecated (org-override removed 2026-06): always null; retained for event-history compatibility."
         label:
           type: string
           description: Human-readable label (e.g., "Home", "Work")
@@ -724,7 +724,7 @@ components:
               type: string
               format: uuid
               nullable: true
-              description: If set, this was an org-specific override
+              description: "Deprecated (org-override removed 2026-06): always null; retained for event-history compatibility."
             removal_type:
               allOf:
                 - $ref: ../components/enums.yaml#/components/schemas/RemovalType
@@ -757,7 +757,7 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: If set, this is an org-specific override phone
+          description: "Deprecated (org-override removed 2026-06): always null; retained for event-history compatibility."
         label:
           type: string
           description: Human-readable label (e.g., "Personal Cell", "Work")
@@ -875,7 +875,7 @@ components:
               type: string
               format: uuid
               nullable: true
-              description: If set, this was an org-specific override
+              description: "Deprecated (org-override removed 2026-06): always null; retained for event-history compatibility."
             removal_type:
               allOf:
                 - $ref: ../components/enums.yaml#/components/schemas/RemovalType

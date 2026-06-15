@@ -18,7 +18,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Phone, Edit2, Trash2, Star, Building2, MessageSquare } from 'lucide-react';
+import { Phone, Edit2, Trash2, Star, MessageSquare } from 'lucide-react';
 import type { UserPhone, PhoneType } from '@/types/user.types';
 import { Logger } from '@/utils/logger';
 
@@ -131,32 +131,24 @@ export const PhoneCard: React.FC<PhoneCardProps> = ({
   };
 
   const formattedNumber = formatPhoneNumber(phone);
-  const isOrgOverride = phone.orgId !== null;
 
   return (
     <Card
       data-testid="phone-card"
       className="transition-all duration-200 hover:shadow-md"
       style={{
-        background: isOrgOverride
-          ? 'rgba(255, 251, 235, 0.8)'
-          : 'rgba(255, 255, 255, 0.8)',
+        background: 'rgba(255, 255, 255, 0.8)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         border: '1px solid',
-        borderColor: isOrgOverride
-          ? 'rgba(251, 191, 36, 0.3)'
-          : 'rgba(229, 231, 235, 0.8)',
+        borderColor: 'rgba(229, 231, 235, 0.8)',
       }}
     >
       <CardContent className="p-4">
         {/* Header with label and badges */}
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Phone
-              className={`w-4 h-4 ${isOrgOverride ? 'text-amber-600' : 'text-gray-500'}`}
-              aria-hidden="true"
-            />
+            <Phone className="w-4 h-4 text-gray-500" aria-hidden="true" />
             <span className="font-medium text-gray-900">{phone.label}</span>
 
             {/* Primary badge */}
@@ -182,17 +174,8 @@ export const PhoneCard: React.FC<PhoneCardProps> = ({
             )}
           </div>
 
-          {/* Type and scope badges */}
+          {/* Type badge */}
           <div className="flex items-center gap-1.5">
-            {isOrgOverride && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
-                title="Organization-specific override"
-              >
-                <Building2 className="w-3 h-3" aria-hidden="true" />
-                Override
-              </span>
-            )}
             <span
               className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getPhoneTypeBadgeClasses(phone.type)}`}
             >

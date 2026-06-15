@@ -44,7 +44,6 @@ describe('MockUserCommandService — envelope contracts', () => {
 
       const result = await commandService.addUserPhone({
         userId: user.id,
-        orgId: null,
         label: 'Mobile',
         type: 'mobile',
         number: '555-010-1234',
@@ -71,7 +70,6 @@ describe('MockUserCommandService — envelope contracts', () => {
 
       const result = await commandService.addUserPhone({
         userId: user.id,
-        orgId: null,
         label: 'Mobile',
         type: 'mobile',
         number: 'not a phone number',
@@ -95,7 +93,6 @@ describe('MockUserCommandService — envelope contracts', () => {
       // Seed a phone to update
       const added = await commandService.addUserPhone({
         userId: user.id,
-        orgId: null,
         label: 'Mobile',
         type: 'mobile',
         number: '555-010-0001',
@@ -162,7 +159,6 @@ describe('MockUserCommandService — envelope contracts', () => {
       // Seed an SMS-capable phone so SMS validation passes
       const phoneResult = await commandService.addUserPhone({
         userId: user.id,
-        orgId: null,
         label: 'Mobile',
         type: 'mobile',
         number: '555-010-0002',
@@ -192,7 +188,6 @@ describe('MockUserCommandService — envelope contracts', () => {
 
       const phoneResult = await commandService.addUserPhone({
         userId: user.id,
-        orgId: null,
         label: 'Home',
         type: 'office',
         number: '555-010-0003',

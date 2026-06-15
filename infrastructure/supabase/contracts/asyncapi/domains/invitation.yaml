@@ -245,8 +245,7 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: UUID of the phone to use for SMS (from user_phones or
-            user_org_phone_overrides)
+          description: UUID of the phone to use for SMS (from user_phones)
 
     RoleAssignment:
       title: RoleAssignment
