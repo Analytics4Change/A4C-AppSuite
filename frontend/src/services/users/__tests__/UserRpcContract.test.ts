@@ -48,14 +48,18 @@ function readAllMigrationsSQL(): string {
 
 /**
  * Extract the body of the LAST `CREATE OR REPLACE FUNCTION api.<name>(`
- * definition from the given SQL. Assumes `CREATE OR REPLACE FUNCTION` blocks
- * are terminated by `$$;` on its own line (project convention).
+ * definition from the given SQL. `CREATE OR REPLACE FUNCTION` blocks are
+ * terminated by a dollar-quote tag on its own line — either the bare `$$;`
+ * (older convention) or a named tag such as `$function$;` (emitted by
+ * `pg_get_functiondef`, used by the org-override-removal migration). The
+ * terminator regex must accept both, otherwise this matcher silently locks
+ * onto a stale earlier definition and the assertions validate dead SQL.
  */
 function extractLastFunctionBody(sql: string, qualifiedName: string): string | null {
   // Match `CREATE OR REPLACE FUNCTION api.name(` or `"api"."name"(`
   const escaped = qualifiedName.replace('.', '"?\\."?');
   const pattern = new RegExp(
-    `CREATE OR REPLACE FUNCTION "?${escaped}"?\\([\\s\\S]*?^\\$\\$;$`,
+    `CREATE OR REPLACE FUNCTION "?${escaped}"?\\([\\s\\S]*?^\\$(?:function)?\\$;$`,
     'gm'
   );
   const matches = sql.match(pattern);
@@ -98,10 +102,12 @@ describe('User RPC contract assertions (anti-drift)', () => {
       expect(body).toContain("'phone'");
     });
 
-    it('branches on p_org_id to read from the correct projection (Blocker 3 architect MUST-FIX)', () => {
-      expect(body).toContain('IF p_org_id IS NULL');
+    it('reads back from global user_phones only — org overrides removed (PR #78)', () => {
+      // PR #78 dropped user_org_phone_overrides; add_user_phone is now global-only
+      // and no longer branches on p_org_id (retained NULL for signature stability).
       expect(body).toMatch(/FROM user_phones\b/);
-      expect(body).toMatch(/FROM user_org_phone_overrides\b/);
+      expect(body).not.toContain('IF p_org_id IS NULL');
+      expect(body).not.toContain('user_org_phone_overrides');
     });
 
     it('uses camelCase keys via jsonb_build_object (not row_to_json)', () => {
