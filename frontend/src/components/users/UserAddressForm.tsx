@@ -40,7 +40,6 @@ export interface AddressFormData {
   zipCode: string;
   country: string;
   isPrimary: boolean;
-  isOrgOverride: boolean;
 }
 
 /**
@@ -56,7 +55,6 @@ const DEFAULT_FORM_DATA: AddressFormData = {
   zipCode: '',
   country: 'USA',
   isPrimary: false,
-  isOrgOverride: false,
 };
 
 /**
@@ -77,9 +75,6 @@ export interface UserAddressFormProps {
 
   /** Whether this is edit mode */
   isEditMode?: boolean;
-
-  /** Whether to show org override option */
-  allowOrgOverride?: boolean;
 
   /** Additional CSS classes */
   className?: string;
@@ -116,11 +111,7 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({
       </Label>
       {children}
       {error && (
-        <p
-          id={errorId}
-          className="flex items-center gap-1 text-sm text-red-600"
-          role="alert"
-        >
+        <p id={errorId} className="flex items-center gap-1 text-sm text-red-600" role="alert">
           <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </p>
@@ -142,11 +133,56 @@ const ADDRESS_TYPES: { value: AddressType; label: string }[] = [
  * US states for dropdown
  */
 const US_STATES = [
-  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
 ];
 
 /**
@@ -164,7 +200,6 @@ export const UserAddressForm: React.FC<UserAddressFormProps> = ({
   onCancel,
   isSubmitting = false,
   isEditMode = false,
-  allowOrgOverride = true,
   className,
 }) => {
   const baseId = useId();
@@ -182,7 +217,6 @@ export const UserAddressForm: React.FC<UserAddressFormProps> = ({
         zipCode: initialData.zipCode || '',
         country: initialData.country || 'USA',
         isPrimary: initialData.isPrimary || false,
-        isOrgOverride: initialData.orgId !== null && initialData.orgId !== undefined,
       };
     }
     return { ...DEFAULT_FORM_DATA };
@@ -272,15 +306,10 @@ export const UserAddressForm: React.FC<UserAddressFormProps> = ({
     zipCode: `${baseId}-zip`,
     country: `${baseId}-country`,
     isPrimary: `${baseId}-primary`,
-    isOrgOverride: `${baseId}-org-override`,
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn('space-y-4', className)}
-      noValidate
-    >
+    <form onSubmit={handleSubmit} className={cn('space-y-4', className)} noValidate>
       {/* Header */}
       <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
         <MapPin className="w-5 h-5 text-gray-500" aria-hidden="true" />
@@ -415,9 +444,7 @@ export const UserAddressForm: React.FC<UserAddressFormProps> = ({
                 'flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm',
                 'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
                 'disabled:cursor-not-allowed disabled:opacity-50',
-                errors.state && touched.has('state')
-                  ? 'border-red-500'
-                  : 'border-gray-300'
+                errors.state && touched.has('state') ? 'border-red-500' : 'border-gray-300'
               )}
             >
               <option value="">--</option>
@@ -469,58 +496,24 @@ export const UserAddressForm: React.FC<UserAddressFormProps> = ({
 
       {/* Checkboxes */}
       <div className="space-y-3 pt-2">
-        {/* Primary address (only for global addresses) */}
-        {!formData.isOrgOverride && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={ids.isPrimary}
-              checked={formData.isPrimary}
-              onCheckedChange={(checked) => handleChange('isPrimary', !!checked)}
-              disabled={isSubmitting}
-              aria-describedby={`${ids.isPrimary}-help`}
-            />
-            <Label htmlFor={ids.isPrimary} className="text-sm text-gray-700 cursor-pointer">
-              Set as primary address
-            </Label>
-          </div>
-        )}
-
-        {/* Organization override option */}
-        {allowOrgOverride && !isEditMode && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={ids.isOrgOverride}
-              checked={formData.isOrgOverride}
-              onCheckedChange={(checked) => {
-                handleChange('isOrgOverride', !!checked);
-                // Clear primary if switching to org override
-                if (checked) {
-                  handleChange('isPrimary', false);
-                }
-              }}
-              disabled={isSubmitting}
-              aria-describedby={`${ids.isOrgOverride}-help`}
-            />
-            <div>
-              <Label htmlFor={ids.isOrgOverride} className="text-sm text-gray-700 cursor-pointer">
-                Organization-specific address
-              </Label>
-              <p id={`${ids.isOrgOverride}-help`} className="text-xs text-gray-500">
-                This address only applies to the current organization
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Primary address */}
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={ids.isPrimary}
+            checked={formData.isPrimary}
+            onCheckedChange={(checked) => handleChange('isPrimary', !!checked)}
+            disabled={isSubmitting}
+            aria-describedby={`${ids.isPrimary}-help`}
+          />
+          <Label htmlFor={ids.isPrimary} className="text-sm text-gray-700 cursor-pointer">
+            Set as primary address
+          </Label>
+        </div>
       </div>
 
       {/* Action buttons */}
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>

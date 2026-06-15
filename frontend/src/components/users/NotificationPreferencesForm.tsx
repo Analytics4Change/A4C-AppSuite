@@ -105,11 +105,20 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
   // Handler for SMS toggle
   const handleSmsEnabledChange = useCallback(
     (enabled: boolean) => {
+      if (enabled && smsCapablePhones.length === 0) {
+        // No SMS-capable phone to target — leave phoneId null (never an undefined
+        // phone) so the save can't violate the sms_phone_id contract. The form
+        // already surfaces an actionable hint; warn for observability.
+        log.warn('SMS notifications enabled with no SMS-capable phone available', {
+          smsCapablePhoneCount: 0,
+        });
+      }
       setLocalPrefs((prev) => ({
         ...prev,
         sms: {
           enabled,
-          // Auto-select first available phone if enabling and none selected
+          // Auto-select first available phone if enabling and none selected.
+          // Falls through to prev (null when empty) — never an undefined phone.
           phoneId:
             enabled && !prev.sms.phoneId && smsCapablePhones.length > 0
               ? smsCapablePhones[0].id
@@ -186,9 +195,7 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
             <Label htmlFor={ids.email} className="text-sm font-medium text-gray-900">
               Email Notifications
             </Label>
-            <p className="text-xs text-gray-500">
-              Receive notifications via email
-            </p>
+            <p className="text-xs text-gray-500">Receive notifications via email</p>
           </div>
         </div>
         <Checkbox
@@ -212,9 +219,7 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
               <Label htmlFor={ids.sms} className="text-sm font-medium text-gray-900">
                 SMS Notifications
               </Label>
-              <p className="text-xs text-gray-500">
-                Receive notifications via text message
-              </p>
+              <p className="text-xs text-gray-500">Receive notifications via text message</p>
             </div>
           </div>
           <Checkbox
@@ -230,10 +235,7 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
         {/* SMS phone selector (shown when SMS is enabled) */}
         {localPrefs.sms.enabled && (
           <div className="ml-12 space-y-2">
-            <Label
-              htmlFor={ids.smsPhone}
-              className="text-sm text-gray-700"
-            >
+            <Label htmlFor={ids.smsPhone} className="text-sm text-gray-700">
               Select phone for SMS
             </Label>
             {smsCapablePhones.length > 0 ? (
@@ -288,9 +290,7 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
             <Label htmlFor={ids.inApp} className="text-sm font-medium text-gray-900">
               In-App Notifications
             </Label>
-            <p className="text-xs text-gray-500">
-              Show notifications within the application
-            </p>
+            <p className="text-xs text-gray-500">Show notifications within the application</p>
           </div>
         </div>
         <Checkbox
@@ -307,20 +307,11 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
       {!inline && (
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
           {onCancel && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleReset}
-              disabled={isSaving}
-            >
+            <Button type="button" variant="outline" onClick={handleReset} disabled={isSaving}>
               Cancel
             </Button>
           )}
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || !isDirty || !!smsError}
-          >
+          <Button type="button" onClick={handleSave} disabled={isSaving || !isDirty || !!smsError}>
             {isSaving ? 'Saving...' : 'Save Preferences'}
           </Button>
         </div>
@@ -329,12 +320,7 @@ export const NotificationPreferencesForm: React.FC<NotificationPreferencesFormPr
       {/* Inline save button */}
       {inline && isDirty && (
         <div className="pt-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving || !!smsError}
-          >
+          <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || !!smsError}>
             {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>

@@ -115,7 +115,6 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
 
       const result = await service.updateUserPhone({
         phoneId: 'phone-1',
-        orgId: null,
         updates: { label: 'Mobile' },
       });
 
@@ -123,7 +122,6 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
       expect(result.phone).toBeDefined();
       expect(result.phone?.id).toBe('phone-1');
       expect(result.phone?.userId).toBe('user-1'); // camelCase
-      expect(result.phone?.orgId).toBeNull();
       expect(result.phone?.countryCode).toBe('+1'); // camelCase
       expect(result.phone?.isPrimary).toBe(true); // camelCase
       expect(result.phone?.smsCapable).toBe(true); // camelCase
@@ -140,7 +138,6 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
 
       const result = await service.updateUserPhone({
         phoneId: 'phone-1',
-        orgId: null,
         updates: { label: 'Mobile' },
       });
 
@@ -174,7 +171,6 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
 
       const result = await service.updateUserPhone({
         phoneId: 'phone-1',
-        orgId: null,
         updates: { label: 'Mobile' },
       });
 
@@ -213,7 +209,6 @@ describe('SupabaseUserCommandService — snake_case → camelCase mapping', () =
 
       const result = await service.addUserPhone({
         userId: 'user-1',
-        orgId: null,
         label: 'Work',
         type: 'office',
         number: '555-0200',

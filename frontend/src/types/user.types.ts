@@ -106,11 +106,11 @@ export interface UserOrgAccess {
 export type AddressType = 'physical' | 'mailing' | 'billing';
 
 /**
- * User address (global or org-specific override)
+ * User address (global)
  *
- * Supports hybrid scope model:
- * - Global addresses (orgId = null) apply across all organizations
- * - Org-specific overrides (orgId set) apply only to that organization
+ * All addresses are stored globally in user_addresses and apply across
+ * all organizations. Per-org overrides were removed in migration
+ * 20260615175954_remove_user_org_contact_overrides.sql.
  */
 export interface UserAddress {
   /** Unique identifier */
@@ -118,12 +118,6 @@ export interface UserAddress {
 
   /** User UUID */
   userId: string;
-
-  /**
-   * Organization UUID for override, null for global address
-   * If set, this address only applies when user is in this org context
-   */
-  orgId: string | null;
 
   /** Human-readable label (e.g., "Home", "Work") */
   label: string;
@@ -198,11 +192,11 @@ export interface InvitationPhone {
 }
 
 /**
- * User phone (global or org-specific override)
+ * User phone (global)
  *
- * Supports hybrid scope model:
- * - Global phones (orgId = null) apply across all organizations
- * - Org-specific overrides (orgId set) apply only to that organization
+ * All phones are stored globally in user_phones and apply across all
+ * organizations. Per-org overrides were removed in migration
+ * 20260615175954_remove_user_org_contact_overrides.sql.
  */
 export interface UserPhone {
   /** Unique identifier */
@@ -210,12 +204,6 @@ export interface UserPhone {
 
   /** User UUID */
   userId: string;
-
-  /**
-   * Organization UUID for override, null for global phone
-   * If set, this phone only applies when user is in this org context
-   */
-  orgId: string | null;
 
   /** Human-readable label (e.g., "Personal Cell", "Work") */
   label: string;
@@ -246,12 +234,6 @@ export interface UserPhone {
    * Mirrored phones have source_contact_phone_id set in the database.
    */
   isMirrored?: boolean;
-
-  /**
-   * Source of the phone: 'global' for user_phones table,
-   * 'org' for user_org_phone_overrides table
-   */
-  source?: 'global' | 'org';
 
   /** When the phone was created */
   createdAt: Date;
@@ -662,11 +644,6 @@ export interface AddUserAddressRequest {
   /** User ID */
   userId: string;
 
-  /**
-   * Organization ID for override (null for global address)
-   */
-  orgId: string | null;
-
   /** Address label */
   label: string;
 
@@ -703,7 +680,7 @@ export interface UpdateUserAddressRequest {
   addressId: string;
 
   /** Fields to update (partial) */
-  updates: Partial<Omit<AddUserAddressRequest, 'userId' | 'orgId'>>;
+  updates: Partial<Omit<AddUserAddressRequest, 'userId'>>;
 }
 
 /**
@@ -723,11 +700,6 @@ export interface RemoveUserAddressRequest {
 export interface AddUserPhoneRequest {
   /** User ID */
   userId: string;
-
-  /**
-   * Organization ID for override (null for global phone)
-   */
-  orgId: string | null;
 
   /** Phone label */
   label: string;
@@ -761,11 +733,8 @@ export interface UpdateUserPhoneRequest {
   /** Phone ID */
   phoneId: string;
 
-  /** Organization ID (null for global phone, set for org-specific) */
-  orgId?: string | null;
-
   /** Fields to update (partial) */
-  updates: Partial<Omit<AddUserPhoneRequest, 'userId' | 'orgId' | 'reason'>>;
+  updates: Partial<Omit<AddUserPhoneRequest, 'userId' | 'reason'>>;
 
   /** Optional audit reason for the change */
   reason?: string;
@@ -777,9 +746,6 @@ export interface UpdateUserPhoneRequest {
 export interface RemoveUserPhoneRequest {
   /** Phone ID */
   phoneId: string;
-
-  /** Organization ID (null for global phone, set for org-specific) */
-  orgId?: string | null;
 
   /** Whether to hard delete (true) or soft delete/deactivate (false) */
   hardDelete?: boolean;

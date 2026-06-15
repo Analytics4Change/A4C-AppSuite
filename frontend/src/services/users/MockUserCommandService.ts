@@ -585,7 +585,6 @@ export class MockUserCommandService implements IUserCommandService {
     const address: UserAddress = {
       id: generateId(),
       userId: request.userId,
-      orgId: request.orgId || null,
       label: request.label,
       type: request.type,
       street1: request.street1.trim(),
@@ -681,7 +680,6 @@ export class MockUserCommandService implements IUserCommandService {
     const phone: UserPhone = {
       id: generateId(),
       userId: request.userId,
-      orgId: request.orgId || null,
       label: request.label,
       type: request.type,
       number: request.number.trim(),

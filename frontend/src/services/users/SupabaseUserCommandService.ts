@@ -861,7 +861,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
       log.info('Adding user phone', {
         userId: request.userId,
         label: request.label,
-        orgId: request.orgId,
       });
 
       // Pattern A v2 (migration 20260423232531): api.add_user_phone returns
@@ -873,7 +872,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
         phone?: {
           id: string;
           userId: string;
-          orgId: string | null;
           label: string;
           type: PhoneType;
           number: string;
@@ -894,7 +892,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_country_code: request.countryCode ?? '+1',
         p_is_primary: request.isPrimary ?? false,
         p_sms_capable: request.smsCapable ?? false,
-        p_org_id: request.orgId ?? null,
+        p_org_id: null,
         p_reason: request.reason ?? null,
       });
 
@@ -959,7 +957,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
     try {
       log.info('Updating user phone', {
         phoneId: request.phoneId,
-        orgId: request.orgId,
       });
 
       // Pattern A v2: api.update_user_phone already returns the refreshed
@@ -972,7 +969,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
         phone?: {
           id: string;
           user_id: string;
-          org_id: string | null;
           label: string;
           type: PhoneType;
           number: string;
@@ -993,7 +989,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         p_country_code: request.updates.countryCode ?? null,
         p_is_primary: request.updates.isPrimary ?? null,
         p_sms_capable: request.updates.smsCapable ?? null,
-        p_org_id: request.orgId ?? null,
+        p_org_id: null,
         p_reason: request.reason ?? null,
       });
 
@@ -1035,7 +1031,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
         ? {
             id: env.phone.id,
             userId: env.phone.user_id,
-            orgId: env.phone.org_id,
             label: env.phone.label,
             type: env.phone.type,
             number: env.phone.number,
@@ -1073,7 +1068,6 @@ export class SupabaseUserCommandService implements IUserCommandService {
       log.info('Removing user phone', {
         phoneId: request.phoneId,
         hardDelete: request.hardDelete,
-        orgId: request.orgId,
       });
 
       const env = await supabaseService.apiRpcEnvelope<{
@@ -1081,7 +1075,7 @@ export class SupabaseUserCommandService implements IUserCommandService {
         eventId: string;
       }>('remove_user_phone', {
         p_phone_id: request.phoneId,
-        p_org_id: request.orgId ?? null,
+        p_org_id: null,
         p_hard_delete: request.hardDelete ?? false,
         p_reason: request.reason ?? null,
       });

@@ -17,7 +17,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Edit2, Trash2, Star, Building2 } from 'lucide-react';
+import { MapPin, Edit2, Trash2, Star } from 'lucide-react';
 import type { UserAddress, AddressType } from '@/types/user.types';
 import { Logger } from '@/utils/logger';
 
@@ -123,32 +123,24 @@ export const AddressCard: React.FC<AddressCardProps> = ({
   };
 
   const addressLines = formatAddress(address);
-  const isOrgOverride = address.orgId !== null;
 
   return (
     <Card
       data-testid="address-card"
       className="transition-all duration-200 hover:shadow-md"
       style={{
-        background: isOrgOverride
-          ? 'rgba(255, 251, 235, 0.8)'
-          : 'rgba(255, 255, 255, 0.8)',
+        background: 'rgba(255, 255, 255, 0.8)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         border: '1px solid',
-        borderColor: isOrgOverride
-          ? 'rgba(251, 191, 36, 0.3)'
-          : 'rgba(229, 231, 235, 0.8)',
+        borderColor: 'rgba(229, 231, 235, 0.8)',
       }}
     >
       <CardContent className="p-4">
         {/* Header with label and badges */}
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            <MapPin
-              className={`w-4 h-4 ${isOrgOverride ? 'text-amber-600' : 'text-gray-500'}`}
-              aria-hidden="true"
-            />
+            <MapPin className="w-4 h-4 text-gray-500" aria-hidden="true" />
             <span className="font-medium text-gray-900">{address.label}</span>
 
             {/* Primary badge */}
@@ -163,17 +155,8 @@ export const AddressCard: React.FC<AddressCardProps> = ({
             )}
           </div>
 
-          {/* Type and scope badges */}
+          {/* Type badge */}
           <div className="flex items-center gap-1.5">
-            {isOrgOverride && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
-                title="Organization-specific override"
-              >
-                <Building2 className="w-3 h-3" aria-hidden="true" />
-                Override
-              </span>
-            )}
             <span
               className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getAddressTypeBadgeClasses(address.type)}`}
             >

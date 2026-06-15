@@ -5,7 +5,7 @@
  * Orchestrates PhoneCard and UserPhoneForm components.
  *
  * Features:
- * - Lists user's phones (global + org-specific)
+ * - Lists user's global phones
  * - Add new phone via form
  * - Edit existing phone
  * - Remove phone (soft delete)
@@ -66,8 +66,7 @@ type SectionMode = 'list' | 'add' | 'edit';
  */
 export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
   ({ userId, editable = true, className, onPhonesChange, smsLinkedPhoneId }) => {
-    const { session } = useAuth();
-    const organizationId = session?.claims?.org_id ?? '';
+    const { session: _session } = useAuth();
 
     const [phones, setPhones] = useState<UserPhone[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -109,7 +108,6 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
         try {
           const result = await commandService.addUserPhone({
             userId,
-            orgId: formData.isOrgOverride ? organizationId : null,
             label: formData.label,
             type: formData.type,
             number: formData.number,
@@ -132,7 +130,7 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
           setIsSubmitting(false);
         }
       },
-      [userId, organizationId, commandService, loadPhones]
+      [userId, commandService, loadPhones]
     );
 
     // Handle edit phone
@@ -145,7 +143,6 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
         try {
           const result = await commandService.updateUserPhone({
             phoneId: editingPhone.id,
-            orgId: editingPhone.orgId,
             updates: {
               label: formData.label,
               type: formData.type,
@@ -183,7 +180,6 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
       try {
         const result = await commandService.removeUserPhone({
           phoneId: phoneToRemove.id,
-          orgId: phoneToRemove.orgId,
           hardDelete: false, // Soft delete by default
         });
 
@@ -231,10 +227,6 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
       setError(null);
     }, []);
 
-    // Separate global and org phones for display
-    const globalPhones = phones.filter((p) => p.source === 'global' || !p.orgId);
-    const orgPhones = phones.filter((p) => p.source === 'org' || p.orgId);
-
     return (
       <Card className={className}>
         <CardHeader className="pb-3">
@@ -244,12 +236,7 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
               Phone Numbers
             </CardTitle>
             {editable && mode === 'list' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setMode('add')}
-                className="h-8"
-              >
+              <Button size="sm" variant="outline" onClick={() => setMode('add')} className="h-8">
                 <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
                 Add Phone
               </Button>
@@ -285,47 +272,18 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
                   No phone numbers added yet.
                 </p>
               ) : (
-                <>
-                  {/* Global phones */}
-                  {globalPhones.length > 0 && (
-                    <div className="space-y-2">
-                      {orgPhones.length > 0 && (
-                        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                          Global Phones
-                        </h4>
-                      )}
-                      {globalPhones.map((phone) => (
-                        <PhoneCard
-                          key={phone.id}
-                          phone={phone}
-                          onEdit={editable ? handleEditClick : undefined}
-                          onRemove={editable ? handleRemoveClick : undefined}
-                          isLoading={isSubmitting}
-                          showActions={editable}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Org-specific phones */}
-                  {orgPhones.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        Organization-Specific
-                      </h4>
-                      {orgPhones.map((phone) => (
-                        <PhoneCard
-                          key={phone.id}
-                          phone={phone}
-                          onEdit={editable ? handleEditClick : undefined}
-                          onRemove={editable ? handleRemoveClick : undefined}
-                          isLoading={isSubmitting}
-                          showActions={editable}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
+                <div className="space-y-2">
+                  {phones.map((phone) => (
+                    <PhoneCard
+                      key={phone.id}
+                      phone={phone}
+                      onEdit={editable ? handleEditClick : undefined}
+                      onRemove={editable ? handleRemoveClick : undefined}
+                      isLoading={isSubmitting}
+                      showActions={editable}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -337,7 +295,6 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
               onCancel={handleCancel}
               isSubmitting={isSubmitting}
               isEditMode={false}
-              allowOrgOverride={true}
             />
           )}
 
@@ -349,7 +306,6 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
               onCancel={handleCancel}
               isSubmitting={isSubmitting}
               isEditMode={true}
-              allowOrgOverride={false}
             />
           )}
 

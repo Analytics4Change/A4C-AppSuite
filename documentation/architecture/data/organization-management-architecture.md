@@ -50,6 +50,8 @@ last_updated: 2026-03-06
 
 ## Architecture Overview
 
+> **Scope note — org-level contacts vs per-user contacts (do not conflate):** This module's contact data (the `headquarters`/`billing`/`admin` contacts, addresses, phones, emails captured at onboarding) is **org-level**, keyed by `organization_id` — `contacts_projection`, `addresses_projection`, `phones_projection`, `emails_projection` and the `organization_*` junction tables. This is entirely separate from a **user's** own contact data (`user_phones`, `user_addresses`, keyed by `user_id`, global). The former per-user *org-override* tables (`user_org_phone_overrides`, `user_org_address_overrides`) were **removed 2026-06-15** (no use case; structural-symmetry artifact); user phones/addresses are now global-only. Removing them did not touch this org-level subsystem.
+
 ### Design Principles
 
 1. **Event-Driven CQRS**: All state changes recorded as immutable events

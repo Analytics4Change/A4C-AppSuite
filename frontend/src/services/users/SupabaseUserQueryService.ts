@@ -145,7 +145,6 @@ interface UserPhoneRow {
   isPrimary: boolean;
   isActive: boolean;
   isMirrored: boolean;
-  source: string; // 'global' | 'org'
 }
 
 /** User org access row from user_organizations_projection (via api.get_user_org_access RPC) */
@@ -1044,7 +1043,6 @@ export class SupabaseUserQueryService implements IUserQueryService {
       return addresses.map((addr) => ({
         id: addr.id,
         userId: addr.user_id,
-        orgId: null, // user_addresses table doesn't have org_id
         label: addr.label,
         type: addr.type as UserAddress['type'],
         street1: addr.street1,
@@ -1067,8 +1065,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
   /**
    * Get user's phones using the api.get_user_phones RPC
    *
-   * Returns both global phones (user_phones table) and org-specific phones
-   * (user_org_phone_overrides table) for the current organization.
+   * Returns the user's global phones (user_phones table).
    */
   async getUserPhones(userId: string): Promise<UserPhone[]> {
     const client = supabaseService.getClient();
@@ -1101,7 +1098,6 @@ export class SupabaseUserQueryService implements IUserQueryService {
       return (data ?? []).map((phone: UserPhoneRow) => ({
         id: phone.id,
         userId: userId,
-        orgId: phone.source === 'org' ? (orgId ?? null) : null,
         label: phone.label,
         type: phone.type as UserPhone['type'],
         countryCode: phone.countryCode ?? '+1',
@@ -1111,7 +1107,6 @@ export class SupabaseUserQueryService implements IUserQueryService {
         isPrimary: phone.isPrimary ?? false,
         isActive: phone.isActive ?? true,
         isMirrored: phone.isMirrored ?? false,
-        source: phone.source as 'global' | 'org',
         createdAt: new Date(),
         updatedAt: new Date(),
       }));

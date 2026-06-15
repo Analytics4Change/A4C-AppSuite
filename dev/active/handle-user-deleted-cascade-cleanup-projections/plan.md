@@ -21,8 +21,6 @@
 | public | user_notification_preferences_projection | user_id | **2** | Membership | **DELETE** (cascade) |
 | public | user_addresses | user_id | 0 | User-owned identity | **DELETE** (cascade) |
 | public | user_phones | user_id | **3** | User-owned identity | **DELETE** (cascade) |
-| public | user_org_address_overrides | user_id | 0 | Membership | **DELETE** (cascade) |
-| public | user_org_phone_overrides | user_id | 0 | Membership | **DELETE** (cascade) |
 | public | user_client_assignments_projection | user_id | 0 | Membership | **DELETE** (cascade) |
 | public | user_client_assignments_projection | assigned_by | (not measured) | Audit reference | **KEEP** (historical fact) |
 | public | schedule_user_assignments_projection | user_id | 0 | Membership | **DELETE** (cascade) |
@@ -57,13 +55,13 @@ DELETE FROM public.user_organizations_projection WHERE user_id = v_user_id;
 DELETE FROM public.user_notification_preferences_projection WHERE user_id = v_user_id;
 DELETE FROM public.user_addresses WHERE user_id = v_user_id;
 DELETE FROM public.user_phones WHERE user_id = v_user_id;
-DELETE FROM public.user_org_address_overrides WHERE user_id = v_user_id;
-DELETE FROM public.user_org_phone_overrides WHERE user_id = v_user_id;
 DELETE FROM public.user_client_assignments_projection WHERE user_id = v_user_id;
 DELETE FROM public.schedule_user_assignments_projection WHERE user_id = v_user_id;
 ```
 
 These are all "membership state" — fact that "user X is in org Y with role Z" or "user X has phone P". When user X is soft-deleted, those facts no longer hold. Reversibility on undelete is via re-onboarding (re-issuing invitations / re-assigning roles).
+
+> **Note (2026-06-15):** `user_org_phone_overrides` and `user_org_address_overrides` were removed from the inventory + cascade SQL above — those per-user org-override tables were dropped entirely (PR removing per-user org contact overrides; migration `20260615175954`). All user phones/addresses are now global (`user_phones`/`user_addresses`, already covered above). Do not re-add DELETEs for the dropped tables.
 
 ### Special case: `contacts_projection`
 

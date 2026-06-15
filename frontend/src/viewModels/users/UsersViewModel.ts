@@ -368,20 +368,6 @@ export class UsersViewModel {
   }
 
   /**
-   * Global addresses (no org override)
-   */
-  get globalAddresses(): UserAddress[] {
-    return this.activeAddresses.filter((a) => !a.orgId);
-  }
-
-  /**
-   * Org-specific address overrides
-   */
-  get orgAddressOverrides(): UserAddress[] {
-    return this.activeAddresses.filter((a) => a.orgId === this.currentOrgId);
-  }
-
-  /**
    * Active phones (not soft-deleted)
    */
   get activePhones(): UserPhone[] {
@@ -400,20 +386,6 @@ export class UsersViewModel {
    */
   get smsCapablePhones(): UserPhone[] {
     return this.activePhones.filter((p) => p.smsCapable);
-  }
-
-  /**
-   * Global phones (no org override)
-   */
-  get globalPhones(): UserPhone[] {
-    return this.activePhones.filter((p) => !p.orgId);
-  }
-
-  /**
-   * Org-specific phone overrides
-   */
-  get orgPhoneOverrides(): UserPhone[] {
-    return this.activePhones.filter((p) => p.orgId === this.currentOrgId);
   }
 
   /**
