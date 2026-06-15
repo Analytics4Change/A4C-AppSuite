@@ -504,26 +504,15 @@ END;
 $function$;
 
 -- =====================================================================
--- 4. Drop RLS policies (6) — must precede DROP TABLE for clean teardown
--- =====================================================================
-DROP POLICY IF EXISTS platform_admin_all ON public.user_org_phone_overrides;
-DROP POLICY IF EXISTS user_org_phone_overrides_org_admin_all ON public.user_org_phone_overrides;
-DROP POLICY IF EXISTS user_org_phone_overrides_own_all ON public.user_org_phone_overrides;
-DROP POLICY IF EXISTS platform_admin_all ON public.user_org_address_overrides;
-DROP POLICY IF EXISTS user_org_address_overrides_org_admin_all ON public.user_org_address_overrides;
-DROP POLICY IF EXISTS user_org_address_overrides_own_all ON public.user_org_address_overrides;
-
--- =====================================================================
--- 5. Drop indexes (5 non-PK)
--- =====================================================================
-DROP INDEX IF EXISTS public.idx_user_org_phone_overrides_lookup;
-DROP INDEX IF EXISTS public.idx_user_org_phone_overrides_sms;
-DROP INDEX IF EXISTS public.idx_user_org_phone_overrides_user;
-DROP INDEX IF EXISTS public.idx_user_org_address_overrides_lookup;
-DROP INDEX IF EXISTS public.idx_user_org_address_overrides_user;
-
--- =====================================================================
--- 6. Drop tables (outbound FKs to user_organizations_projection vanish; zero inbound FKs)
+-- 4. Drop tables — DROP TABLE cascades all dependent objects (RLS policies +
+--    indexes + constraints), so explicit DROP POLICY/INDEX are unnecessary AND
+--    would break idempotency (`DROP POLICY IF EXISTS ... ON <tbl>` still errors
+--    42P01 when the table is already gone — IF EXISTS guards the policy, not the
+--    table). DROP TABLE IF EXISTS no-ops cleanly whether or not the table exists.
+--    Cascaded with each table:
+--      policies: platform_admin_all, *_org_admin_all, *_own_all (3 per table)
+--      indexes:  idx_user_org_{phone,address}_overrides_{lookup,sms,user}
+--    Outbound FKs to user_organizations_projection vanish; zero inbound FKs.
 -- =====================================================================
 DROP TABLE IF EXISTS public.user_org_phone_overrides;
 DROP TABLE IF EXISTS public.user_org_address_overrides;
