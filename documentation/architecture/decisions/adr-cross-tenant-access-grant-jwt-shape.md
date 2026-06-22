@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-26
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -47,6 +47,8 @@ What does NOT yet exist:
 - Any RLS policy that consults `cross_tenant_access_grants_projection` for cross-tenant data access. The grant projection itself has only two SELECT policies — `cross_tenant_grants_org_admin_select` (baseline_v4:15252-15259) and `platform_admin_all` (L15625) — and NO insert/update/delete policy; grant writes are exclusively event-sourced via SECURITY DEFINER handlers.
 
 This ADR commits the JWT-claim-shape architecture and grant-permission-source mechanism. It does NOT commit the grant write-side RPC body, the type-specific backing tables, the Bucket D RLS audit, or the grant-creation UI; those are Phase 0.4+, Phase 2, Phase 4, and Phase N respectively in [the cross-tenant-access-grant-rollout card](../../../dev/active/cross-tenant-access-grant-rollout/plan.md).
+
+> **As-built update (2026-06-22)**: This ADR is point-in-time (decision authored 2026-05-26). Subsequent state: the grant **write-side SHIPPED** in Phase 2 (`api.create_access_grant`, VAR partnership RPCs, `var_partnerships_projection`, `grant_role_templates`; PR #71, 2026-06-04), `emergency_access` became reachable (PR #79), and Phase 3 made `api.list_users` grant-aware via the Model M membership-oracle guard (PR #80). The Bucket D RLS audit (Phase 4) and grant UI (Phase N) remain open. "to be built" language below is original-decision context. See [cross-tenant-access-grant-rpc-reachability-matrix.md](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) for current per-RPC status.
 
 ### Why this ADR exists now
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-26
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -375,6 +375,8 @@ interface AccessGrantCreatedEvent {
 
 **VAR Contract Authorization** — VAR contracts typically grant `view` and `export` operations on analytics-class data: usage analytics, support tickets, billing reports. `phi_restricted: true` is the default in `terms` per HIPAA-grade VAR-default policy (locked by ADR Decision C.2's `var_default` template seed: 4 `partner.*` permissions with PHI-restricted default terms). `authorization_reference` points at the `var_partnerships_projection` row.
 
+**Emergency Access Authorization** (SHIPPED — PR #79, 2026-06-22) — for a time-critical clinical need (e.g. a covering clinician at another org needs to see a client's record + active meds). The `emergency_default` template (`grant_role_templates`) confers exactly `{client.view, medication.view}` — **read-only** clinical-PHI leaf permissions (they imply nothing, so they cannot escalate into any write/administer/discharge perm), with `phi_restricted: true`. Unlike every other type, `authorization_reference` is **NULL** for `emergency_access` (a deliberate CHECK-constraint carve-out — emergencies have no pre-existing backing contract). To bound the HIPAA time-limitation risk, `api.create_access_grant` **requires** `expires_at` for emergency grants and **caps the window at 72 hours** (policy-in-code, compliance-ratified 2026-06-15). Write/administer emergency authority is a separate, decision-gated future template (`emergency_clinical_write`), NOT this default. See [grant_role_templates.md](../../infrastructure/reference/database/tables/grant_role_templates.md).
+
 **Court Order Authorization** — Court orders grant `view` + `export` operations on client-specific records: client records, medication history, treatment plans. Always `client_specific` (scope = `'client_specific'` with `scope_id = client_uuid`) and `time_limited` (bounded by `expires_at` mirroring court-order expiration). The `legal_reference` field carries the court order number; `authorization_reference` points at the `court_authorizations_projection` row (Phase N).
 
 **Agency Assignment Authorization** — Social services agency assignments grant `view` + `update` + `create` on case-management data: case notes, service plans, progress reports. Caseworker-specific (`consultant_user_id` non-NULL, points at the caseworker's user UUID). `scope` typically `'client_specific'` keyed to the assigned client; `authorization_reference` points at the `agency_assignments_projection` row (Phase N).
@@ -714,23 +716,23 @@ CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 --   referring_partner_id: UUID (optional, who referred this org)
 ```
 
-### Phase 1: Cross-Tenant Access (PLANNED)
+> **Status note (2026-06-22)**: The phases below are organized by *authorization type* and predate the as-built rollout. The cross-tenant-grant **backend** shipped across a separate Phase 1–3 sequence (see [adr-cross-tenant-access-grant-jwt-shape.md](../decisions/adr-cross-tenant-access-grant-jwt-shape.md) and [cross-tenant-access-grant-rpc-reachability-matrix.md](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md)). Delivered/deferred markers added inline.
 
-**Remaining Tasks:**
-1. Create `cross_tenant_access_grants_projection` table
-2. Implement access grant event processors
-3. Create RLS policies for cross-tenant data access
-4. Build UI for managing access grants
+### Phase 1: Cross-Tenant Access (BACKEND SHIPPED)
 
-### Phase 2: VAR Partnership Implementation
+1. ✅ `cross_tenant_access_grants_projection` table — shipped (PR #70/#71)
+2. ✅ Access grant event processors (`process_access_grant_event` + arms) — shipped (PR #71; column alignment hotfix PR #74)
+3. ✅ RLS policies for the grants projection — shipped (PR #71; see the table reference doc). Grant-derived data-tier RLS across remaining Bucket-D tables = Phase 4 (not yet seeded).
+4. ❌ UI for managing access grants — NOT built (Phase N)
 
-**Focus**: Complete VAR-specific relationship management as the first provider partner type
+### Phase 2: VAR Partnership Implementation (WRITE-SIDE SHIPPED)
 
-**Tasks**:
-1. Implement `var_partnerships_projection` table and events
-2. Create VAR partnership lifecycle management
-3. Add revenue sharing and support level tracking
-4. Build VAR dashboard and multi-provider access UI
+**Focus**: VAR-specific relationship management as the first provider partner type
+
+1. ✅ `var_partnerships_projection` table + `var_partnership.*` events + `process_var_partnership_event` router — shipped (PR #71, 2026-06-04)
+2. ✅ VAR partnership lifecycle RPCs (`create/update/reactivate/terminate_var_partnership`, `create_access_grant`) — shipped (PR #71)
+3. ❌ Revenue sharing / support-level tracking — NOT built
+4. ❌ VAR dashboard + multi-provider access UI — NOT built (Phase N)
 
 ### Phase 3: Court System Integration
 

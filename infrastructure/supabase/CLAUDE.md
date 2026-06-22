@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-23
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -424,22 +424,32 @@ handlers/
 
 ### Critical Rules
 
-> **⚠️ CRITICAL: NEVER create per-event-type triggers on `domain_events`**
+> **⚠️ CRITICAL: Exactly ONE *routing* trigger — never add a second BEFORE-INSERT router**
 >
-> All event routing goes through a **single** `process_domain_event()` BEFORE INSERT
-> trigger. This trigger dispatches by `stream_type` to the appropriate router function,
-> which then dispatches by `event_type` to individual handlers. **Do NOT create
-> additional triggers** with WHEN clauses filtering specific event types — duplicate
-> triggers cause events to be processed multiple times.
+> Projection routing goes through a **single** `process_domain_event()` BEFORE INSERT/UPDATE
+> trigger: it dispatches by `stream_type` to a router → by `event_type` to a handler. **Do NOT
+> create a second BEFORE-INSERT trigger** that filters `event_type` to update a projection —
+> duplicate routing processes events multiple times.
 >
 > ```
-> ✅ CORRECT: Add CASE line to router function
+> ✅ CORRECT (projection update): add a CASE line to the router
 >    process_domain_event() → process_user_event(NEW) → handle_user_foo(NEW)
 >
-> ❌ WRONG: Create trigger with WHEN clause
->    CREATE TRIGGER my_trigger AFTER INSERT ON domain_events
->    WHEN (NEW.event_type = 'user.foo.created') ...
+> ❌ WRONG: a SECOND BEFORE-INSERT trigger that routes/updates a projection by event_type
 > ```
+>
+> **Sanctioned exception — AFTER-INSERT side-effect / event-chaining triggers.** A trigger that
+> fires `AFTER INSERT ... WHEN (NEW.event_type = '…')` to perform a *side effect* (start a workflow,
+> `pg_notify`, or emit a chained domain event) is a deliberate, established pattern — it does not
+> route projections, so it does not conflict with the single dispatcher. Existing examples on
+> `domain_events`: `bootstrap_workflow_trigger`, `enqueue_workflow_from_bootstrap_event_trigger`,
+> `update_workflow_queue_projection_trigger`, `emit_grant_revocations_on_user_deleted_trigger`
+> (PR #81). **Use an AFTER trigger — not a nested `api.emit_domain_event()` from a BEFORE handler —
+> for event-chaining**: a nested emit records an inner failure on the INNER event's
+> `processing_error`, invisible to the originating RPC's outer Pattern A v2 read-back (silent
+> `{success:true}`); the AFTER trigger surfaces each chained event's failure as an independent,
+> retryable `processing_error`. See `documentation/infrastructure/patterns/event-processing-patterns.md`
+> § "AFTER-INSERT event-chaining".
 
 > **⚠️ Event type naming convention**
 >
