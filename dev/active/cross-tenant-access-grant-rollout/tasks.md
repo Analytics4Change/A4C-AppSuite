@@ -165,12 +165,18 @@ ADR Phase 1 manifest changes:
 - **14. (new)** Ship codegen script `frontend/scripts/gen-rpc-reachability-matrix.cjs`.
 - **15. (new)** Ship CI workflow `.github/workflows/rpc-reachability-matrix-sync.yml`.
 
-### Phase 3 handoff (2-RPC scope after architect review)
+### Phase 3 handoff (CORRECTED 2026-06-22 — architect re-adjudication)
 
-| RPC | Bucket | Work |
-|---|---|---|
-| `api.list_users` | A (strict) | Replace early-return guard with PR #67 three-step skeleton |
-| `api.list_invitations` | A-variant | Replace early-RAISE guard with three-step skeleton + permission check on `invitation.read` |
+> **The original 2026-05-26 handoff below was WRONG on both RPCs** (`software-architect-dbc` re-adjudication 2026-06-22, record `~/.claude/plans/fizzy-jingling-puppy-agent-a9866ddd44acd09e3.md`). It assumed the three-step perm-gated skeleton + an `invitation.read` permission, but: `invitation.read` **does not exist** (no `invitation.*` family seeded); a `has_effective_permission('user.view', path)` gate on `list_users` violates the users-as-identities scoped-vs-unscoped rule AND is **inert** (no template confers `user.view`); and `has_cross_tenant_access(...)` is a deployed stub returning FALSE.
+
+| RPC | Bucket | Work | Status |
+|---|---|---|---|
+| `api.list_users` | A (strict) | **Model M** — swap the session-org guard (`p_org_id = get_current_org_id()`) for a membership-oracle `EXISTS` against the caller's `accessible_organizations @> [p_org_id]` (NOT the three-step perm-gated skeleton). | **DONE** — migration `20260622183824` |
+| `api.list_invitations` | A-variant | **Split out** — needs an exposure-policy decision (does a clinical-grant consultant see an org's invitations? likely NO) + an `invitation.read` permission seed if yes. | **Deferred** → `dev/active/seed-list-invitations-cross-tenant-visibility-decision.md` |
+
+Original (superseded) handoff, kept for provenance:
+| `api.list_users` | A (strict) | ~~Replace early-return guard with PR #67 three-step skeleton~~ |
+| `api.list_invitations` | A-variant | ~~Replace early-RAISE guard with three-step skeleton + permission check on `invitation.read`~~ |
 
 ### Phase 4 handoff (Bucket D + D-variant RLS audit scope — 35 RPCs)
 
