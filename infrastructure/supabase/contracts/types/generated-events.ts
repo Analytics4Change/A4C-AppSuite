@@ -2228,7 +2228,7 @@ export interface AccessGrantRevokedEvent {
 
 export interface AccessGrantRevokedData {
   'grant_id': string;
-  'revoked_by': string;
+  'revoked_by'?: string;
   'revocation_reason': string;
   'additionalProperties'?: Map<string, any>;
 }

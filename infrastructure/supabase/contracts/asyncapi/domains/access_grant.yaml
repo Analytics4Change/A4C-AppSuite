@@ -181,7 +181,6 @@ components:
       type: object
       required:
         - grant_id
-        - revoked_by
         - revocation_reason
       properties:
         grant_id:
@@ -190,7 +189,8 @@ components:
         revoked_by:
           type: string
           format: uuid
-          description: User ID of person revoking access
+          nullable: true
+          description: User ID of person revoking access; NULL for automated revocations (e.g. consultant user deleted)
         revocation_reason:
           type: string
           description: Explanation for why access is being revoked (e.g., contract
