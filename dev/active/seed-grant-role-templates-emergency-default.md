@@ -1,8 +1,23 @@
 # Seed `emergency_default` template for `emergency_access` authorization_type (or make template optional)
 
-**Status**: seed (not yet planned)
+**Status**: SHIPPED 2026-06-22 (Option B + expiry guard; migration `20260615232910`) — pending PR merge
 **Priority**: Medium-High (production-functional gap; `emergency_access` authorization type is currently unreachable end-to-end despite being a first-class enum value)
 **Origin**: Phase 2 UAT execution 2026-06-09 probe L6 (claude during UAT card execution)
+
+## Outcome (SHIPPED 2026-06-22)
+
+Resolved via **Option B** (architect-confirmed, record `~/.claude/plans/misty-popping-bengio-agent-a9ecd00d9dc2ce504.md`): seeded the 2-row `emergency_default` template (`{client.view, medication.view}`, read-only clinical-PHI **leaf** perms — verified 0 outbound implications, structurally non-escalating) **+** a body-only pre-emit guard on `api.create_access_grant` requiring `expires_at NOT NULL` and capping the emergency window at **72h** (closes the HIPAA unbounded-grant hole in the same unit of work). Migration `20260615232910_seed_emergency_default_grant_template_and_bound_emergency_expiry.sql`.
+
+Independent re-verification (live dev DB + deployed body) + **pitfall #6 clean diff** (Section C == deployed `pg_get_functiondef` body, only the 2 new guards added). No signature change → no TS regen, no AsyncAPI change; M3 `@a4c-rpc-shape: envelope` comment preserved.
+
+**L6 re-probe (transactional simulate-JWT, `BEGIN; set_config; create_access_grant; ROLLBACK` — zero dev pollution):**
+- Happy path (`emergency_access`, `authorization_reference=NULL`, `expires_at=now()+24h`) → `success:true`, perms `[{client.view},{medication.view}]` @ `liveforlife.aspen`. **L6 now PASS** (was BLOCKED).
+- NULL expiry → `ERROR 22004: expires_at is required for emergency_access`.
+- `now()+96h` → `ERROR 22023: expires_at for emergency_access may not exceed 72 hours from now`.
+- `p_permission_overrides={medication.view}` → `success:true`, perms `[{medication.view}]` (INTERSECT narrowing intact).
+- Post-probe: 0 leaked grants, 0 leaked events; template 2 rows persist.
+
+**Sibling card spun out**: `seed-emergency-clinical-write-grant-template.md` — the deferred write/administer emergency template (decision-gated; explicitly NOT this read-only default).
 
 ## Problem
 
