@@ -77,9 +77,13 @@ BEGIN
 
     -- contacts_projection: preserve the contact entity (it may be referenced by
     -- other domain entities), drop only the user linkage. user_id is nullable;
-    -- the partial UNIQUE index idx_contacts_unique_user_id WHERE user_id IS NOT
-    -- NULL tolerates NULLs.
-    UPDATE public.contacts_projection SET user_id = NULL WHERE user_id = p_event.stream_id;
+    -- the partial indexes idx_contacts_unique_user_per_org (organization_id,
+    -- user_id) and idx_contacts_user_id — both WHERE user_id IS NOT NULL — tolerate
+    -- NULLs. The explicit user_id IS NOT NULL conjunct mirrors those index
+    -- predicates and makes replay a guaranteed no-op (no write against rows already
+    -- unlinked on a prior pass).
+    UPDATE public.contacts_projection SET user_id = NULL
+     WHERE user_id = p_event.stream_id AND user_id IS NOT NULL;
 END;
 $function$;
 
@@ -99,6 +103,12 @@ AS $function$
 DECLARE
     v_grant record;
 BEGIN
+    -- INVARIANT: a deleted user can only ever be a grant *consultant*, never a
+    -- grant *target* — grant targets are orgs/clients (provider_org_id / client
+    -- scope), never users. So filtering on consultant_user_id = NEW.stream_id is
+    -- the COMPLETE set of grants to revoke for this user. (Boundary doc for Phase N
+    -- user-targeted grant types: revisit this assumption if a user-as-target grant
+    -- type is ever introduced.)
     FOR v_grant IN
         SELECT id
         FROM public.cross_tenant_access_grants_projection
@@ -107,7 +117,9 @@ BEGIN
     LOOP
         -- Handler process_access_grant_event keys its UPDATE on event_data->>'grant_id'
         -- (NOT stream_id); set both. revoked_by NULL = automated (contract made
-        -- nullable in this PR's AsyncAPI change).
+        -- nullable in this PR's AsyncAPI change). READ-SIDE POSTCONDITION: revoked
+        -- grant rows produced by this path carry revoked_by IS NULL — consumers
+        -- (read RPCs / frontend grant types) must treat revoked_by as nullable.
         PERFORM api.emit_domain_event(
             p_stream_id      := v_grant.id,
             p_stream_type    := 'access_grant',
@@ -183,13 +195,33 @@ END $$;
 -- matches the historical user.deleted events. Direct DELETEs (the user.deleted
 -- event already exists; re-emitting would add audit noise). Covers all 3 arms.
 -- Migration context (not a trigger) -> emit_domain_event for grant-revoke is
--- safe here. Dev targets today: 9 membership rows, 0 contacts, 0 active grants.
+-- safe here.
+--
+-- BLAST RADIUS: scope is env-dependent — the loop runs over EVERY tombstoned user
+-- in the TARGET environment (not just dev's), and each active grant found drives a
+-- synchronous grant-revoke (emit -> handler -> accessible_organizations recompute)
+-- inside this single migration transaction. It is idempotent / re-run-safe
+-- (DELETE/NULL no-op; grant-revoke filters status='active' so a re-applied
+-- migration emits 0 duplicates). The RAISE NOTICE below records the actual counts
+-- in the deploy log so the blast radius is observable per environment. Dev targets
+-- at authoring time: 9 membership rows across 2 users, 0 contacts, 0 active grants.
 -- -----------------------------------------------------------------------------
 DO $$
 DECLARE
     v_user record;
     v_grant record;
+    v_tombstoned_users bigint;
+    v_active_grants     bigint;
 BEGIN
+    SELECT count(*) INTO v_tombstoned_users
+      FROM public.users WHERE deleted_at IS NOT NULL;
+    SELECT count(*) INTO v_active_grants
+      FROM public.cross_tenant_access_grants_projection g
+      JOIN public.users u ON u.id = g.consultant_user_id
+     WHERE u.deleted_at IS NOT NULL AND g.status = 'active';
+    RAISE NOTICE 'handle_user_deleted backfill blast radius: % tombstoned user(s), % active grant(s) to revoke',
+                 v_tombstoned_users, v_active_grants;
+
     FOR v_user IN SELECT id FROM public.users WHERE deleted_at IS NOT NULL LOOP
         DELETE FROM public.user_roles_projection                    WHERE user_id = v_user.id;
         DELETE FROM public.user_organizations_projection            WHERE user_id = v_user.id;
@@ -198,7 +230,7 @@ BEGIN
         DELETE FROM public.user_phones                              WHERE user_id = v_user.id;
         DELETE FROM public.user_client_assignments_projection       WHERE user_id = v_user.id;
         DELETE FROM public.schedule_user_assignments_projection     WHERE user_id = v_user.id;
-        UPDATE public.contacts_projection SET user_id = NULL        WHERE user_id = v_user.id;
+        UPDATE public.contacts_projection SET user_id = NULL        WHERE user_id = v_user.id AND user_id IS NOT NULL;
 
         FOR v_grant IN
             SELECT id FROM public.cross_tenant_access_grants_projection

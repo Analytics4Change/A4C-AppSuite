@@ -39,7 +39,10 @@ BEGIN
     DELETE FROM public.schedule_user_assignments_projection     WHERE user_id = p_event.stream_id;
 
     -- contacts_projection: preserve the contact entity, drop only the user
-    -- linkage (user_id nullable; partial UNIQUE index tolerates NULLs).
-    UPDATE public.contacts_projection SET user_id = NULL WHERE user_id = p_event.stream_id;
+    -- linkage (user_id nullable; partial indexes idx_contacts_unique_user_per_org
+    -- and idx_contacts_user_id, both WHERE user_id IS NOT NULL, tolerate NULLs).
+    -- The explicit user_id IS NOT NULL conjunct makes replay a guaranteed no-op.
+    UPDATE public.contacts_projection SET user_id = NULL
+     WHERE user_id = p_event.stream_id AND user_id IS NOT NULL;
 END;
 $function$;

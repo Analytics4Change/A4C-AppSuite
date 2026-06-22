@@ -10,7 +10,7 @@
  * 2. cd infrastructure/supabase/contracts && npm run generate:types
  * 3. cd workflows && npm run sync-schemas
  *
- * Last synced: 2026-06-09T19:04:00.578Z
+ * Last synced: 2026-06-22T21:53:58.523Z
  */
 
 // =============================================================================
@@ -2231,7 +2231,7 @@ export interface AccessGrantRevokedEvent {
 
 export interface AccessGrantRevokedData {
   'grant_id': string;
-  'revoked_by': string;
+  'revoked_by'?: string;
   'revocation_reason': string;
   'additionalProperties'?: Map<string, any>;
 }
