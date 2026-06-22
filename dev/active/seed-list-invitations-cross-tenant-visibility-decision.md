@@ -2,7 +2,7 @@
 
 **Status**: seed (not yet planned) — **decision-gated**
 **Priority**: Low-Medium (no current consultant use case; forward-need split out of Phase 3)
-**Origin**: Cross-tenant grant Phase 3 (PR for migration `20260622183824`). Architect (`software-architect-dbc`, 2026-06-22) split `list_invitations` out of Phase 3 because, unlike `list_users`, it is NOT a clean guard swap — it pulls in a permission seed + a HIPAA exposure-policy decision.
+**Origin**: Cross-tenant grant Phase 3 (PR #80, SHIPPED 2026-06-22, merge `b56a796c`, migration `20260622183824`). Architect (`software-architect-dbc`, 2026-06-22) split `list_invitations` out of Phase 3 because, unlike `list_users`, it is NOT a clean guard swap — it pulls in a permission seed + a HIPAA exposure-policy decision.
 
 ## Problem / why this is its own card
 

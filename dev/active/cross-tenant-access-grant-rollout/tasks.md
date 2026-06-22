@@ -75,10 +75,10 @@ Pending. Likely shape (NOT committed):
 
 ## Current Status
 
-**Phase**: Phase 0 — Architecture design (0.1 + 0.2 + 0.3 + 0.4 + 0.5 SHIPPED; closing on merge of PR #68)
-**Status**: All 5 sub-phase outcomes blocks complete (see sections below). 4 architect-review passes (one per sub-phase commit + one final cohesion pass on PR #68) with findings folded in. PR #68 open for external review.
-**Last Updated**: 2026-05-26
-**Next Step**: After PR #68 merges, seed `dev/active/cross-tenant-grant-phase-1-jwt-shape/` with plan.md tracking the 15-step migration manifest from ADR Consequences. Branch `feat/cross-tenant-grant-phase-1-jwt-shape` from main.
+**Phase**: Phase 3 SHIPPED (PR #80, 2026-06-22). Phases 0 + 1 + 2 + 3 all SHIPPED. Phase 4 (Bucket D RLS audit, 35 RPCs) NOT YET SEEDED; Phase N (court/agency/family) deferred.
+**Status**: Phase 3 made `api.list_users` grant-aware via the Model M membership-oracle guard (merge commit `b56a796c`; architect verdict APPROVE, no in-PR changes). `api.list_invitations` split out to a decision-gated sub-card (`seed-list-invitations-cross-tenant-visibility-decision.md`). See "Phase 3 — Outcomes" section below.
+**Last Updated**: 2026-06-22
+**Next Step**: Phase 4 is the remaining backend phase — seed `dev/active/cross-tenant-grant-phase-4-rls-audit/` (35 strict-D + 1 D-variant RLS policies extended with grant-aware `USING` clauses; may sub-divide per table cluster). Phases 4 and N are parallelable. The `list_invitations` exposure-policy decision (sub-card) gates whether that A-variant RPC ever becomes grant-aware.
 
 ---
 
@@ -171,7 +171,7 @@ ADR Phase 1 manifest changes:
 
 | RPC | Bucket | Work | Status |
 |---|---|---|---|
-| `api.list_users` | A (strict) | **Model M** — swap the session-org guard (`p_org_id = get_current_org_id()`) for a membership-oracle `EXISTS` against the caller's `accessible_organizations @> [p_org_id]` (NOT the three-step perm-gated skeleton). | **DONE** — migration `20260622183824` |
+| `api.list_users` | A (strict) | **Model M** — swap the session-org guard (`p_org_id = get_current_org_id()`) for a membership-oracle `EXISTS` against the caller's `accessible_organizations @> [p_org_id]` (NOT the three-step perm-gated skeleton). | **SHIPPED** — PR #80 merged `b56a796c` 2026-06-22 (migration `20260622183824`) |
 | `api.list_invitations` | A-variant | **Split out** — needs an exposure-policy decision (does a clinical-grant consultant see an org's invitations? likely NO) + an `invitation.read` permission seed if yes. | **Deferred** → `dev/active/seed-list-invitations-cross-tenant-visibility-decision.md` |
 
 Original (superseded) handoff, kept for provenance:
@@ -408,3 +408,26 @@ After Phase 0 PR merges to main:
 - **`audit.*` event family** AsyncAPI is registered for `audit.high_risk_action_logged`; future cross-grant / cross-tenant audit events follow the 2-level form precedent.
 - Phase 3 (2-RPC `list_users` / `list_invitations` A-variant refactor) + Phase 4 (35 strict-D + 1 D-variant RLS audit) handoffs locked at Phase 0.3, unblocked by Phase 1 + 2 completion.
 - **Phase N (court/agency/family)** can follow Phase 2's pattern verbatim: type-specific projection (`court_authorizations_projection` etc.) + `<aggregate>.*` event family + emit RPCs + dispatcher CASE branch. ADR Decision C.3's "pattern transferability" note applies.
+
+## Phase 3 — Outcomes (SHIPPED 2026-06-22)
+
+**PR #80** — merged commit `b56a796c` 2026-06-22 (no-squash per precedent; preserves the Phase 3 migration commit `7f014afd` + the architect-review doc commit `fa475a34`). Post-merge `Deploy Database Migrations` green (run `27982799137`, 50s). Single migration `20260622183824_phase_3_list_users_membership_guard.sql` (+150 lines).
+
+**Scope — 1 RPC (`api.list_users`), 1 split-out (`api.list_invitations`)**:
+
+1. ✅ **Model M membership-oracle guard.** Replaced the PR #66 session-org equality (`p_org_id = get_current_org_id()` — rejected grant-bearers, whose JWT `org_id` stays at their home org) with `has_platform_privilege() OR EXISTS (SELECT 1 FROM public.users caller WHERE caller.id = get_current_user_id() AND caller.accessible_organizations @> ARRAY[p_org_id]::uuid[])`. The guard now references the SAME oracle as the query-body predicate → "may you ask" ⇔ "what you see" can never disagree. RETURN-empty (Bucket A, no existence leak) preserved.
+2. ✅ **Verbatim body (pitfall #6).** Query body fetched via `pg_get_functiondef`; diffed byte-identical against the deployed predecessor (PR #66 body `20260519233323`, NOT baseline_v4 — baseline still had the old `user_roles_projection` EXISTS form). Only the guard block changed. Signature + return shape unchanged → CREATE OR REPLACE preserves OID; no M3 DROP+CREATE re-tag; no TS/AsyncAPI regen.
+3. ✅ **COMMENT re-issue** flips `@a4c-consultant-callable` `pending-phase3-refactor`→`yes` and `@a4c-phase-target` `3`→`none`; `@a4c-rpc-shape: read` + `@a4c-bucket: A` unchanged. Reachability-matrix doc hand-edits byte-match all three generated locations (CI `rpc-reachability-matrix-sync` PASS).
+4. ✅ **Bug caught + fixed in verification.** `list_users` `RETURNS TABLE(id uuid, …)`, so the guard's EXISTS had to alias the `users` table (`caller`) — an unqualified `id` is ambiguous (SQLSTATE 42702). The original guard never queried a table so it never hit this.
+5. ✅ **`api.list_invitations` split out** (architect D2) → `dev/active/seed-list-invitations-cross-tenant-visibility-decision.md`. Unlike `list_users` it is NOT a clean guard swap: `invitation.read` permission does not exist (no `invitation.*` family seeded) and it needs a HIPAA exposure-policy decision (likely "consultants don't see invitations"). Decision-gated; default recommendation = won't-do (leave org-admin-only).
+
+**Architect re-adjudication (2026-06-22)** rejected the original 2026-05-26 handoff on both RPCs: the three-step `has_effective_permission('user.view', path)` skeleton would (1) violate the users-as-identities scoped-vs-unscoped rule and (2) be inert (no template confers `user.view`); `has_cross_tenant_access(...)` is a deployed stub returning FALSE — so reading `accessible_organizations` directly is the only grant-aware mechanism that works today. Record: `~/.claude/plans/fizzy-jingling-puppy-agent-a9866ddd44acd09e3.md`.
+
+**Verification** (dev; transactional simulate-JWT, `BEGIN…ROLLBACK`, zero pollution): grant-bearer sees provider-org members + self (PASS); non-member consultant empty (PASS, no existence leak); org-internal admin + platform admin unchanged (PASS). Backward-compat = true superset, with a minor soundness *improvement* (eliminates the old form's stale-JWT session-org admit).
+
+**Post-ship architect review** (`software-architect-dbc`, full PR review): **APPROVE**, no blocking/should-fix findings, no in-PR code change forced. Items-to-address were all optional nits + verification gates (2/3 already green on CI; simulate-JWT smoke already executed). Review archived at `dev/active/cross-tenant-access-grant-rollout/pr-80-architect-review.md` (commit `fa475a34`).
+
+**Carry-forwards**:
+- **`seed-list-invitations-cross-tenant-visibility-decision.md`** — decision-gated A-variant follow-up (exposure policy → maybe seed `invitation.read` + RAISE→RETURN info-leak fix in the same migration).
+- **Phase 4** (Bucket D + D-variant RLS audit, 35 RPCs) — NOT YET SEEDED; the remaining backend phase. Parallelable with Phase N.
+- **UI grant-bearer segregation filter** ("direct member vs grant-bearer" second axis) → Phase N (ADR § user-visibility-consequence).
