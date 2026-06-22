@@ -6,7 +6,7 @@ last_updated: 2026-06-22
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection enabling cross-organization data access for provider_partner orgs (VAR contracts, court orders, social services). Time-bound, scope-limited grants with full audit trail. Supports statuses: active, revoked, expired, suspended. RLS enabled with policies (shipped Phase 2, PR #71).
+**Summary**: CQRS projection enabling cross-organization data access for provider_partner orgs (VAR contracts, court orders, social services). Time-bound, scope-limited grants with full audit trail. Supports statuses: active, revoked, expired, suspended. RLS enabled with policies (present since baseline_v4, 2026-02-12).
 
 **When to read**:
 - Implementing VAR (Vendor Authorized Representative) access
@@ -343,7 +343,7 @@ ORDER BY granted_at DESC;
 
 ## Row-Level Security (RLS)
 
-**Status**: ✅ ENABLED with policies (shipped in cross-tenant grant Phase 2, PR #71, 2026-06-04). Regenerate the live set with `SELECT polname, pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polrelid='public.cross_tenant_access_grants_projection'::regclass;`.
+**Status**: ✅ ENABLED with policies (present since baseline_v4, 2026-02-12 — `platform_admin_all` at baseline_v4:15625 and `cross_tenant_grants_org_admin_select` at baseline_v4:15255; NOT added in Phase 2, which created the *var_partnerships_projection* policies). Regenerate the live set with `SELECT polname, pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polrelid='public.cross_tenant_access_grants_projection'::regclass;`.
 
 ### Deployed policies (as of 2026-06-22)
 
@@ -703,5 +703,4 @@ WHERE consultant_org_id = '<uuid>'
 
 - **Event Processor**: `infrastructure/supabase/sql/03-functions/event-processing/006-process-access-grant-events.sql`
 - **Table Definition**: `infrastructure/supabase/sql/02-tables/rbac/005-cross_tenant_access_grants_projection.sql`
-- **RLS Enable**: `infrastructure/supabase/sql/06-rls/enable_rls_all_tables.sql:17`
-- **⚠️ RLS Policies**: **NOT YET IMPLEMENTED** - CRITICAL GAP
+- **RLS Enable + Policies**: `infrastructure/supabase/supabase/migrations/20260212010625_baseline_v4.sql` — `platform_admin_all` (:15625), `cross_tenant_grants_org_admin_select` (:15255). RLS is ✅ ENABLED (see "RLS Policies" section above); the prior "NOT YET IMPLEMENTED — CRITICAL GAP" note was stale and is removed.

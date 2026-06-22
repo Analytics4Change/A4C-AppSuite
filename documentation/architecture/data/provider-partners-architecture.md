@@ -730,7 +730,7 @@ CREATE TYPE partner_type AS ENUM ('var', 'family', 'court', 'other');
 **Focus**: VAR-specific relationship management as the first provider partner type
 
 1. ✅ `var_partnerships_projection` table + `var_partnership.*` events + `process_var_partnership_event` router — shipped (PR #71, 2026-06-04)
-2. ✅ VAR partnership lifecycle RPCs (`create/update/reactivate/terminate_var_partnership`, `create_access_grant`) — shipped (PR #71)
+2. ✅ VAR partnership lifecycle RPCs (5: `create/update/suspend/reactivate/terminate_var_partnership`, plus `create_access_grant`) — shipped (PR #71)
 3. ❌ Revenue sharing / support-level tracking — NOT built
 4. ❌ VAR dashboard + multi-provider access UI — NOT built (Phase N)
 

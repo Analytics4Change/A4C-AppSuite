@@ -30,9 +30,9 @@ A4C uses a **split handler architecture** for processing domain events into CQRS
 
 | Component | Count | Purpose |
 |-----------|-------|---------|
-| **Routers** | 13 active | Thin CASE dispatchers (~50 lines each) |
-| **Handlers** | 52 | Focused event processors (20-50 lines each) |
-| **Triggers** | 6 as of 2026-06-22 | On `domain_events`: 1 BEFORE INSERT/UPDATE router + AFTER-INSERT side-effect triggers (regenerate: `SELECT tgname FROM pg_trigger WHERE tgrelid='public.domain_events'::regclass AND NOT tgisinternal`) |
+| **Routers** | 16 reference files / 17 wired as of 2026-06-22 | Thin CASE dispatchers (~50 lines each). Regenerate file count: `ls infrastructure/supabase/handlers/routers/*.sql \| wc -l`; wired count = distinct `PERFORM process_*_event` in `handlers/trigger/process_domain_event.sql` (16 files but 17 wired because `process_rbac_event` serves both `role` and `permission` stream types) |
+| **Handlers** | 91 as of 2026-06-22 | Focused event processors (20-50 lines each). Regenerate: `find infrastructure/supabase/handlers -name 'handle_*.sql' \| wc -l` |
+| **Triggers** | 6 as of 2026-06-22 | On `domain_events`: 1 BEFORE-INSERT/UPDATE router (`process_domain_event_trigger`) + 1 BEFORE-INSERT `pg_notify` side-effect (`trigger_notify_bootstrap_initiated`) + 4 AFTER-INSERT side-effect/event-chaining triggers (regenerate: `SELECT tgname FROM pg_trigger WHERE tgrelid='public.domain_events'::regclass AND NOT tgisinternal`) |
 
 > **Note**: This document covers the **synchronous trigger handler pattern** used for projection updates. For async side effects (email, DNS, webhooks), see [Event Processing Patterns](./event-processing-patterns.md).
 
@@ -96,8 +96,15 @@ domain_events → process_domain_event() BEFORE INSERT trigger (single trigger)
 > appropriate router → handler. **Do NOT** create a second BEFORE-INSERT trigger that filters
 > on `event_type` to update projections — that duplicates routing and causes double-processing
 > (an early migration did this and was removed by `remove_duplicate_event_triggers`,
-> `20260204220526`). When adding a new event type for a projection update, only add a CASE line
-> to the appropriate router function.
+> `20260204220526` — that migration is no longer a standalone file; it was folded into
+> `20260212010625_baseline_v4.sql`). When adding a new event type for a projection update, only
+> add a CASE line to the appropriate router function.
+>
+> **Sanctioned BEFORE-INSERT side-effect.** The rule above forbids a second BEFORE-INSERT trigger
+> that *routes projections*. There is one sanctioned BEFORE-INSERT trigger that performs a pure
+> side effect and does NOT route projections: `trigger_notify_bootstrap_initiated` (a `pg_notify`
+> on bootstrap initiation). It coexists with the dispatcher precisely because it touches no
+> projection.
 >
 > **The sanctioned exception — AFTER-INSERT side-effect / event-chaining triggers.** Triggers
 > that fire `AFTER INSERT` with a `WHEN (NEW.event_type = '…')` clause to perform a *side effect*
@@ -493,17 +500,26 @@ Canonical SQL source for every handler, router, and trigger is at `infrastructur
 
 These are documentation files (not deployment artifacts) — the source of truth is always the deployed database via migrations.
 
+Counts below are as of 2026-06-22 (regenerate per directory with
+`ls infrastructure/supabase/handlers/<dir>/*.sql | wc -l`; total handlers with
+`find infrastructure/supabase/handlers -name 'handle_*.sql' | wc -l` = 91):
+
 ```
 handlers/
 ├── README.md                    # Sync rules, usage instructions
-├── trigger/                     # trigger function files (incl. emit_grant_revocations_on_user_deleted)
-├── routers/                     # 12 active router files
-├── user/                        # 20 handler files
+├── trigger/                     # 6 trigger function files (incl. emit_grant_revocations_on_user_deleted)
+├── routers/                     # 16 router files (17 wired — process_rbac_event serves role + permission)
+├── user/                        # 19 handler files
 ├── organization/                # 11 handler files
 ├── organization_unit/           # 5 handler files
-├── rbac/                        # 10 handler files
+├── rbac/                        # 9 handler files
 ├── bootstrap/                   # 3 handler files
-└── invitation/                  # 1 handler file
+├── invitation/                  # 1 handler file
+├── contact/                     # 2 handler files
+├── schedule/                    # 8 handler files
+├── client/                      # 23 handler files
+├── client_field_category/       # 5 handler files
+└── client_field_definition/     # 5 handler files
 ```
 
 **Workflow**:
@@ -586,7 +602,7 @@ if (response.success && !response.unit?.id) {
 
 ### Affected RPCs
 
-**All `api.update_*` and `api.change_*` RPCs MUST follow this pattern** as of migration `20260423060052_api_rpc_readback_pattern.sql` (2026-04-23). Generalization formalized in [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md). 18 RPCs currently apply Pattern A (return-error envelope on handler failure):
+**All `api.update_*` and `api.change_*` RPCs MUST follow this pattern** as of migration `20260423060052_api_rpc_readback_pattern.sql` (2026-04-23). Generalization formalized in [adr-rpc-readback-pattern.md](../../architecture/decisions/adr-rpc-readback-pattern.md), which carries the canonical inventory (18 RPCs as of that ADR — treat the ADR's list as the source of truth rather than this count). RPCs applying Pattern A (return-error envelope on handler failure):
 
 | Group | RPCs | Migration |
 |---|---|---|

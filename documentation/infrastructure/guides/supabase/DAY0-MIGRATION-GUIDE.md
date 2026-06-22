@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-03-27
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -59,16 +59,23 @@ During baseline consolidation:
 
 This prevents column name drift, type mismatches, and logic errors that occur when AI agents reconstruct functions from memory.
 
+Counts as of 2026-06-22 (regenerate per dir: `ls infrastructure/supabase/handlers/<dir>/*.sql | wc -l`):
+
 ```
 handlers/
-├── trigger/           # 5 trigger function files
-├── routers/           # 12 active router files
-├── user/              # 20 handler files
-├── organization/      # 11 handler files
-├── organization_unit/ # 5 handler files
-├── rbac/              # 10 handler files
-├── bootstrap/         # 3 handler files
-└── invitation/        # 1 handler file
+├── trigger/                 # 6 trigger function files
+├── routers/                 # 16 router files (17 wired — process_rbac_event serves role + permission)
+├── user/                    # 19 handler files
+├── organization/            # 11 handler files
+├── organization_unit/       # 5 handler files
+├── rbac/                    # 9 handler files
+├── bootstrap/               # 3 handler files
+├── invitation/              # 1 handler file
+├── contact/                 # 2 handler files
+├── schedule/                # 8 handler files
+├── client/                  # 23 handler files
+├── client_field_category/   # 5 handler files
+└── client_field_definition/ # 5 handler files
 ```
 
 **See**: [`handlers/README.md`](../../../../infrastructure/supabase/handlers/README.md) for usage rules and sync protocol.

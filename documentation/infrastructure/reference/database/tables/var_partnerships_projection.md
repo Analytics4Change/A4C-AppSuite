@@ -39,7 +39,7 @@ CQRS projection of VAR partnership contracts. Shipped in cross-tenant grant **Ph
 | `contract_number` | text | Optional external reference |
 | `contract_start_date` | date NOT NULL | |
 | `contract_end_date` | date | NULL = open-ended |
-| `revenue_share_percentage` | numeric | Business metadata (tracking UI not built) |
+| `revenue_share_percentage` | numeric(5,2) | Business metadata (tracking UI not built) |
 | `support_level` | text | CHECK ∈ {`tier1`, `tier1_tier2`, `full`} |
 | `terms` | jsonb | Default `{}` |
 | `status` | text NOT NULL | CHECK ∈ {`active`, `expired`, `terminated`, `suspended`}; default `active` |
@@ -47,11 +47,11 @@ CQRS projection of VAR partnership contracts. Shipped in cross-tenant grant **Ph
 | `terminated_at` / `terminated_by` / `termination_reason` | — | Termination audit (audit-reference cols) |
 | `suspended_at` / `suspended_by` / `suspension_reason` | — | Suspension audit (audit-reference cols) |
 
-**Key constraints**: PK `id`; FKs to `organizations_projection` (both sides, CASCADE); the three CHECKs above.
+**Key constraints**: PK `id`; partial UNIQUE `idx_var_partnerships_pair_active (partner_org_id, provider_org_id) WHERE status IN ('active','suspended')` (one live partnership per partner↔provider pair); FKs to `organizations_projection` (both sides, CASCADE); the three CHECKs above.
 
 ## Event family
 
-Fed by `var_partnership.*` events routed through `process_var_partnership_event` (added in Phase 2). Lifecycle RPCs: `api.create_var_partnership`, `api.update_var_partnership`, `api.reactivate_var_partnership`, `api.terminate_var_partnership` (terminate cascade-revokes dependent grants). See the migration and the parent ADR for the per-event payloads — do not duplicate them here.
+Fed by `var_partnership.*` events routed through `process_var_partnership_event` (added in Phase 2). Lifecycle RPCs (5): `api.create_var_partnership`, `api.update_var_partnership`, `api.suspend_var_partnership`, `api.reactivate_var_partnership`, `api.terminate_var_partnership` (terminate cascade-revokes dependent grants). See the migration and the parent ADR for the per-event payloads — do not duplicate them here.
 
 ## Row-Level Security
 

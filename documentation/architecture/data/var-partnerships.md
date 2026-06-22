@@ -26,7 +26,7 @@ last_updated: 2026-06-22
 > [!NOTE]
 > **Implementation status (2026-06-22) — write-side shipped, business/UI features deferred.**
 > - ✅ VAR organizations created via organization bootstrap (`partner_type = 'var'`); VARs receive subdomains
-> - ✅ **VAR partnership write-side SHIPPED** (cross-tenant grant Phase 2, PR #71, 2026-06-04): `var_partnerships_projection`, `var_partnership.*` events + `process_var_partnership_event` router, and the lifecycle RPCs (`create/update/reactivate/terminate_var_partnership`, `create_access_grant` with the `var_default` template)
+> - ✅ **VAR partnership write-side SHIPPED** (cross-tenant grant Phase 2, PR #71, 2026-06-04): `var_partnerships_projection`, `var_partnership.*` events + `process_var_partnership_event` router, and the 5 lifecycle RPCs (`create/update/suspend/reactivate/terminate_var_partnership`, plus `create_access_grant` with the `var_default` template)
 > - ❌ VAR management dashboard / multi-provider access UI NOT built (Phase N)
 > - ❌ Revenue share tracking NOT implemented
 > - ❌ White-label configuration NOT implemented
