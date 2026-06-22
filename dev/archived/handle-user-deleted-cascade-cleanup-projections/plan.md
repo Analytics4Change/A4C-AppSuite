@@ -1,6 +1,10 @@
 # `handle_user_deleted` should cascade-cleanup all FK-dependent membership projections
 
-**Status**: seed (not yet planned)
+**Status**: ✅ SHIPPED 2026-06-22 (PR #81, merge `d74b5bcd`) — ARCHIVED
+
+> **Outcome (PR #81)**: Two-layer fix, architect-reviewed (APPROVE WITH IN-PR FIXES). (1) BEFORE handler `handle_user_deleted` tombstones FIRST (load-bearing for the accessible_organizations recompute self-guard), then hard-DELETEs the 7 membership/identity projections + NULLs the `contacts_projection` user-linkage. (2) Grant-revoke is a dedicated AFTER-INSERT trigger `emit_grant_revocations_on_user_deleted` (architect F1 — a nested emit from the BEFORE handler would bury an inner failure invisible to `api.delete_user`'s outer read-back). F2: `AccessGrantRevokedData.revoked_by` made nullable (wired source = `rbac.yaml`; types regen'd in contracts + workflows). Backfill cleaned 9→0 stale rows. Verified on dev (transactional simulate-JWT, all 5 probes PASS). 8 inline review comments folded in (`de17f281`). Migration `20260622212441`. **PR #64 UAT T4 now runnable as designed.**
+
+**Status (original)**: seed (not yet planned)
 **Priority**: Medium-High — data integrity defect with concrete observable consequences (broken `check_user_org_membership` semantics for soft-deleted users; UAT can't reach Finding #3's gate-skip path because role rows linger). Multiple consuming RPCs currently work around the symptom with `WHERE u.deleted_at IS NULL` joins; the architectural fix is to make the projection state reflect the lifecycle event consistently.
 **Origin**: PR #64 UAT T4 prep (2026-05-19) — couldn't find a clean "soft-deleted user with no role rows" subject because `handle_user_deleted` doesn't nuke `user_roles_projection` rows. Inventory across all projections holding `user_id` references showed **10 stale rows** across 4 tables for the 2 soft-deleted users on dev.
 
