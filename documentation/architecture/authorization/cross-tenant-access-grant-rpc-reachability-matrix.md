@@ -215,7 +215,7 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `list_user_client_assignments` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `list_user_org_access` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `list_user_organizations` | E-variant | yes | none | E-variant: sui generis (mixed self-context + org-admin predicate). |
-| `list_users` | A | pending-phase3-refactor | 3 | Early-return tenancy guard (PR #66 strict-A pattern); forward-incompatible with grant-bearers; Phase 3 refactor target. |
+| `list_users` | A | yes | none | Grant-derived membership via accessible_organizations (Model M, Phase 3): a consultant holding an active in-window grant to p_org_id has it in accessible_organizations and is admitted by the membership-oracle tenancy guard. RETURN-empty for non-members (no existence leak). |
 | `list_users_for_bulk_assignment` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
 | `list_users_for_role_management` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
 | `list_users_for_schedule_management` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
@@ -279,13 +279,13 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 
 ## Phase 3 refactor target list (Bucket A + A-variant)
 
-**2 RPCs** to refactor in Phase 3 to the PR #67 three-step skeleton (replace early-return / early-raise guard with `has_effective_permission` + `accessible_organizations @>` membership predicate):
+Bucket A + A-variant RPCs (the table below is **bucket-derived**, so it lists these regardless of completion status). **Status as of Phase 3 (PR for `20260622183824`):** `list_users` is **DONE** — refactored to the Model M membership-oracle tenancy guard (consultant-callable=yes), NOT the originally-handoff'd three-step perm-gated skeleton (that skeleton violated the users-as-identities scoped-vs-unscoped rule and was inert — no template confers `user.view`). `list_invitations` is **deferred** to its own sub-card (`seed-list-invitations-cross-tenant-visibility-decision`) pending an `invitation.read` permission seed + a HIPAA exposure-policy decision (does a clinical-grant consultant see an org's invitations?).
 
 <!-- GENERATED:PHASE-3-TARGETS:START -->
 | `api.<name>` | Bucket | Reason |
 |---|---|---|
 | `list_invitations` | A-variant | A-variant: same equality-check shape as strict-A but RAISEs instead of RETURNs; Phase 3 refactor target. |
-| `list_users` | A | Early-return tenancy guard (PR #66 strict-A pattern); forward-incompatible with grant-bearers; Phase 3 refactor target. |
+| `list_users` | A | Grant-derived membership via accessible_organizations (Model M, Phase 3): a consultant holding an active in-window grant to p_org_id has it in accessible_organizations and is admitted by the membership-oracle tenancy guard. RETURN-empty for non-members (no existence leak). |
 <!-- GENERATED:PHASE-3-TARGETS:END -->
 
 If future RPCs adopt the early-return/early-raise guard pattern (anti-recommended; the three-step skeleton should be the default), they would land in Bucket A or A-variant and need the same refactor.

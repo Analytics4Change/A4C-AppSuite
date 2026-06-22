@@ -242,7 +242,16 @@ The four `api.list_users*` RPCs share a normalized three-step skeleton (establis
    - template-id signature (`list_users_for_schedule_management`): `v_org_id := public.get_current_org_id();` then validate template belongs to that org
 3. **Membership-predicate query**: `WHERE u.accessible_organizations @> ARRAY[v_org_id]::uuid[]` — the canonical membership oracle, GIN-indexed via `idx_users_accessible_orgs_gin`. NEVER use `current_organization_id = v_org_id` (that's the user's active-session pointer, not a membership oracle) and NEVER use `scalar = ANY(accessible_organizations)` (GIN `array_ops` doesn't index that form — the `@>` containment form is required).
 
-**Variant**: `api.list_users` (PR #66) uses an early-return tenancy guard (`IF NOT (has_platform_privilege() OR p_org_id = get_current_org_id()) THEN RETURN; END IF;`) in place of the scope-bound permission gate, because its signature takes an explicit `p_org_id` parameter without a permission name. This guard is correct for the org-internal admin use case but is potentially incompatible with future cross-tenant grants — flagged for future audit when partner-grant work activates.
+**Variant**: `api.list_users` uses an early-return tenancy guard (no scope-bound permission gate) because its signature takes an explicit `p_org_id` parameter without a permission name. **Audit resolved (Phase 3, migration `20260622183824`)**: the guard was upgraded from the PR #66 session-org form (`p_org_id = get_current_org_id()` — rejected grant-bearers, whose JWT `org_id` stays at home org) to the **Model M membership-oracle** form:
+```sql
+IF NOT (
+  public.has_platform_privilege()
+  OR EXISTS (SELECT 1 FROM public.users caller
+             WHERE caller.id = public.get_current_user_id()
+               AND caller.accessible_organizations @> ARRAY[p_org_id]::uuid[])
+) THEN RETURN; END IF;
+```
+`list_users` REMAINS the deliberate tenancy-guard variant — it was explicitly NOT converted to the three-step `has_effective_permission(perm, scope_path)` skeleton, because (1) users-as-identities have no org location finer than tenant (scoped-vs-unscoped rule below), and (2) no grant template confers `user.view`, so a scope-path perm gate would be inert for every consultant. Model M keeps the guard and the query predicate referencing the SAME oracle (`accessible_organizations @> [p_org_id]`). Note: alias the `users` table in the guard's EXISTS — `list_users` RETURNS a `TABLE(id uuid, …)` so an unqualified `id` is ambiguous (42702). See [[pr-79-close-out]]-adjacent Phase 3 close-out + architect record `~/.claude/plans/fizzy-jingling-puppy-agent-a9866ddd44acd09e3.md`.
 
 **Two-step → one-step normalization (PR #67)**: legacy bodies that derived `v_user_scope := public.get_permission_scope(perm)` and then manually checked `v_user_scope @> p_scope_path` should be collapsed to a single `has_effective_permission(perm, p_scope_path)` call. This is strictly more correct under multi-scope JWT entries (cross-tenant grant scenario): `get_permission_scope` does `LIMIT 1`; `has_effective_permission` does `EXISTS`. Today they're observationally equivalent because `compute_effective_permissions` ends in `DISTINCT ON (permission_name)`, but that invariant is one cross-tenant-grant feature away from breaking.
 
