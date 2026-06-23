@@ -64,15 +64,23 @@ BEGIN
     access_expiration_date = COALESCE(EXCLUDED.access_expiration_date, user_organizations_projection.access_expiration_date),
     updated_at = p_event.created_at;
 
-  v_email_enabled := COALESCE((p_event.event_data->'notification_preferences'->>'email')::BOOLEAN, true);
-  v_sms_enabled := COALESCE((p_event.event_data->'notification_preferences'->'sms'->>'enabled')::BOOLEAN, false);
+  -- Create user_notification_preferences_projection record (normalized columns)
+  -- Parse from nested JSONB with backwards compatibility for camelCase
+  v_email_enabled := COALESCE(
+    (p_event.event_data->'notification_preferences'->>'email')::BOOLEAN,
+    true  -- Default to email enabled
+  );
+  v_sms_enabled := COALESCE(
+    (p_event.event_data->'notification_preferences'->'sms'->>'enabled')::BOOLEAN,
+    false
+  );
   v_sms_phone_id := COALESCE(
     (p_event.event_data->'notification_preferences'->'sms'->>'phone_id')::UUID,
-    (p_event.event_data->'notification_preferences'->'sms'->>'phoneId')::UUID
+    (p_event.event_data->'notification_preferences'->'sms'->>'phoneId')::UUID  -- camelCase fallback
   );
   v_in_app_enabled := COALESCE(
     (p_event.event_data->'notification_preferences'->>'in_app')::BOOLEAN,
-    (p_event.event_data->'notification_preferences'->>'inApp')::BOOLEAN,
+    (p_event.event_data->'notification_preferences'->>'inApp')::BOOLEAN,  -- camelCase fallback
     false
   );
 
