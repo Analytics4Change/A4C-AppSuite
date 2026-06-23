@@ -4469,6 +4469,7 @@ export type Database = {
       users: {
         Row: {
           accessible_organizations: string[] | null
+          correlation_id: string | null
           created_at: string | null
           current_org_unit_id: string | null
           current_organization_id: string | null
@@ -4486,6 +4487,7 @@ export type Database = {
         }
         Insert: {
           accessible_organizations?: string[] | null
+          correlation_id?: string | null
           created_at?: string | null
           current_org_unit_id?: string | null
           current_organization_id?: string | null
@@ -4503,6 +4505,7 @@ export type Database = {
         }
         Update: {
           accessible_organizations?: string[] | null
+          correlation_id?: string | null
           created_at?: string | null
           current_org_unit_id?: string | null
           current_organization_id?: string | null

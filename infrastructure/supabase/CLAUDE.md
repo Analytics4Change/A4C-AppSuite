@@ -703,6 +703,8 @@ ORDER BY created_at DESC;
 - **Updating entity**: LOOKUP and REUSE the stored `correlation_id`
 - **Never generate** new `correlation_id` for subsequent lifecycle events
 
+**Where each entity's lifecycle id is STORED**: `invitations_projection.correlation_id`, `organizations_projection.correlation_id`, and **`users.correlation_id`** (added 2026-06-23). For the USER entity, a SQL RPC reuses it without editing each emit's metadata: it `SELECT`s `users.correlation_id` and `PERFORM set_config('app.correlation_id', v_corr::text, true)` once near the top — every `api.emit_domain_event()` below then inherits it via emit's session-var fallback (which populates both the top-level `domain_events.correlation_id` column and `event_metadata.correlation_id`). The user's chained emitters are the **identity/membership** transitions (`modify_user_roles`, `deactivate_user`, `reactivate_user`, `delete_user`, `update_user_access_dates`); sub-entity edits (phone/address/notification-pref/client-assignment) are intentionally NOT chained. See [event-metadata-schema.md](../../documentation/workflows/reference/event-metadata-schema.md#events-using-stored-correlation_id).
+
 **Example — Invitation Lifecycle**:
 ```typescript
 // validate-invitation: Returns stored correlation_id

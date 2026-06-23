@@ -16,7 +16,7 @@ BEGIN
 
   INSERT INTO users (
     id, email, name, first_name, last_name, current_organization_id,
-    accessible_organizations, roles, metadata, is_active, created_at, updated_at
+    accessible_organizations, roles, metadata, is_active, correlation_id, created_at, updated_at  -- correlation: anchor column
   ) VALUES (
     v_user_id,
     p_event.event_data->>'email',
@@ -35,6 +35,7 @@ BEGIN
       'invited_via', p_event.event_data->>'invited_via'
     ),
     true,
+    p_event.correlation_id,  -- correlation: anchor from the user.created event
     p_event.created_at,
     p_event.created_at
   ) ON CONFLICT (id) DO UPDATE SET
@@ -46,6 +47,7 @@ BEGIN
     accessible_organizations = ARRAY(
       SELECT DISTINCT unnest(users.accessible_organizations || EXCLUDED.accessible_organizations)
     ),
+    correlation_id = COALESCE(users.correlation_id, EXCLUDED.correlation_id),  -- correlation: keep-existing on replay
     updated_at = p_event.created_at;
 
   INSERT INTO user_organizations_projection (
@@ -62,15 +64,23 @@ BEGIN
     access_expiration_date = COALESCE(EXCLUDED.access_expiration_date, user_organizations_projection.access_expiration_date),
     updated_at = p_event.created_at;
 
-  v_email_enabled := COALESCE((p_event.event_data->'notification_preferences'->>'email')::BOOLEAN, true);
-  v_sms_enabled := COALESCE((p_event.event_data->'notification_preferences'->'sms'->>'enabled')::BOOLEAN, false);
+  -- Create user_notification_preferences_projection record (normalized columns)
+  -- Parse from nested JSONB with backwards compatibility for camelCase
+  v_email_enabled := COALESCE(
+    (p_event.event_data->'notification_preferences'->>'email')::BOOLEAN,
+    true  -- Default to email enabled
+  );
+  v_sms_enabled := COALESCE(
+    (p_event.event_data->'notification_preferences'->'sms'->>'enabled')::BOOLEAN,
+    false
+  );
   v_sms_phone_id := COALESCE(
     (p_event.event_data->'notification_preferences'->'sms'->>'phone_id')::UUID,
-    (p_event.event_data->'notification_preferences'->'sms'->>'phoneId')::UUID
+    (p_event.event_data->'notification_preferences'->'sms'->>'phoneId')::UUID  -- camelCase fallback
   );
   v_in_app_enabled := COALESCE(
     (p_event.event_data->'notification_preferences'->>'in_app')::BOOLEAN,
-    (p_event.event_data->'notification_preferences'->>'inApp')::BOOLEAN,
+    (p_event.event_data->'notification_preferences'->>'inApp')::BOOLEAN,  -- camelCase fallback
     false
   );
 

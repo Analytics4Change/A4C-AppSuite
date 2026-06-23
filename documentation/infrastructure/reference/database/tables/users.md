@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-21
+last_updated: 2026-06-23
 ---
 
 <!-- TL;DR-START -->
@@ -48,6 +48,7 @@ The `users` table is a shadow table for Supabase Auth users, used for Row-Level 
 | metadata | jsonb | YES | '{}' | Additional custom user metadata |
 | last_login | timestamptz | YES | - | Timestamp of most recent authentication |
 | is_active | boolean | YES | true | User active status (can be disabled) |
+| correlation_id | uuid | YES | - | Business-scoped correlation_id for the user's identity/membership lifecycle (added 2026-06-23). Anchored at `user.created` and `user.synced_from_auth`, reused by identity/membership emitters. See [event-metadata-schema.md](../../../../workflows/reference/event-metadata-schema.md#events-using-stored-correlation_id). |
 | created_at | timestamptz | YES | NOW() | Record creation timestamp |
 | updated_at | timestamptz | YES | NOW() | Record update timestamp |
 

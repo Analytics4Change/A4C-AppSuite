@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-07
+last_updated: 2026-06-23
 ---
 
 <!-- TL;DR-START -->
@@ -393,13 +393,17 @@ ORDER BY created_at ASC;
 
 #### Events Using Stored correlation_id
 
-All lifecycle events MUST look up and reuse the stored `correlation_id`:
+Lifecycle events look up and reuse the stored `correlation_id` from the business entity's store:
 
-| Entity | Create Event | Subsequent Events |
-|--------|--------------|-------------------|
-| Invitation | `user.invited` | `invitation.resent`, `invitation.revoked`, `invitation.accepted`, `invitation.expired` |
-| Organization | `organization.created` | `organization.updated`, `organization.activated`, `organization.deactivated` |
-| User | `user.created` | `user.role.assigned`, `user.role.revoked`, `user.deactivated` |
+| Entity | Store | Create Event | Chained subsequent events |
+|--------|-------|--------------|---------------------------|
+| Invitation | `invitations_projection.correlation_id` | `user.invited` | `invitation.resent`, `invitation.revoked`, `invitation.accepted`, `invitation.expired` (reused by `accept-invitation`) |
+| Organization | `organizations_projection.correlation_id` | `organization.created` | `organization.updated`, `organization.activated`, `organization.deactivated` |
+| User | **`users.correlation_id`** (added 2026-06-23) | `user.created` / `user.synced_from_auth` | `user.role.assigned`, `user.role.revoked`, `user.deactivated`, `user.reactivated`, `user.deleted`, `user.access_dates_updated` |
+
+> **User-lifecycle chaining (2026-06-23)**: `users.correlation_id` is the user-entity store — anchored at `user.created` **and `user.synced_from_auth`** (both replay-safe keep-existing), backfilled (never NULL). The **identity/membership** emitters (`api.modify_user_roles`, `deactivate_user`, `reactivate_user`, `delete_user`, `update_user_access_dates`) chain to it by setting the transaction-local `app.correlation_id` to the user's stored id, which `api.emit_domain_event` inherits via its session-var fallback (populating both `domain_events.correlation_id` and `event_metadata.correlation_id`). **EXCLUDED** as sub-entity edits (each keeps its own per-op correlation): phone/address/notification-preference/client-assignment events.
+>
+> The invitation and the user it onboards live in **two different stores** (`invitations_projection.correlation_id` vs `users.correlation_id`), but **share the same correlation_id *value*** when onboarded via invitation: `accept-invitation` overrides the `user.created` event's id with the invitation's stored id (`accept-invitation/index.ts:475-477`), so the user's anchor inherits it — a reviewer tracing by correlation_id finds the invitation + user events in one chain. A **directly-created** user (no invitation; e.g. OAuth signup via `user.synced_from_auth`) gets an independent anchor id.
 
 ### Distributed Tracing (W3C Trace Context)
 
