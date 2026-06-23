@@ -1,6 +1,6 @@
 # Fix `handle_user_role_assigned` to maintain `public.users.accessible_organizations`
 
-**Status**: SUPERSEDED 2026-05-13 — see `dev/active/reject-cross-provider-invitations/plan.md`
+**Status**: SUPERSEDED 2026-05-13 → ARCHIVED 2026-06-23 — successor `reject-cross-provider-invitations` SHIPPED (PR #64), now at `dev/archived/reject-cross-provider-invitations/`. The `accessible_organizations` denormalization gap closes automatically once provider→provider Sally invitations are rejected at the boundary; no separate fix needed.
 **Priority**: Medium (affects post-invitation routing for multi-org users — frontend lands them on the wrong subdomain)
 **Origin**: PR #63 UAT Test 5 post-test finding (2026-05-13, Sally scenario for `dakaratekid@gmail.com`)
 

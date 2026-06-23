@@ -1,8 +1,10 @@
 # manage-user-deactivate-pattern-a-v2-retrofit — Context
 
 **Type**: Security follow-up; Pattern A v2 read-back retrofit
-**Status**: 🟢 ACTIVE — in flight (PR pending)
+**Status**: ✅ SHIPPED 2026-05-13 via PR #63 — ARCHIVED (status banner was stale; reconciled 2026-06-23)
 **Priority**: HIGH (closes silent-failure gap on Edge Function deactivate operation)
+
+> **Closeout (2026-06-23)**: The deactivate Pattern A v2 read-back **shipped** — but NOT via the wire-tier `_shared/rpc-readback.ts` helper described in the "Scope" section below. That wire-tier approach (PR #60) and its `.schema('public')` hotfix (PR #61) both failed UAT against the deployed PostgREST exposed-schemas allowlist, so the work **pivoted to the SQL-RPC tier**: `api.deactivate_user` (PR #63, merge `e48451f3`) does the projection read-back + `processing_error` lookup inside the database; the wire-tier helper was deleted. This codified "no PostgREST cross-schema reads" (`infrastructure/supabase/CLAUDE.md` Rule 19; see `pr-63-close-out`). The silent-failure gap this card targeted is closed. The sibling **reactivate** retrofit remains NOT-YET-SEEDED (mirror PR #63's SQL-RPC pattern: `api.reactivate_user` + thin EF wrapper — do NOT reuse a wire-tier helper).
 **Origin**: Recommended by architect after PR #44 close-out; in MEMORY.md "Active Backlogs" as "Recommended next card" post-`migrate-services-to-api-rpc-envelope` archival (2026-05-12).
 
 ## Capability target
