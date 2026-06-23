@@ -185,6 +185,27 @@ $comment$Reactivates a deactivated user by emitting user.reactivated; handle_use
 -- Section B — constraint-hardening (PR #83 Finding 4). Pre: 0 NULL correlation_id
 -- (both insert handlers anchor it; backfill filled the rest). DEFAULT makes any
 -- future insert non-NULL by construction; SET NOT NULL enforces the invariant.
+--
+-- PR #84 architect review fold-ins (both non-blocking; addressed for clarity):
+--   F2 (VERY LOW): explicit pre-ALTER NULL-count guard. Fails loud with a clear
+--     message + ERRCODE P9099 (pitfall-#8 convention) rather than Postgres's
+--     generic "column \"correlation_id\" contains null values" if a NULL ever
+--     slipped past the backfill. The interpolated value is a row COUNT, not a
+--     tenant identifier — Rule 16 compliant.
+--   F1 (LOW): the two `ALTER ... SET` forms are intentionally NOT IF-NOT-EXISTS
+--     guarded — `SET DEFAULT` / `SET NOT NULL` are naturally idempotent (re-run =
+--     harmless no-op), unlike `ADD COLUMN`. Safe under repair+repush re-application.
 -- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_nulls bigint;
+BEGIN
+  SELECT count(*) INTO v_nulls FROM public.users WHERE correlation_id IS NULL;
+  IF v_nulls > 0 THEN
+    RAISE EXCEPTION 'Cannot harden users.correlation_id: % NULL row(s) remain — backfill incomplete', v_nulls
+      USING ERRCODE = 'P9099';
+  END IF;
+END $$;
+
 ALTER TABLE public.users ALTER COLUMN correlation_id SET DEFAULT gen_random_uuid();
 ALTER TABLE public.users ALTER COLUMN correlation_id SET NOT NULL;
