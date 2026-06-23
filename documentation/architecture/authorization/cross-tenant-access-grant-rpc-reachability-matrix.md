@@ -52,9 +52,9 @@ last_updated: 2026-06-23
 | C | 31 |
 | D | 36 |
 | D-variant | 1 |
-| E | 45 |
+| E | 46 |
 | E-variant | 1 |
-| **Total** | **179** |
+| **Total** | **180** |
 <!-- GENERATED:PER-BUCKET-COUNTS:END -->
 
 > [!NOTE]
@@ -226,6 +226,7 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `reactivate_organization_unit` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
 | `reactivate_role` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
 | `reactivate_schedule_template` | C | yes | none | Scope-path-bound has_effective_permission; forward-compatible with multi-scope grants under Phase 1 tightened DISTINCT ON. |
+| `reactivate_user` | E | yes | none | No tenancy context; grant-irrelevant by default. Mirror of api.deactivate_user. |
 | `reactivate_var_partnership` | B | no | none | Provider-admin authority + partnership.manage permission; consultant variant N/A. |
 | `register_client` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
 | `remove_client_address` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
