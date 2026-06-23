@@ -20,7 +20,7 @@
  *
  * Operations:
  * - deactivate: Deactivate a user within the organization (Pattern A v2 via SQL RPC)
- * - reactivate: Reactivate a deactivated user (legacy emit flow — retrofit deferred to next card)
+ * - reactivate: Reactivate a deactivated user (Pattern A v2 via SQL RPC api.reactivate_user)
  *
  * CQRS-compliant: Emits domain events:
  * - user.deactivated / user.reactivated
@@ -46,10 +46,9 @@ import {
   createSpan,
   endSpan,
 } from '../_shared/tracing-context.ts';
-import { buildEventMetadata } from '../_shared/emit-event.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v17-deactivate-sql-rpc-pivot';
+const DEPLOY_VERSION = 'v18-reactivate-sql-rpc-pivot';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -83,34 +82,6 @@ interface ManageUserResponse {
    * in the frontend. Optional — consumers are not required to surface it.
    */
   eventId?: string;
-}
-
-/**
- * Get user details for validation (reactivate path only — the deactivate
- * path now delegates tenancy/idempotency checks to `api.deactivate_user`).
- */
-async function getUserDetails(
-  supabase: AnySchemaSupabaseClient,
-  userId: string,
-  orgId: string
-): Promise<{ exists: boolean; isActive: boolean; email?: string }> {
-  const { data, error } = await supabase
-    .rpc('get_user_org_details', { p_user_id: userId, p_org_id: orgId });
-
-  if (error) {
-    console.error(`[manage-user v${DEPLOY_VERSION}] Error getting user details:`, error);
-    return { exists: false, isActive: false };
-  }
-
-  if (!data?.[0]) {
-    return { exists: false, isActive: false };
-  }
-
-  return {
-    exists: true,
-    isActive: data[0].is_active,
-    email: data[0].email,
-  };
 }
 
 serve(async (req) => {
@@ -283,8 +254,7 @@ serve(async (req) => {
     //   - idempotency (already-inactive, already-deleted)
     //   - emit user.deactivated + Pattern A v2 read-back (BOTH checks per Rule 13)
     //
-    // For reactivate (legacy emit flow): retained as-is. The matching
-    // Pattern A v2 retrofit for the reactivate path is the next card.
+    // For reactivate: now Pattern A v2 via api.reactivate_user (same as deactivate).
 
     // ==========================================================================
     // DEACTIVATE PATH — SQL RPC (Pattern A v2 lives in api.deactivate_user)
@@ -339,56 +309,52 @@ serve(async (req) => {
       console.log(`[manage-user v${DEPLOY_VERSION}] deactivate_user OK, eventId=${eventId}`);
     } else {
       // ==========================================================================
-      // REACTIVATE PATH — LEGACY EMIT FLOW (retrofit deferred to next card)
+      // REACTIVATE PATH — SQL RPC (Pattern A v2 lives in api.reactivate_user)
       // ==========================================================================
-      const userDetails = await getUserDetails(supabaseAdmin, requestData.userId, orgId);
+      // Retrofitted from the legacy direct-emit flow (PR closing
+      // manage-user-reactivate-pattern-a-v2-retrofit). The RPC absorbs the
+      // not-found (404) / already-active (400) / deleted checks as success-false
+      // envelopes, mirrors api.deactivate_user, and adds the Pattern A v2
+      // read-back the legacy emit lacked. Auth unban (below, LB1) is unchanged.
+      console.log(`[manage-user v${DEPLOY_VERSION}] Calling api.reactivate_user RPC...`);
 
-      if (!userDetails.exists) {
-        return new Response(
-          JSON.stringify({ error: 'User not found in this organization' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (userDetails.isActive) {
-        return new Response(
-          JSON.stringify({ error: 'User is already active' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const now = new Date().toISOString();
-      const eventType = 'user.reactivated';
-      const eventData: Record<string, unknown> = {
-        user_id: requestData.userId,
-        org_id: orgId,
-        reactivated_at: now,
-      };
-      if (requestData.reason) {
-        eventData.reason = requestData.reason;
-      }
-
-      console.log(`[manage-user v${DEPLOY_VERSION}] Emitting ${eventType} event...`);
-
-      const { data: emittedEventId, error: eventError } = await supabaseAdmin
-        .rpc('emit_domain_event', {
-          p_stream_id: requestData.userId,
-          p_stream_type: 'user',
-          p_event_type: eventType,
-          p_event_data: eventData,
-          p_event_metadata: buildEventMetadata(tracingContext, eventType, req, {
-            user_id: user.id,
-            reason: requestData.reason || 'Manual reactivate',
-          }),
+      const { data: envelope, error: rpcError } = await supabaseUser
+        .schema('api')
+        .rpc('reactivate_user', {
+          p_user_id: requestData.userId,
+          p_reason: requestData.reason ?? null,
         });
 
-      if (eventError) {
-        console.error(`[manage-user v${DEPLOY_VERSION}] Failed to emit event:`, eventError);
-        return handleRpcError(eventError, correlationId, corsHeaders, 'reactivate user');
+      if (rpcError) {
+        console.error(`[manage-user v${DEPLOY_VERSION}] reactivate_user RPC error:`, rpcError);
+        return handleRpcError(rpcError, correlationId, corsHeaders, 'reactivate user');
       }
 
-      eventId = emittedEventId as string | undefined;
-      console.log(`[manage-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
+      // Pattern A v2 envelope: 200 + {success:false, error, eventId?} for all
+      // handler-driven failures (idempotency, tenancy, read-back miss). Caller
+      // parses data.success, not HTTP status (adr-rpc-readback-pattern.md).
+      const env_ = (envelope ?? {}) as {
+        success?: boolean;
+        error?: string;
+        eventId?: string;
+        userId?: string;
+      };
+
+      if (!env_.success) {
+        console.warn(`[manage-user v${DEPLOY_VERSION}] reactivate_user envelope failure:`, env_.error);
+        const errorResponse: ManageUserResponse = {
+          success: false,
+          error: env_.error ?? 'Failed to reactivate user',
+          eventId: env_.eventId,
+        };
+        return new Response(JSON.stringify(errorResponse), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      eventId = env_.eventId;
+      console.log(`[manage-user v${DEPLOY_VERSION}] reactivate_user OK, eventId=${eventId}`);
     }
 
     // ==========================================================================

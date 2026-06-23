@@ -70,6 +70,7 @@ export type EnvelopeRpcs =
   | 'reactivate_organization_unit'
   | 'reactivate_role'
   | 'reactivate_schedule_template'
+  | 'reactivate_user'
   | 'reactivate_var_partnership'
   | 'register_client'
   | 'remove_client_address'
