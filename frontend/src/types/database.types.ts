@@ -1295,6 +1295,10 @@ export type Database = {
         Args: { p_template_id: string }
         Returns: Json
       }
+      reactivate_user: {
+        Args: { p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
       reactivate_var_partnership: {
         Args: {
           p_new_contract_end_date?: string
@@ -4469,7 +4473,7 @@ export type Database = {
       users: {
         Row: {
           accessible_organizations: string[] | null
-          correlation_id: string | null
+          correlation_id: string
           created_at: string | null
           current_org_unit_id: string | null
           current_organization_id: string | null
@@ -4487,7 +4491,7 @@ export type Database = {
         }
         Insert: {
           accessible_organizations?: string[] | null
-          correlation_id?: string | null
+          correlation_id?: string
           created_at?: string | null
           current_org_unit_id?: string | null
           current_organization_id?: string | null
@@ -4505,7 +4509,7 @@ export type Database = {
         }
         Update: {
           accessible_organizations?: string[] | null
-          correlation_id?: string | null
+          correlation_id?: string
           created_at?: string | null
           current_org_unit_id?: string | null
           current_organization_id?: string | null

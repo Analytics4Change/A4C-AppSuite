@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-24
+last_updated: 2026-06-23
 ---
 
 <!-- TL;DR-START -->
@@ -97,9 +97,12 @@ Reactivates a deactivated user.
 
 **Event Emitted**: `user.reactivated`
 
-**Validation Rules**:
-- Target user must exist in the organization
-- Target user must be deactivated
+**Implementation**: Pattern A v2 via SQL RPC `api.reactivate_user` (retrofitted 2026-06-23, mirroring the `deactivate` path). The RPC performs the tenancy/idempotency checks + event-emit + read-back; the EF then clears the auth ban (`auth.admin.updateUserById({ban_duration: 'none'})`, LB1). Returns the Pattern A v2 envelope (`200` + `{success, error?, eventId?}` — callers check `data.success`, not HTTP status).
+
+**Validation Rules** (now enforced by `api.reactivate_user` as success-false envelopes, not HTTP 4xx):
+- Target user must exist in the caller's organization (else `{success:false, error:'User not found in this organization'}`)
+- Target user must be deactivated (else `'User is already active'`)
+- Target user must not be deleted (else `'User is deleted'`)
 
 ---
 
