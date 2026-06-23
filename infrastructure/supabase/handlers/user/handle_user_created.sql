@@ -16,7 +16,7 @@ BEGIN
 
   INSERT INTO users (
     id, email, name, first_name, last_name, current_organization_id,
-    accessible_organizations, roles, metadata, is_active, created_at, updated_at
+    accessible_organizations, roles, metadata, is_active, correlation_id, created_at, updated_at  -- correlation: anchor column
   ) VALUES (
     v_user_id,
     p_event.event_data->>'email',
@@ -35,6 +35,7 @@ BEGIN
       'invited_via', p_event.event_data->>'invited_via'
     ),
     true,
+    p_event.correlation_id,  -- correlation: anchor from the user.created event
     p_event.created_at,
     p_event.created_at
   ) ON CONFLICT (id) DO UPDATE SET
@@ -46,6 +47,7 @@ BEGIN
     accessible_organizations = ARRAY(
       SELECT DISTINCT unnest(users.accessible_organizations || EXCLUDED.accessible_organizations)
     ),
+    correlation_id = COALESCE(users.correlation_id, EXCLUDED.correlation_id),  -- correlation: keep-existing on replay
     updated_at = p_event.created_at;
 
   INSERT INTO user_organizations_projection (
