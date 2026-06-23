@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-22
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -115,6 +115,18 @@ These permissions are assigned to organization-level roles and apply within the 
 | `user.role_assign` | Assign roles to users | Yes |
 | `user.role_revoke` | Revoke roles from users | Yes |
 
+### Cross-Tenant Grant Management (3)
+
+Added to `provider_admin` in PR #73 (2026-06-09) — authority to issue/revoke cross-tenant access grants to provider-partner consultants.
+
+| Permission | Description | provider_admin |
+|------------|-------------|----------------|
+| `grant.create` | Create a cross-tenant access grant (`api.create_access_grant`) | Yes |
+| `grant.revoke` | Revoke an access grant (`api.revoke_access_grant`) | Yes |
+| `grant.view` | View cross-tenant access grants | Yes |
+
+> **Retired**: `platform.view_event_details` was removed in PR #73 (failed-event detail is now gated uniformly by `has_platform_privilege()`); it no longer exists in `permissions_projection`.
+
 ## Canonical Role Permissions
 
 ### super_admin
@@ -123,9 +135,9 @@ Global platform administrator with all permissions. Can manage the platform orga
 
 **Permissions**: All 31 permissions (10 global + 21 org-scoped)
 
-### provider_admin (23 permissions)
+### provider_admin (35 active as of 2026-06-22)
 
-Organization owner with full control within their organization. All 21 org-scoped permissions plus 2 permission management permissions.
+Organization owner with full control within their organization — the org-scoped permissions (incl. the 3 cross-tenant `grant.*` permissions above) plus permission-management permissions. Regenerate the authoritative count: `SELECT count(*) FROM role_permission_templates WHERE role_name='provider_admin' AND is_active`.
 
 ```typescript
 const PROVIDER_ADMIN_PERMISSIONS = [

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-23
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -365,24 +365,25 @@ WHERE p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
 
 Event processing uses **split handlers** (not monolithic processors):
 
-**Routers** (13 active):
-- `process_user_event()`, `process_organization_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_organization_unit_event()`, `process_schedule_event()`
+**Routers** (16 reference files / 17 wired as of 2026-06-22 — `process_rbac_event` serves both `role` and `permission` stream types; regenerate: `ls infrastructure/supabase/handlers/routers/*.sql | wc -l`):
+- `process_user_event()`, `process_organization_event()`, `process_organization_unit_event()`, `process_rbac_event()`, `process_invitation_event()`, `process_contact_event()`, `process_address_event()`, `process_phone_event()`, `process_email_event()`, `process_access_grant_event()`, `process_impersonation_event()`, `process_schedule_event()`, `process_var_partnership_event()`, `process_client_event()`, `process_client_field_definition_event()`, `process_client_field_category_event()`
 - Plus `process_junction_event()` for all `*.linked`/`*.unlinked` events
 - Thin CASE dispatchers (~50 lines each)
 - Dispatch to individual handlers based on `event_type`
 
-**Handlers** (52 total):
+**Handlers** (91 as of 2026-06-22; regenerate: `find infrastructure/supabase/handlers -name 'handle_*.sql' | wc -l`):
 - `handle_user_phone_added()`, `handle_organization_created()`, etc.
 - One function per event type
 - 20-50 lines each, single responsibility
 - Validated independently by plpgsql_check
 
-**Triggers on `domain_events`** (5):
-- `process_domain_event_trigger` (BEFORE INSERT/UPDATE) — main dispatcher
+**Triggers on `domain_events`** (6 as of 2026-06-22; regenerate: `SELECT tgname FROM pg_trigger WHERE tgrelid='public.domain_events'::regclass AND NOT tgisinternal`):
+- `process_domain_event_trigger` (BEFORE INSERT/UPDATE) — main dispatcher (the ONLY projection-routing trigger)
+- `trigger_notify_bootstrap_initiated` (BEFORE INSERT) — `pg_notify` side-effect (does NOT route projections)
 - `bootstrap_workflow_trigger` (AFTER INSERT)
 - `enqueue_workflow_from_bootstrap_event_trigger` (AFTER INSERT)
-- `trigger_notify_bootstrap_initiated` (BEFORE INSERT)
 - `update_workflow_queue_projection_trigger` (AFTER INSERT)
+- `emit_grant_revocations_on_user_deleted_trigger` (AFTER INSERT, `WHEN event_type='user.deleted'`) — PR #81 event-chaining: emits `access_grant.revoked` per active grant of the deleted consultant
 
 **Two event processing patterns** — choose based on what the handler does:
 - **Projection updates** → Synchronous BEFORE INSERT trigger handler (immediate consistency)
@@ -398,16 +399,23 @@ Event processing uses **split handlers** (not monolithic processors):
 
 Canonical SQL for every handler, router, and trigger lives at `infrastructure/supabase/handlers/`:
 
+Counts as of 2026-06-22 (regenerate per dir: `ls handlers/<dir>/*.sql | wc -l`):
+
 ```
 handlers/
-├── trigger/           # 5 trigger function files
-├── routers/           # 12 active router files
-├── user/              # 20 handler files
-├── organization/      # 11 handler files
-├── organization_unit/ # 5 handler files
-├── rbac/              # 10 handler files
-├── bootstrap/         # 3 handler files
-└── invitation/        # 1 handler file
+├── trigger/                 # 6 trigger function files
+├── routers/                 # 16 router files (17 wired — process_rbac_event serves role + permission)
+├── user/                    # 19 handler files
+├── organization/            # 11 handler files
+├── organization_unit/       # 5 handler files
+├── rbac/                    # 9 handler files
+├── bootstrap/               # 3 handler files
+├── invitation/              # 1 handler file
+├── contact/                 # 2 handler files
+├── schedule/                # 8 handler files
+├── client/                  # 23 handler files
+├── client_field_category/   # 5 handler files
+└── client_field_definition/ # 5 handler files
 ```
 
 **Before modifying a handler**: Read `handlers/<domain>/<handler>.sql`, copy it, modify the copy.
@@ -424,22 +432,32 @@ handlers/
 
 ### Critical Rules
 
-> **⚠️ CRITICAL: NEVER create per-event-type triggers on `domain_events`**
+> **⚠️ CRITICAL: Exactly ONE *routing* trigger — never add a second BEFORE-INSERT router**
 >
-> All event routing goes through a **single** `process_domain_event()` BEFORE INSERT
-> trigger. This trigger dispatches by `stream_type` to the appropriate router function,
-> which then dispatches by `event_type` to individual handlers. **Do NOT create
-> additional triggers** with WHEN clauses filtering specific event types — duplicate
-> triggers cause events to be processed multiple times.
+> Projection routing goes through a **single** `process_domain_event()` BEFORE INSERT/UPDATE
+> trigger: it dispatches by `stream_type` to a router → by `event_type` to a handler. **Do NOT
+> create a second BEFORE-INSERT trigger** that filters `event_type` to update a projection —
+> duplicate routing processes events multiple times.
 >
 > ```
-> ✅ CORRECT: Add CASE line to router function
+> ✅ CORRECT (projection update): add a CASE line to the router
 >    process_domain_event() → process_user_event(NEW) → handle_user_foo(NEW)
 >
-> ❌ WRONG: Create trigger with WHEN clause
->    CREATE TRIGGER my_trigger AFTER INSERT ON domain_events
->    WHEN (NEW.event_type = 'user.foo.created') ...
+> ❌ WRONG: a SECOND BEFORE-INSERT trigger that routes/updates a projection by event_type
 > ```
+>
+> **Sanctioned exception — AFTER-INSERT side-effect / event-chaining triggers.** A trigger that
+> fires `AFTER INSERT ... WHEN (NEW.event_type = '…')` to perform a *side effect* (start a workflow,
+> `pg_notify`, or emit a chained domain event) is a deliberate, established pattern — it does not
+> route projections, so it does not conflict with the single dispatcher. Existing examples on
+> `domain_events`: `bootstrap_workflow_trigger`, `enqueue_workflow_from_bootstrap_event_trigger`,
+> `update_workflow_queue_projection_trigger`, `emit_grant_revocations_on_user_deleted_trigger`
+> (PR #81). **Use an AFTER trigger — not a nested `api.emit_domain_event()` from a BEFORE handler —
+> for event-chaining**: a nested emit records an inner failure on the INNER event's
+> `processing_error`, invisible to the originating RPC's outer Pattern A v2 read-back (silent
+> `{success:true}`); the AFTER trigger surfaces each chained event's failure as an independent,
+> retryable `processing_error`. See `documentation/infrastructure/patterns/event-processing-patterns.md`
+> § "AFTER-INSERT event-chaining".
 
 > **⚠️ Event type naming convention**
 >

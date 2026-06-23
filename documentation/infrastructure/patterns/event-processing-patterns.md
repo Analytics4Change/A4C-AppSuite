@@ -1,29 +1,29 @@
 ---
 status: current
-last_updated: 2026-02-06
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Decision guide for choosing between synchronous trigger handlers (projection updates) and async pg_notify + Temporal (side effects like email, DNS, webhooks). Includes decision tree, anti-patterns, and error handling differences.
+**Summary**: Decision guide for processing domain events — synchronous trigger handlers (projection updates), async pg_notify + Temporal (side effects), and AFTER-INSERT event-chaining (emit one event from another). Includes decision tree, anti-patterns, and error handling differences.
 
 **When to read**:
 - Adding a new event type and deciding how to process it
 - Choosing between synchronous projection update vs async workflow
-- Understanding why the system has two event processing patterns
+- Emitting a chained domain event in response to another event (use an AFTER trigger, not a nested emit)
 - Reviewing whether an API function follows CQRS correctly
 
 **Prerequisites**: [event-handler-pattern.md](./event-handler-pattern.md), [event-driven-workflow-triggering.md](../../architecture/workflows/event-driven-workflow-triggering.md)
 
-**Key topics**: `event-processing-patterns`, `pattern-selection`, `pg-notify-pattern`, `synchronous-handler`, `async-workflow`, `dual-write`
+**Key topics**: `event-processing-patterns`, `pattern-selection`, `pg-notify-pattern`, `synchronous-handler`, `async-workflow`, `event-chaining`, `dual-write`
 
 **Estimated read time**: 10 minutes
 <!-- TL;DR-END -->
 
 # Event Processing Pattern Selection
 
-A4C-AppSuite uses two distinct patterns for processing domain events. Every new event type must be processed by one or both patterns. This guide explains when to use each.
+A4C-AppSuite processes domain events with two base patterns — synchronous (projection updates) and async (side effects) — plus two compositions: the Hybrid pattern (both at once) and AFTER-INSERT event-chaining (emit one event from another). Every new event type uses one or more of these. This guide explains when to use each.
 
 ## The Two Patterns
 
@@ -124,6 +124,25 @@ Is this a projection/read-model update?
 | Deliver webhook | **Async** | AFTER trigger → pg_notify → Temporal → HTTP POST | ~200ms+ |
 | Multi-step onboarding | **Async** | AFTER trigger → pg_notify → Temporal workflow with saga | ~200ms+ |
 | Projection + email | **Hybrid** | BEFORE handler (projection) + AFTER trigger (email) | Both |
+| Emit a chained domain event | **Event-chaining** | AFTER trigger → `api.emit_domain_event(...)` | < 10ms |
+
+## AFTER-INSERT event-chaining (emit one event in response to another)
+
+When processing event A must **emit event B** (e.g. deleting a user revokes their active grants; a bootstrap-failed event emits a cleanup event), do it from a dedicated **AFTER INSERT trigger** with a `WHEN (NEW.event_type = '…')` clause that calls `api.emit_domain_event(...)`. **Do NOT** call `api.emit_domain_event(...)` from inside a BEFORE-INSERT handler.
+
+**Why not a nested emit from the BEFORE handler** (the load-bearing reason, PR #81): a nested `api.emit_domain_event()` does an `INSERT INTO domain_events` *inside* the BEFORE handler, recursively firing the dispatcher for event B in the same nested INSERT. If event B's handler fails, the dispatcher's `WHEN OTHERS` records the error on **event B's** `processing_error` row — which the originating RPC's outer Pattern A v2 read-back never inspects (it only checks event A). The RPC returns `{success: true}` over a silently-failed chain. An AFTER-INSERT trigger runs *after* event A's row is durable, so event B is an independent row whose failure surfaces as its own retryable `processing_error` (visible in `/admin/events`, retryable via `api.retry_failed_event`).
+
+```
+INSERT INTO domain_events (event_type := 'user.deleted', ...)
+  ↓ BEFORE INSERT: process_domain_event() → process_user_event() → handle_user_deleted()
+      (synchronous projection cascade — DELETE membership rows; NO emit here)
+  ↓ row durable
+  ↓ AFTER INSERT (WHEN event_type='user.deleted'):
+      emit_grant_revocations_on_user_deleted() → api.emit_domain_event('access_grant.revoked', …)
+        ↓ each emitted event processed independently; failure = its own processing_error
+```
+
+Reference implementation: `infrastructure/supabase/handlers/trigger/emit_grant_revocations_on_user_deleted.sql` (PR #81). This is the sanctioned exception to the "single dispatcher" rule — it performs a side effect (emit), not projection routing. See [event-handler-pattern.md](./event-handler-pattern.md) § "Exactly ONE routing trigger".
 
 ## Hybrid Pattern
 

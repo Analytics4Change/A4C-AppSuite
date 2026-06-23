@@ -1,6 +1,6 @@
 ---
 status: aspirational
-last_updated: 2025-12-30
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -23,14 +23,15 @@ last_updated: 2025-12-30
 
 # VAR Partnership Implementation
 
-> [!WARNING]
-> **VAR-specific features NOT implemented.**
-> - ✅ VAR organizations CAN be created via organization bootstrap (select partner_type = 'var')
-> - ✅ VARs DO receive subdomains like regular providers
-> - ❌ VAR management dashboard NOT built
+> [!NOTE]
+> **Implementation status (2026-06-22) — write-side shipped, business/UI features deferred.**
+> - ✅ VAR organizations created via organization bootstrap (`partner_type = 'var'`); VARs receive subdomains
+> - ✅ **VAR partnership write-side SHIPPED** (cross-tenant grant Phase 2, PR #71, 2026-06-04): `var_partnerships_projection`, `var_partnership.*` events + `process_var_partnership_event` router, and the 5 lifecycle RPCs (`create/update/suspend/reactivate/terminate_var_partnership`, plus `create_access_grant` with the `var_default` template)
+> - ❌ VAR management dashboard / multi-provider access UI NOT built (Phase N)
 > - ❌ Revenue share tracking NOT implemented
 > - ❌ White-label configuration NOT implemented
-> See [provider-partners-architecture.md](provider-partners-architecture.md) for foundation status.
+>
+> The doc's `status: aspirational` is retained because the dashboard/revenue/white-label vision below is not built; the core partnership lifecycle is real. See [provider-partners-architecture.md](provider-partners-architecture.md) and [cross-tenant-access-grant-rpc-reachability-matrix.md](../authorization/cross-tenant-access-grant-rpc-reachability-matrix.md).
 
 
 ## Overview

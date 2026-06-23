@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
@@ -43,7 +43,7 @@ last_updated: 2025-12-30
 
 - **`grantProviderAdminPermissions` activity**: Created at `workflows/src/activities/organization-bootstrap/grant-provider-admin-permissions.ts`
 - **Bootstrap workflow updated**: Now grants canonical permissions after organization creation (Step 1.5)
-- **Canonical permissions defined**: See [permissions-reference.md](./permissions-reference.md) for the 23 provider_admin permissions
+- **Canonical permissions defined**: See [permissions-reference.md](./permissions-reference.md) for the provider_admin permission set (35 active as of 2026-06-22; regenerate with `SELECT count(*) FROM role_permission_templates WHERE role_name='provider_admin' AND is_active`). PR #73 (2026-06-09) added `grant.create`, `grant.revoke`, `grant.view` (cross-tenant grant write authority) and retired `platform.view_event_details`.
 - **Backfill SQL scripts**: Created for existing provider_admin roles
 
 ### What's Remaining

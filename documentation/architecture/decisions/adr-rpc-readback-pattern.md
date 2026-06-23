@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-30
+last_updated: 2026-06-22
 ---
 
 
@@ -249,7 +249,9 @@ For caller-driven failures that do use `RAISE EXCEPTION`, existing ERRCODEs are 
 
 - **2026-04-30** — **Type-level enforcement (M3) ships**: migrations `20260430172625_backfill_rpc_shape_comments.sql` + `20260430172836_fix_rpc_shape_classifications.sql` (the second now superseded — body-introspection in the rewritten backfill is self-consistent). Every `api.*` function carries `COMMENT ON FUNCTION ... '@a4c-rpc-shape: envelope|read'`. Codegen at `frontend/scripts/gen-rpc-registry.cjs` reads `pg_description` and emits `EnvelopeRpcs` / `ReadRpcs` / `UncategorizedRpcs` string-literal unions; helpers `apiRpc<T>` / `apiRpcEnvelope<T>` narrow `functionName` on those unions, making wrong-helper-for-shape a TypeScript compile error. CI workflow `.github/workflows/rpc-registry-sync.yml` runs against a locally-seeded Supabase container (deterministic anchor, not dev DB) and fails on diff or `UncategorizedRpcs ≠ never`. **First-run found two real bugs** in the codegen (`regexp_matches` inside `COALESCE`; `psql -F'\t'` shell-quoting through dash) — both fixed; the workflow now passes consistently. Same PR migrated 10 wrong-helper sites (7 `SupabaseUserCommandService` + 3 `EventMonitoringService`) from `apiRpc<{success, ...}>` to `apiRpcEnvelope<T>`. Architect review verdict: APPROVE WITH MINOR FOLLOW-UPS (CR-1, CR-2, NT-1..NT-6, S-1..S-6 all absorbed).
 
-Total RPCs using Pattern A v2: **20 single-event + 2 multi-event (`update_role`, `modify_user_roles`)** = 22 definitions across 21 RPCs (one RPC has two overloads). Plus 1 Edge Function operation (`manage-user`'s `update_notification_preferences`, v11+). All race-safe on captured event_id.
+- **2026-06-15** — Per-user org-override contact tables (`user_org_phone_overrides`, `user_org_address_overrides`) were **dropped** (PR #78, migration `20260615175954`); all user phones/addresses are now global-only. `api.add_user_phone` / `api.update_user_phone` no longer branch their read-back on `p_org_id` between two tables — the 2026-04-23 entry above describes the now-superseded two-table form. (`p_org_id` retained as an always-NULL vestigial param so `CREATE OR REPLACE` preserves the OID + M3 shape comment.)
+
+Total RPCs using Pattern A v2: regenerate from the M3 registry rather than trusting a pinned count — `grep -c '@a4c-rpc-shape: envelope'` across migrations, or inspect `frontend/src/services/api/rpc-registry.generated.ts`. (Historical anchor: 22 envelope definitions as of 2026-04-30.) All race-safe on captured event_id.
 
 ### Frontend envelope types — user domain (Blocker 3, 2026-04-23)
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-05-26
+last_updated: 2026-06-22
 purpose: agent-navigation
 ---
 
@@ -92,6 +92,12 @@ purpose: agent-navigation
 | `rpc-reachability-matrix` | [cross-tenant-access-grant-rpc-reachability-matrix.md](architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) | adr-cross-tenant-access-grant-jwt-shape.md, adr-rpc-readback-pattern.md |
 | `consultant-callability` | [cross-tenant-access-grant-rpc-reachability-matrix.md](architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) | adr-cross-tenant-access-grant-jwt-shape.md |
 | `bucket-classification` | [cross-tenant-access-grant-rpc-reachability-matrix.md](architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) | infrastructure/supabase/CLAUDE.md § list_users* family pattern |
+| `model-m` / `membership-oracle` | [cross-tenant-access-grant-rpc-reachability-matrix.md](architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) | infrastructure/supabase/CLAUDE.md § list_users* family pattern |
+| `emergency-access` / `emergency-default` | [provider-partners-architecture.md](architecture/data/provider-partners-architecture.md) | grant_role_templates.md, adr-cross-tenant-access-grant-jwt-shape.md |
+| `grant-permissions` (`grant.create` / `grant.revoke` / `grant.view`) | [provider-admin-permissions-architecture.md](architecture/authorization/provider-admin-permissions-architecture.md) | permissions-reference.md, provider-partners-architecture.md |
+| `var-partnership-projection` | [var_partnerships_projection.md](infrastructure/reference/database/tables/var_partnerships_projection.md) | provider-partners-architecture.md, var-partnerships.md |
+| `grant-role-templates` | [grant_role_templates.md](infrastructure/reference/database/tables/grant_role_templates.md) | adr-cross-tenant-access-grant-jwt-shape.md, provider-partners-architecture.md |
+| `event-chaining` / `after-insert-emit` | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | event-handler-pattern.md |
 | `contract-drift` | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | asyncapi-contracts.md, workflows/CLAUDE.md |
 | `controlled-substances` | [medications.md](infrastructure/reference/database/tables/medications.md) | dosage_info.md |
 | `cqrs` | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | EVENT-DRIVEN-GUIDE.md, MIGRATION-FROM-CRUD.md |
@@ -336,7 +342,7 @@ purpose: agent-navigation
 | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) | ADR: All `api.update_*`/`change_*` RPCs use Pattern A (return-error envelope) for handler-driven failures; RAISE EXCEPTION forbidden because it rolls back the audit row | `adr`, `rpc-readback`, `processing-error`, `projection-guard`, `api-contract` | 2400 |
 | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | ADR: SQL RPC is the default for write operations; Edge Functions reserved for 6 load-bearing criteria (LB1–LB6). Includes inventory of all 7 Edge Functions with per-operation classification + extraction backlog. | `adr`, `edge-function`, `sql-rpc`, `orchestration-tier`, `cqrs` | 2800 |
 | [adr-cross-tenant-access-grant-jwt-shape.md](architecture/decisions/adr-cross-tenant-access-grant-jwt-shape.md) | ADR: Cross-tenant grants extend the JWT via `compute_effective_permissions` (Path B); grant permissions snapshotted into `cross_tenant_access_grants_projection.permissions` at write time (hybrid snapshot); asymmetric `DISTINCT ON (permission_name, scope_path)`; separate `grant_role_templates` table; opt-in implication propagation. Phase 0.3 addendum captures per-bucket consultant-callability decisions. | `adr`, `cross-tenant-grant`, `jwt-claim-shape`, `compute-effective-permissions`, `provider-partner`, `accessible-organizations`, `hybrid-snapshot` | 3000 |
-| [cross-tenant-access-grant-rpc-reachability-matrix.md](architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) | Per-RPC classification of all 104 `api.*` SQL functions into PR #67's 5-bucket taxonomy (A explicit-org-param via early-return guard; B JWT-bound; C scope-path-bound; C-legacy two-step pattern; D entity-lookup+RLS; E global). Per-bucket consultant-callability decisions; Phase 3 (2 RPCs: `list_users` + `list_invitations`) and Phase 4 (35 RPCs by table cluster: 34 strict-D + 1 D-variant) handoff lists; `@a4c-bucket` + `@a4c-consultant-callable` comment vocabulary spec for the Phase 1 codegen. | `rpc-reachability-matrix`, `consultant-callability`, `bucket-classification`, `cross-tenant-grant`, `provider-partner` | 2800 |
+| [cross-tenant-access-grant-rpc-reachability-matrix.md](architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md) | Codegen-generated per-RPC classification of the full `api.*` inventory (170+ RPCs) into PR #67's 5-bucket taxonomy (A explicit-org-param guard; B JWT-bound; C scope-path-bound; C-legacy two-step; D entity-lookup+RLS; E global). Per-bucket consultant-callability. **Phase 3 SHIPPED** (`list_users` made grant-aware via the Model M membership-oracle guard, PR #80; `list_invitations` deferred to a decision-gated sub-card). Phase 4 = Bucket-D RLS audit (37 RPCs = 36 strict-D + 1 D-variant, not yet seeded). `@a4c-bucket`/`@a4c-consultant-callable`/`@a4c-phase-target` comment vocabulary + codegen spec. | `rpc-reachability-matrix`, `consultant-callability`, `bucket-classification`, `model-m`, `membership-oracle`, `cross-tenant-grant` | 3000 |
 | [multi-tenancy-architecture.md](architecture/data/multi-tenancy-architecture.md) | Organization isolation via RLS and JWT claims | `rls`, `multi-tenant`, `org_id` | 2800 |
 | [event-sourcing-overview.md](architecture/data/event-sourcing-overview.md) | CQRS pattern, domain events, projections | `cqrs`, `events`, `projections` | 2500 |
 | [temporal-overview.md](architecture/workflows/temporal-overview.md) | Workflow orchestration concepts and patterns | `temporal`, `workflow`, `saga` | 3200 |
@@ -409,7 +415,9 @@ purpose: agent-navigation
 | [contacts_projection.md](infrastructure/reference/database/tables/contacts_projection.md) | Organization contacts | `contacts`, `billing-contact`, `pii` | 750 |
 | [addresses_projection.md](infrastructure/reference/database/tables/addresses_projection.md) | Organization addresses | `addresses`, `headquarters`, `soft-delete` | 750 |
 | [phones_projection.md](infrastructure/reference/database/tables/phones_projection.md) | Organization phones | `phones`, `office-phone`, `fax` | 700 |
-| [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | VAR cross-org access | `cross-tenant`, `var-contracts`, `authorization` | 650 |
+| [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | VAR cross-org access (RLS present since baseline_v4) | `cross-tenant`, `var-contracts`, `authorization` | 650 |
+| [var_partnerships_projection.md](infrastructure/reference/database/tables/var_partnerships_projection.md) | VAR partnership contracts (Phase 2 projection) | `var-partnership-projection`, `provider-partner`, `cross-tenant-grant` | 600 |
+| [grant_role_templates.md](infrastructure/reference/database/tables/grant_role_templates.md) | Grant permission-set templates (`var_default`, `emergency_default`) | `grant-role-templates`, `emergency-default`, `var-default` | 550 |
 | [medications.md](infrastructure/reference/database/tables/medications.md) | Medication catalog | `medication`, `formulary`, `rxnorm` | 600 |
 | [medication_history.md](infrastructure/reference/database/tables/medication_history.md) | Prescription records | `prescriptions`, `compliance`, `controlled-substances` | 720 |
 | [dosage_info.md](infrastructure/reference/database/tables/dosage_info.md) | MAR tracking | `dosage-info`, `mar`, `medication-administration` | 800 |

@@ -1,12 +1,12 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-06-22
 ---
 
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: CQRS projection enabling cross-organization data access for provider_partner orgs (VAR contracts, court orders, social services). Time-bound, scope-limited grants with full audit trail. Supports statuses: active, revoked, expired, suspended. RLS enabled but policies NOT YET IMPLEMENTED - CRITICAL GAP.
+**Summary**: CQRS projection enabling cross-organization data access for provider_partner orgs (VAR contracts, court orders, social services). Time-bound, scope-limited grants with full audit trail. Supports statuses: active, revoked, expired, suspended. RLS enabled with policies (present since baseline_v4, 2026-02-12).
 
 **When to read**:
 - Implementing VAR (Vendor Authorized Representative) access
@@ -343,56 +343,24 @@ ORDER BY granted_at DESC;
 
 ## Row-Level Security (RLS)
 
-**Status**: ⚠️ ENABLED but **NO POLICIES DEFINED** - CRITICAL GAP
+**Status**: ✅ ENABLED with policies (present since baseline_v4, 2026-02-12 — `platform_admin_all` at baseline_v4:15625 and `cross_tenant_grants_org_admin_select` at baseline_v4:15255; NOT added in Phase 2, which created the *var_partnerships_projection* policies). Regenerate the live set with `SELECT polname, pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polrelid='public.cross_tenant_access_grants_projection'::regclass;`.
 
-### Current State
+### Deployed policies (as of 2026-06-22)
+
+**`platform_admin_all` (FOR ALL)** — platform owners bypass tenant scope:
 ```sql
-ALTER TABLE cross_tenant_access_grants_projection ENABLE ROW LEVEL SECURITY;
--- RLS is enabled but NO policies exist
--- Result: Table is COMPLETELY BLOCKED for non-superuser access
+USING (has_platform_privilege())
 ```
 
-### Recommended Policies (NOT YET IMPLEMENTED)
-
-**Policy 1: Super Admin Full Access**
+**`cross_tenant_grants_org_admin_select` (FOR SELECT)** — an org admin sees grants where their org is either side of the partnership:
 ```sql
-CREATE POLICY access_grants_super_admin_all
-  ON cross_tenant_access_grants_projection FOR ALL
-  USING (is_super_admin(get_current_user_id()));
+USING (
+  has_org_admin_permission()
+  AND (consultant_org_id = get_current_org_id() OR provider_org_id = get_current_org_id())
+)
 ```
 
-**Policy 2: Consultant Organization View Own Grants**
-```sql
-CREATE POLICY access_grants_consultant_view
-  ON cross_tenant_access_grants_projection FOR SELECT
-  USING (
-    consultant_org_id = (current_setting('request.jwt.claims', true)::json->>'org_id')::UUID
-    OR is_super_admin(get_current_user_id())
-  );
-```
-
-**Policy 3: Provider Organization View Grants to Them**
-```sql
-CREATE POLICY access_grants_provider_view
-  ON cross_tenant_access_grants_projection FOR SELECT
-  USING (
-    provider_org_id = (current_setting('request.jwt.claims', true)::json->>'org_id')::UUID
-    OR is_super_admin(get_current_user_id())
-  );
-```
-
-**Policy 4: Provider Admin Can Grant/Revoke**
-```sql
-CREATE POLICY access_grants_provider_manage
-  ON cross_tenant_access_grants_projection FOR ALL
-  USING (
-    provider_org_id = get_current_org_id()
-    AND has_org_admin_permission()
-  );
-```
-
-### CRITICAL ACTION REQUIRED
-**RLS policies MUST be implemented before production use. Current state blocks all access.**
+> **Note**: These RLS policies govern *direct* table reads. The frontend reads grants through `api.*` SQL RPCs (CQRS rule), and grant-**derived** cross-tenant data access (a consultant reading the provider org's clients/users) is mediated separately — via `users.accessible_organizations` (which unions in active grants) and the per-table grant-aware predicates added across Phases 1–3. Phase 4 extends the remaining Bucket-D table RLS policies to consult this projection; see `documentation/architecture/authorization/cross-tenant-access-grant-rpc-reachability-matrix.md`.
 
 ## Constraints
 
@@ -661,23 +629,18 @@ ORDER BY ctag.granted_at DESC;
 
 ## Troubleshooting
 
-### Issue: RLS Blocks All Access
+### Issue: RLS returns 0 rows despite grants existing
 
-**Symptoms**: All queries return 0 rows despite grants existing
+**Symptoms**: A direct `SELECT` returns 0 rows even though grants exist.
 
 **Diagnosis**:
 ```sql
--- Check if RLS is enabled
-SELECT relname, relrowsecurity
-FROM pg_class
-WHERE relname = 'cross_tenant_access_grants_projection';
-
--- Check for policies
-SELECT COUNT(*) FROM pg_policies
-WHERE tablename = 'cross_tenant_access_grants_projection';
+-- Confirm RLS + policies are present
+SELECT relname, relrowsecurity FROM pg_class WHERE relname = 'cross_tenant_access_grants_projection';
+SELECT polname FROM pg_policy WHERE polrelid='public.cross_tenant_access_grants_projection'::regclass;
 ```
 
-**Resolution**: Implement RLS policies (see Recommended Policies section)
+**Resolution**: The `cross_tenant_grants_org_admin_select` policy only admits a caller who (a) holds an org-admin permission AND (b) acts in an org on either side of the grant (`consultant_org_id` or `provider_org_id` = `get_current_org_id()`). A caller missing the org-admin permission, or scoped to an unrelated org, correctly sees 0 rows. Platform owners (`has_platform_privilege()`) see all. Frontend code should read via the `api.*` grant RPCs rather than direct table access.
 
 ### Issue: Grant Not Authorizing Access
 
@@ -740,5 +703,4 @@ WHERE consultant_org_id = '<uuid>'
 
 - **Event Processor**: `infrastructure/supabase/sql/03-functions/event-processing/006-process-access-grant-events.sql`
 - **Table Definition**: `infrastructure/supabase/sql/02-tables/rbac/005-cross_tenant_access_grants_projection.sql`
-- **RLS Enable**: `infrastructure/supabase/sql/06-rls/enable_rls_all_tables.sql:17`
-- **⚠️ RLS Policies**: **NOT YET IMPLEMENTED** - CRITICAL GAP
+- **RLS Enable + Policies**: `infrastructure/supabase/supabase/migrations/20260212010625_baseline_v4.sql` — `platform_admin_all` (:15625), `cross_tenant_grants_org_admin_select` (:15255). RLS is ✅ ENABLED (see "RLS Policies" section above); the prior "NOT YET IMPLEMENTED — CRITICAL GAP" note was stale and is removed.
