@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-06-23
+last_updated: 2026-06-24
 ---
 
 <!-- TL;DR-START -->
@@ -54,10 +54,12 @@ POST https://<project-ref>.supabase.co/functions/v1/invite-user
 | `not_found` | No live user (or soft-deleted) | Create invitation (token + email) | `invitation_sent` |
 | `expired_invitation` | Stale token, same org | Replace stale token | `invitation_sent` |
 | `deactivated` | Has a role here, `users.is_active=false` | **Reactivate** (`api.reactivate_user` + clear auth ban) **then assign** requested roles | `user_reactivated_and_role_assigned` |
-| `existing_user_no_roles` | Users row, **zero** roles anywhere ("zombie") | **Direct role assignment** (`api.modify_user_roles`) | `role_assigned` |
-| `other_org_member` | Users row, ≥1 role in another org | **Cross-provider eligibility gate**, then on eligible → direct role assignment | `role_assigned` (or 422 if blocked) |
+| `existing_user_no_roles` | Users row, **zero** roles anywhere ("zombie") | **Direct role assignment** (`api.modify_user_roles`); if the target's home org differs from the caller's (cross-org), **fall back** to the invitation flow | `role_assigned` (or `invitation_sent` on fallback) |
+| `other_org_member` | Users row, ≥1 role in another org | **Cross-provider eligibility gate**, then create invitation (token) | `invitation_sent` (or 422 if blocked) |
 
-Existing-user paths emit **only** `user.role.assigned` / `user.reactivated` (via the RPCs); they do **not** emit `user.invited` or `user.created`. The correlation id chains automatically — the RPCs set `app.correlation_id` from `users.correlation_id`.
+**Narrow scope** (current): only **same-org** existing users are routed to direct assignment. `other_org_member` (roles in another org) stays on the invitation path — cross-org direct role assignment is deferred to the cross-tenant grant pipeline ([cross-org-existing-user-direct-role-assign card](../../../../dev/active/cross-org-existing-user-direct-role-assign/plan.md)). The role RPCs gate on `users.current_organization_id`, so a cross-org target returns `NOT_FOUND`; `existing_user_no_roles` handles that by falling back to the invitation flow.
+
+Existing-user (direct-assign) paths emit **only** `user.role.assigned` / `user.reactivated` (via the RPCs); they do **not** emit `user.invited` or `user.created`. The correlation id chains automatically — the RPCs set `app.correlation_id` from `users.correlation_id`.
 
 ### Cross-provider gate
 

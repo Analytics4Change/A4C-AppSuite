@@ -11,9 +11,9 @@
  * Per-Edge-Function test pattern from PR #42.
  */
 
-import { assertEquals } from 'https://deno.land/std@0.220.1/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.220.1/assert/mod.ts';
 
-import { checkEmailStatus } from '../index.ts';
+import { assignRolesToExistingUser, checkEmailStatus } from '../index.ts';
 
 type RpcResponse = { data: unknown; error: unknown };
 
@@ -89,4 +89,78 @@ Deno.test('checkEmailStatus → not_found when no user and no invitation exist',
   });
   const result = await checkEmailStatus(client, 'new@b.com', 'org1');
   assertEquals(result.status, 'not_found');
+});
+
+// ---------------------------------------------------------------------------
+// assignRolesToExistingUser — envelope handling (narrow-scope fallback + N3)
+// ---------------------------------------------------------------------------
+
+/** Stub whose `.schema('api').rpc()` resolves to a configured modify_user_roles result. */
+function mockUserClient(rpcResult: RpcResponse): Parameters<typeof assignRolesToExistingUser>[0] {
+  return {
+    schema() {
+      return { rpc: () => Promise.resolve(rpcResult) };
+    },
+  } as unknown as Parameters<typeof assignRolesToExistingUser>[0];
+}
+
+const CORS = { 'Access-Control-Allow-Origin': '*' };
+
+Deno.test('assignRolesToExistingUser → fallback_to_invite on tenancy NOT_FOUND (cross-org)', async () => {
+  // Deployed modify_user_roles tenancy shape: error code is top-level `error`.
+  const client = mockUserClient({
+    data: {
+      success: false,
+      error: 'NOT_FOUND',
+      errorDetails: { code: 'NOT_FOUND', message: 'User not found in this organization' },
+    },
+    error: null,
+  });
+  const outcome = await assignRolesToExistingUser(client, 'u1', ['r1'], 'reason', 'role_assigned', 'corr', CORS);
+  assertEquals(outcome.kind, 'fallback_to_invite');
+});
+
+Deno.test('assignRolesToExistingUser → done 200 with action on success', async () => {
+  const client = mockUserClient({ data: { success: true }, error: null });
+  const outcome = await assignRolesToExistingUser(client, 'u2', ['r1'], 'reason', 'role_assigned', 'corr', CORS);
+  assertEquals(outcome.kind, 'done');
+  if (outcome.kind !== 'done') return;
+  assertEquals(outcome.response.status, 200);
+  const body = await outcome.response.json();
+  assertEquals(body.success, true);
+  assertEquals(body.action, 'role_assigned');
+  assertEquals(body.userId, 'u2');
+});
+
+Deno.test('assignRolesToExistingUser → done 400 threading violations + code (VALIDATION_FAILED, N3)', async () => {
+  const client = mockUserClient({
+    data: { success: false, error: 'VALIDATION_FAILED', violations: [{ role_id: 'r1', error_code: 'X' }] },
+    error: null,
+  });
+  const outcome = await assignRolesToExistingUser(client, 'u3', ['r1'], 'reason', 'role_assigned', 'corr', CORS);
+  assertEquals(outcome.kind, 'done');
+  if (outcome.kind !== 'done') return;
+  assertEquals(outcome.response.status, 400);
+  const body = await outcome.response.json();
+  assertEquals(body.success, false);
+  assertEquals(body.errorDetails.code, 'VALIDATION_FAILED');
+  assert(Array.isArray(body.errorDetails.context.violations));
+});
+
+Deno.test('assignRolesToExistingUser → done 400 with errorDetails.message for TARGET_DEACTIVATED', async () => {
+  const client = mockUserClient({
+    data: {
+      success: false,
+      error: 'TARGET_DEACTIVATED',
+      errorDetails: { code: 'TARGET_DEACTIVATED', message: 'Cannot modify roles on a deactivated user' },
+    },
+    error: null,
+  });
+  const outcome = await assignRolesToExistingUser(client, 'u4', ['r1'], 'reason', 'role_assigned', 'corr', CORS);
+  assertEquals(outcome.kind, 'done');
+  if (outcome.kind !== 'done') return;
+  assertEquals(outcome.response.status, 400);
+  const body = await outcome.response.json();
+  assertEquals(body.error, 'Cannot modify roles on a deactivated user');
+  assertEquals(body.errorDetails.code, 'TARGET_DEACTIVATED');
 });
