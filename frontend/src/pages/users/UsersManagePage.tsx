@@ -44,6 +44,7 @@ import type {
   UserDisplayStatus,
   NotificationPreferences,
   UserPhone,
+  InviteUserResult,
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
@@ -351,6 +352,24 @@ export const UsersManagePage: React.FC = observer(() => {
 
       if (result.success) {
         log.info('Form submitted successfully', { mode: panelMode });
+        // Create mode = invite flow. Surface an action-specific toast: existing
+        // users are added directly (no email/token), so don't claim an invite was
+        // sent. data-testid carries the action for UAT assertions.
+        if (panelMode === 'create') {
+          const action = (result as InviteUserResult).action ?? 'invitation_sent';
+          const who =
+            [formViewModel.formData.firstName, formViewModel.formData.lastName]
+              .filter(Boolean)
+              .join(' ')
+              .trim() || formViewModel.formData.email;
+          const message =
+            action === 'role_assigned'
+              ? `${who} added to the organization`
+              : action === 'user_reactivated_and_role_assigned'
+                ? `${who} reactivated and added to the organization`
+                : `Invitation sent to ${formViewModel.formData.email}`;
+          toast.success(<span data-testid={`invite-success-${action}`}>{message}</span>);
+        }
         await viewModel.loadAll();
         // Reset form after successful creation
         if (panelMode === 'create') {

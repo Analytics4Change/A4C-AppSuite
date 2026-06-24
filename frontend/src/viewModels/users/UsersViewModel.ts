@@ -827,8 +827,23 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = `Invitation sent to ${request.email}`;
-          log.info('User invited', { email: request.email });
+          // Message reflects what actually happened — existing users are added
+          // directly (no invitation email), so don't claim an invite was sent.
+          const fullName = [request.firstName, request.lastName].filter(Boolean).join(' ').trim();
+          const who = fullName || request.email;
+          switch (result.action) {
+            case 'role_assigned':
+              this.successMessage = `${who} added to the organization`;
+              break;
+            case 'user_reactivated_and_role_assigned':
+              this.successMessage = `${who} reactivated and added to the organization`;
+              break;
+            case 'invitation_sent':
+            default:
+              this.successMessage = `Invitation sent to ${request.email}`;
+              break;
+          }
+          log.info('User invited', { email: request.email, action: result.action });
         } else {
           this.error = result.error ?? 'Failed to send invitation';
           log.warn('Failed to invite user', { error: result.error });

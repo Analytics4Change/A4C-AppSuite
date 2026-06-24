@@ -58,7 +58,7 @@ import { buildEventMetadata } from '../_shared/emit-event.ts';
 import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v18-cross-provider-invitation-gate';
+const DEPLOY_VERSION = 'v19-route-existing-users-to-role-assign';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -127,12 +127,24 @@ interface InviteUserRequest {
  * Email lookup result statuses
  */
 type EmailStatus =
-  | 'not_found'           // No user with this email
-  | 'pending_invitation'  // Has pending invitation in this org
-  | 'expired_invitation'  // Has expired invitation in this org
-  | 'active_member'       // Active member of this org
-  | 'deactivated'         // Deactivated member of this org
-  | 'other_org_member';   // User exists but not in this org
+  | 'not_found'             // No user with this email
+  | 'pending_invitation'    // Has pending invitation in this org
+  | 'expired_invitation'    // Has expired invitation in this org
+  | 'active_member'         // Active member of this org
+  | 'deactivated'           // Deactivated member of this org
+  | 'existing_user_no_roles' // User exists, zero roles anywhere (zombie)
+  | 'other_org_member';     // User exists with ≥1 role in another org
+
+/**
+ * What invite-user actually DID — discriminates the success response so the
+ * frontend can show the right message. `invitation_sent` = greenfield/expired
+ * (token issued); `role_assigned` = existing user assigned directly (no token);
+ * `user_reactivated_and_role_assigned` = deactivated user reactivated then assigned.
+ */
+export type InviteUserAction =
+  | 'invitation_sent'
+  | 'role_assigned'
+  | 'user_reactivated_and_role_assigned';
 
 interface EmailLookupResult {
   status: EmailStatus;
@@ -146,10 +158,13 @@ interface EmailLookupResult {
  */
 interface InviteUserResponse {
   success: boolean;
+  action?: InviteUserAction;
   invitationId?: string;
+  userId?: string;
   emailStatus?: EmailStatus;
   suggestedAction?: string;
   error?: string;
+  errorDetails?: { code?: string };
 }
 
 /**
@@ -166,7 +181,7 @@ function generateSecureToken(): string {
 /**
  * Check email status via smart lookup
  */
-async function checkEmailStatus(
+export async function checkEmailStatus(
   supabase: AnySchemaSupabaseClient,
   email: string,
   orgId: string,
@@ -241,13 +256,145 @@ async function checkEmailStatus(
   }
 
   if (existingUser?.[0]) {
+    const existingUserId = existingUser[0].user_id;
+    // Split the overloaded "user exists but not in this org" case: a user with
+    // zero role assignments anywhere is a roleless existing user ("zombie",
+    // route: direct assign), distinct from a member of another org (route:
+    // cross-provider gate then assign). api.check_user_has_any_role supplies the
+    // missing signal. On error, default to other_org_member — the conservative
+    // path that still runs the cross-provider eligibility gate.
+    const { data: hasRole, error: roleAnyError } = await supabase
+      .rpc('check_user_has_any_role', { p_user_id: existingUserId });
+    if (roleAnyError) {
+      console.error(`[invite-user v${DEPLOY_VERSION}] has-any-role check error:`, roleAnyError);
+    }
     return {
-      status: 'other_org_member',
-      userId: existingUser[0].user_id,
+      status: (roleAnyError || hasRole) ? 'other_org_member' : 'existing_user_no_roles',
+      userId: existingUserId,
     };
   }
 
   return { status: 'not_found' };
+}
+
+/**
+ * Existing-user routing: assign the requested roles to a user who already exists,
+ * via api.modify_user_roles called with the CALLER's JWT (supabaseUser.schema('api'))
+ * so the RPC's permission + scope gates evaluate against the inviter (Rule 19). No
+ * invitation token, no user.invited/user.created — only user.role.assigned is
+ * emitted (by the RPC). Correlation chains automatically (modify_user_roles sets
+ * app.correlation_id from users.correlation_id). Returns the HTTP Response.
+ *
+ * Role-grant authority was already pre-validated for this request by the shared
+ * validate_role_assignment block; modify_user_roles re-checks internally, so this
+ * helper does not re-call it. The envelope surfaces RPC-side failures (e.g.
+ * TARGET_DEACTIVATED, role-violation codes) as success:false.
+ */
+async function assignRolesToExistingUser(
+  supabaseUser: AnySchemaSupabaseClient,
+  userId: string,
+  roleIds: string[],
+  reason: string,
+  action: InviteUserAction,
+  correlationId: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  const { data: envelope, error: rpcError } = await supabaseUser
+    .schema('api')
+    .rpc('modify_user_roles', {
+      p_user_id: userId,
+      p_role_ids_to_add: roleIds,
+      p_role_ids_to_remove: [],
+      p_reason: reason,
+    });
+
+  if (rpcError) {
+    return handleRpcError(rpcError, correlationId, corsHeaders, 'Assign role to existing user');
+  }
+
+  const env_ = (envelope ?? {}) as {
+    success?: boolean;
+    error?: string;
+    code?: string;
+    message?: string;
+  };
+
+  if (!env_.success) {
+    console.warn(`[invite-user v${DEPLOY_VERSION}] modify_user_roles envelope failure:`, env_.error ?? env_.message);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: env_.message ?? env_.error ?? 'Role assignment failed',
+        errorDetails: env_.code ? { code: env_.code } : undefined,
+      } as InviteUserResponse),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, action, userId } as InviteUserResponse),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+/**
+ * Deactivated-user routing: reactivate the user (projection via api.reactivate_user
+ * + clear the Supabase Auth ban, LB1) then additively assign the requested roles.
+ * modify_user_roles rejects deactivated targets (TARGET_DEACTIVATED), so reactivation
+ * must precede assignment. Partial-failure: if reactivate succeeds but the assign
+ * fails, the user stays active without the new role and the assign error is returned
+ * (admin retries) — the same accepted trade-off as the auth-unban step.
+ */
+async function reactivateThenAssign(
+  supabaseUser: AnySchemaSupabaseClient,
+  supabaseAdmin: AnySchemaSupabaseClient,
+  userId: string,
+  roleIds: string[],
+  correlationId: string,
+  corsHeaders: Record<string, string>,
+): Promise<Response> {
+  const { data: envelope, error: rpcError } = await supabaseUser
+    .schema('api')
+    .rpc('reactivate_user', {
+      p_user_id: userId,
+      p_reason: 'Reactivated to add existing user to organization via invite flow',
+    });
+
+  if (rpcError) {
+    return handleRpcError(rpcError, correlationId, corsHeaders, 'Reactivate user');
+  }
+
+  const env_ = (envelope ?? {}) as { success?: boolean; error?: string };
+  if (!env_.success) {
+    console.warn(`[invite-user v${DEPLOY_VERSION}] reactivate_user envelope failure:`, env_.error);
+    return new Response(
+      JSON.stringify({ success: false, error: env_.error ?? 'Failed to reactivate user' } as InviteUserResponse),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // LB1: clear the Supabase Auth ban set at deactivation, else the reactivated
+  // user (is_active=true in the projection) still cannot log in. Warn-and-proceed
+  // on failure (idempotently retriable; the projection is the source of truth for
+  // is_active). Mirrors manage-user's reactivate path.
+  const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(
+    userId,
+    { ban_duration: 'none' }
+  );
+  if (unbanError) {
+    console.warn(`[invite-user v${DEPLOY_VERSION}] Failed to clear auth ban after reactivate:`, unbanError);
+  }
+
+  // Additively assign the requested roles on top of the user's restored roles.
+  return assignRolesToExistingUser(
+    supabaseUser,
+    userId,
+    roleIds,
+    'Added existing user to organization via invite flow (post-reactivation)',
+    'user_reactivated_and_role_assigned',
+    correlationId,
+    corsHeaders,
+  );
 }
 
 /**
@@ -839,6 +986,54 @@ serve(async (req) => {
     }
 
     // ==========================================================================
+    // EXISTING-USER ROUTING — assign role / reactivate-then-assign (no token)
+    // ==========================================================================
+    // Card: invite-user-route-existing-users-to-role-assign (epic PR 3).
+    // For users who already exist, the correct write is a direct role assignment
+    // (or reactivate-then-assign), NOT an invitation token + acceptance ceremony.
+    // These paths emit ONLY user.role.assigned / user.reactivated (via the RPCs) —
+    // no misleading user.invited / no-op user.created. Correlation chains
+    // automatically (the RPCs set app.correlation_id from users.correlation_id).
+    // Reached only after the cross-provider gate above (ineligible other_org_member
+    // already returned 422); the remaining fall-through to CREATE INVITATION is
+    // greenfield (not_found) or stale-token replacement (expired_invitation).
+    if (
+      emailStatus.userId &&
+      (emailStatus.status === 'deactivated' ||
+        emailStatus.status === 'existing_user_no_roles' ||
+        emailStatus.status === 'other_org_member')
+    ) {
+      const roleIds = (requestData.roles ?? []).map((r) => r.role_id);
+      if (roleIds.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'At least one role is required to add an existing user to the organization',
+          } as InviteUserResponse),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (emailStatus.status === 'deactivated') {
+        console.log(`[invite-user v${DEPLOY_VERSION}] Existing deactivated user — reactivate then assign roles`);
+        return await reactivateThenAssign(
+          supabaseUser, supabaseAdmin, emailStatus.userId, roleIds, correlationId, corsHeaders,
+        );
+      }
+
+      console.log(`[invite-user v${DEPLOY_VERSION}] Existing user (${emailStatus.status}) — assign roles directly`);
+      return await assignRolesToExistingUser(
+        supabaseUser,
+        emailStatus.userId,
+        roleIds,
+        'Added existing user to organization via invite flow',
+        'role_assigned',
+        correlationId,
+        corsHeaders,
+      );
+    }
+
+    // ==========================================================================
     // CREATE INVITATION
     // ==========================================================================
     const invitationId = crypto.randomUUID();
@@ -930,6 +1125,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
+          action: 'invitation_sent',
           invitationId,
           emailStatus: 'not_found',
           suggestedAction: 'Invitation created but email failed - use resend',
@@ -946,6 +1142,7 @@ serve(async (req) => {
     // ==========================================================================
     const response: InviteUserResponse = {
       success: true,
+      action: 'invitation_sent',
       invitationId,
       emailStatus: emailStatus.status,
     };

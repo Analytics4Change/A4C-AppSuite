@@ -167,6 +167,8 @@ purpose: agent-navigation
 | `integration-testing` | [integration-testing.md](workflows/guides/integration-testing.md) | triggering-workflows.md |
 | `intake` | [clients_projection.md](infrastructure/reference/database/tables/clients_projection.md) | client-data-model.md, client_field_definitions_projection.md |
 | `invitation` | [invitations_projection.md](infrastructure/reference/database/tables/invitations_projection.md) | organizations_projection.md |
+| `invite-user` | [invite-user.md](infrastructure/reference/edge-functions/invite-user.md) | manage-user.md, accept-invitation.md |
+| `user-invitation` | [invite-user.md](infrastructure/reference/edge-functions/invite-user.md) | invitations_projection.md, accept-invitation.md |
 | `iso-639` | [client_reference_values.md](infrastructure/reference/database/tables/client_reference_values.md) | clients_projection.md |
 | `invitation-emails` | [resend-email-provider.md](workflows/guides/resend-email-provider.md) | activities-reference.md |
 | `invitation-oauth` | [oauth-invitation-acceptance.md](architecture/authentication/oauth-invitation-acceptance.md) | invitations_projection.md, frontend-auth-architecture.md |
@@ -377,6 +379,7 @@ purpose: agent-navigation
 | [SUPABASE-AUTH-SETUP.md](infrastructure/guides/supabase/SUPABASE-AUTH-SETUP.md) | Auth provider configuration | `supabase`, `auth`, `setup` | 1600 |
 | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | Edge function testing guide | `edge-function`, `testing`, `deno` | 1200 |
 | [manage-user.md](infrastructure/reference/edge-functions/manage-user.md) | User lifecycle Edge Function API (deactivate, roles, notification prefs) | `manage-user`, `user-lifecycle`, `notification-preferences`, `role-modification` | 1000 |
+| [invite-user.md](infrastructure/reference/edge-functions/invite-user.md) | invite-user Edge Function API: state-based routing (invite vs role-assign vs reactivate), action discriminator | `invite-user`, `user-invitation`, `role-assignment`, `email-status` | 1100 |
 | [CONTRACT-TYPE-GENERATION.md](infrastructure/guides/supabase/CONTRACT-TYPE-GENERATION.md) | AsyncAPI → TypeScript type generation with Modelina | `asyncapi`, `modelina`, `type-generation`, `contract-drift`, `generated-events` | 3700 |
 | [event-observability.md](infrastructure/guides/event-observability.md) | Event processing observability, W3C Trace Context, span timing | `observability`, `tracing`, `failed-events`, `correlation-id`, `trace-id`, `span-id`, `session-id`, `w3c-trace-context` | 3200 |
 | [event-processing-patterns.md](infrastructure/patterns/event-processing-patterns.md) | Decision guide: sync trigger handlers vs async pg_notify + Temporal | `event-processing-patterns`, `pattern-selection`, `pg-notify-pattern`, `dual-write`, `synchronous-handler`, `async-workflow` | 2800 |
