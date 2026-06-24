@@ -20,6 +20,7 @@ import type {
   UpdateUserRequest,
   ModifyRolesRequest,
   InviteUserResult,
+  InviteUserAction,
   UpdateUserResult,
   UserPhoneResult,
   UpdateNotificationPreferencesResult,
@@ -129,10 +130,25 @@ export class SupabaseUserCommandService implements IUserCommandService {
         };
       }
 
+      const action: InviteUserAction = data.action ?? 'invitation_sent';
+
+      // Existing-user paths (role_assigned / user_reactivated_and_role_assigned)
+      // issue no invitation token — there is no `invitation` to build, only the
+      // assigned user's id. Only `invitation_sent` populates the invitation.
+      if (action !== 'invitation_sent') {
+        log.info('Existing user routed to role assignment', { action, userId: data.userId });
+        return {
+          success: true,
+          action,
+          userId: data.userId,
+        };
+      }
+
       log.info('User invited successfully', { invitationId: data.invitationId });
 
       return {
         success: true,
+        action,
         invitation: {
           id: data.invitationId,
           invitationId: data.invitationId,

@@ -833,9 +833,27 @@ export interface UserRpcEnvelope {
   };
 }
 
-/** Response for `inviteUser` (populates `invitation` from Edge Function response). */
+/**
+ * What `invite-user` actually did — discriminates the success response.
+ * `invitation_sent` = greenfield/expired email (token issued, `invitation` set);
+ * `role_assigned` = existing user assigned directly (no token, no `invitation`);
+ * `user_reactivated_and_role_assigned` = deactivated user reactivated then assigned.
+ * Mirrors the Edge Function's `InviteUserAction` (invite-user/index.ts).
+ */
+export type InviteUserAction =
+  | 'invitation_sent'
+  | 'role_assigned'
+  | 'user_reactivated_and_role_assigned';
+
+/**
+ * Response for `inviteUser`. `action` discriminates what happened: for
+ * `invitation_sent` the `invitation` is populated; for the role-assignment
+ * actions there is no invitation (existing user), only `userId`.
+ */
 export interface InviteUserResult extends UserRpcEnvelope {
+  action?: InviteUserAction;
   invitation?: Invitation;
+  userId?: string;
 }
 
 /**

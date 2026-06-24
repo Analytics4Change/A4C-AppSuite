@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-06-23
+last_updated: 2026-06-24
 ---
 
 <!-- TL;DR-START -->
@@ -52,9 +52,9 @@ last_updated: 2026-06-23
 | C | 31 |
 | D | 36 |
 | D-variant | 1 |
-| E | 46 |
+| E | 47 |
 | E-variant | 1 |
-| **Total** | **180** |
+| **Total** | **181** |
 <!-- GENERATED:PER-BUCKET-COUNTS:END -->
 
 > [!NOTE]
@@ -115,6 +115,7 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `check_organization_by_slug` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `check_pending_invitation` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `check_user_exists` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
+| `check_user_has_any_role` | E | yes | none | No tenancy context; grant-irrelevant by default. Mirror of api.check_user_exists. |
 | `check_user_invitation_existence` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `check_user_org_membership` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `create_access_grant` | B | no | none | Provider-admin authority (HIPAA gate at provider org path via has_effective_permission('grant.create', v_provider_path)); consultant variant N/A by design — grants are issued FOR consultants by provider admins, not BY consultants. |

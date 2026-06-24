@@ -119,6 +119,7 @@ export type ReadRpcs =
   | 'check_organization_by_slug'
   | 'check_pending_invitation'
   | 'check_user_exists'
+  | 'check_user_has_any_role'
   | 'check_user_invitation_existence'
   | 'check_user_org_membership'
   | 'deactivate_all_field_definitions'

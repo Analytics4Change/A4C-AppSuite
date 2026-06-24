@@ -210,6 +210,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      check_user_has_any_role: { Args: { p_user_id: string }; Returns: boolean }
       check_user_invitation_existence: {
         Args: { p_user_id: string }
         Returns: Json
