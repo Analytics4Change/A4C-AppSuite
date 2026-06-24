@@ -1,6 +1,13 @@
 # `invite-user` should route by user-state, not always create an invitation token
 
-**Status**: seed (not yet planned)
+> **SHIPPED + ARCHIVED 2026-06-24** — delivered as a 3-PR epic:
+> - **PR #83** (correlation foundation): `users.correlation_id` anchored across the user lifecycle.
+> - **PR #84** (`api.reactivate_user` Pattern A v2 + correlation NOT NULL).
+> - **PR #85** (this card's routing refactor, **narrow scope**): same-org existing users → direct assign / reactivate-then-assign; `other_org_member` stays on the invitation path; cross-org zombies fall back to invitation. New `api.check_user_has_any_role` read RPC. Architect REQUEST CHANGES → narrow scope → APPROVE.
+>
+> The original PR #64 T2 bug (same-org roleless user issued a token) is fixed. Two follow-ups remain active: `consolidate-email-onto-temporal-notification-workflow/` (the deferred informational email + Resend consolidation) and `cross-org-existing-user-direct-role-assign/` (the deferred cross-org case, gated on the grant pipeline). → see `memory/pr-85-close-out.md`.
+
+**Status**: SHIPPED (was: seed)
 **Priority**: Medium-High — architectural drift; the invite-user EF currently issues invitation tokens (with email + acceptance ceremony) to **existing non-deleted users** whose roles have been revoked or who are deactivated, when the correct action is to directly modify roles or reactivate. The bad UX is masked by the fact that the Sally short-circuit in `accept-invitation` makes the flow "work" — but the wrong abstraction generates misleading audit trails, wrong success messages, and unnecessary email round-trips.
 **Origin**: PR #64 UAT T2 discovery (2026-05-18) — `lars.tice+test3@gmail.com` (non-deleted user, zero roles anywhere, accessible_organizations=[testorg]) was issued a fresh invitation token when admin re-added him to testorg.
 
