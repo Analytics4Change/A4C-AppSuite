@@ -6,7 +6,7 @@ last_updated: 2026-06-24
 <!-- TL;DR-START -->
 ## TL;DR
 
-**Summary**: Edge Function API reference for `invite-user`. Routes by user-state: greenfield emails get an invitation token + email; **existing** users are added by direct role assignment (or reactivate-then-assign) with no token. The success response carries an `action` discriminator.
+**Summary**: Edge Function API reference for `invite-user`. Routes by user-state: greenfield emails get an invitation token + email; **same-org existing** users are added by direct role assignment (or reactivate-then-assign) with no token; cross-org existing users fall back to the invitation flow. The success response carries an `action` discriminator.
 
 **When to read**:
 - Implementing or debugging the "add user to organization" UI flow
@@ -31,7 +31,8 @@ last_updated: 2026-06-24
 `invite-user` is the **command** entry point for adding a user to an organization. It does **smart email lookup** (`checkEmailStatus`) and routes by the result, because the correct write differs by user-state:
 
 - **Greenfield** (no live user, or a stale token) → create an invitation (token + email + acceptance ceremony).
-- **Existing user** → a direct **role assignment** (or **reactivate-then-assign**) — no token, no email, no `user.invited`/`user.created` noise.
+- **Same-org existing user** (roleless "zombie" in this org, or a deactivated member of it) → a direct **role assignment** (or **reactivate-then-assign**) — no token, no email, no `user.invited`/`user.created` noise.
+- **Cross-org existing user** (a member of another org) → stays on the invitation flow (status quo). Cross-org direct role assignment is deferred to the grant pipeline — see the [routing table](#email-status-routing) for the narrow-scope rationale.
 
 This routing was introduced by the `invite-user-route-existing-users-to-role-assign` card (epic PR 3). Before it, existing users were wrongly issued invitation tokens, producing misleading audit trails and spurious emails (discovered in PR #64 UAT T2).
 
