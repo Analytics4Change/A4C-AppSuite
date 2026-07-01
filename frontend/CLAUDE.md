@@ -126,6 +126,8 @@ Self-audit pattern: `grep -rnE 'usePermissionGate|hasPermission\(' frontend/src/
 
 ## Accessibility & WCAG Compliance
 
+> **Command-result feedback** (success/error of a state-changing operation) follows a dedicated standard: [command-feedback.md](../documentation/frontend/patterns/command-feedback.md) — success → polite `role="status"` banner; failure → assertive `role="alert"` banner (the single announcement) **+** an `aria-hidden` toast echo for scroll-independence. Errors are sanitized before display; raw goes to `log.warn`.
+
 ### WCAG 2.1 Level AA Requirements
 
 - **ALL interactive elements** must meet WCAG 2.1 Level AA standards
