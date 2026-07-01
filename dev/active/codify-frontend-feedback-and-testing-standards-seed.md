@@ -11,6 +11,8 @@ The architect deferred two cross-cutting standards to post-merge codification ra
 
 ## S1: Toast + persistent-banner double-surface convention — LOW / DOCUMENTATION
 
+> **⚠️ Revisited 2026-07-01 (software-architect-dbc).** S1's premise below is **inverted** by the codebase: banners are the house style (~35 sites/15 files), not toasts; and the installed Sonner v2 announces **politely** (container `aria-live="polite"`), never assertively — so rule #4 ("toast is `alert` → demote the banner") is backwards. Resolved standard: **Banner-authoritative, toast-as-visual-echo** — success → polite banner; failure → assertive banner (single announcement) + `aria-hidden` toast echo. Now documented at [`documentation/frontend/patterns/command-feedback.md`](../../documentation/frontend/patterns/command-feedback.md) (**Phase 1 doc shipped**). Phase 2 (UsersManagePage reference impl + `useCommandFeedback`/`sanitizeCommandError`/`<CommandFeedbackBanner>`, fixing the 3 double-announce sites) and Phase 3 (progressive rollout) pending. **S2 below still stands.** Archive this card once Phase 2 lands.
+
 **Pattern**: Successful and failed command results in the frontend are surfaced via two parallel mechanisms — a transient Sonner `toast.success/error` AND a page-local persistent banner (typically `role="alert"`). The convention is now de facto at three call sites:
 
 - `frontend/src/pages/auth/ResetPasswordPage.tsx:144` — toast only (page redirects, no banner)
@@ -29,7 +31,7 @@ The architect deferred two cross-cutting standards to post-merge codification ra
 1. **Default**: success → `toast.success(<short verb-noun message>)`; error → `toast.error(<sanitized user-friendly message>)`.
 2. **Add a persistent banner** when the failure prevents the user from continuing on the same page (e.g. `viewModel.error` bannered on a form they must fix). Don't double up — clear the banner if the toast already announced.
 3. **Sanitization rule**: error envelopes from `api.*` RPCs may contain handler internals (`Event processing failed: <constraint name>`). Strip the prefix and substitute a friendly fallback for the toast / banner; keep the raw form in `log.warn`.
-4. **Aria-live**: when both surfaces are visible simultaneously, exactly one should be `role="alert"`; the other becomes `role="status"` or `aria-live="off"`. Default toast is `alert`, so demote any concurrent banner.
+4. **Aria-live** — ~~Default toast is `alert`, so demote any concurrent banner.~~ **CORRECTED 2026-07-01**: Sonner v2 toasts announce **politely** (container `aria-live="polite"`), never `alert`. So the **banner owns the single announcement** (`role="alert"`) and the concurrent failure toast is `aria-hidden="true"` (visual echo only). See `command-feedback.md`.
 
 **Recommendation**: Single doc-only PR; ~30 minutes; refactor existing ad-hoc comments into this canonical doc and add a forward-link from `frontend/CLAUDE.md`.
 

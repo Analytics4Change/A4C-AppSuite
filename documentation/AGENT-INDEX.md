@@ -21,6 +21,7 @@ purpose: agent-navigation
 | Add Temporal workflow | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | [temporal-overview.md](architecture/workflows/temporal-overview.md) |
 | Add data collection applet | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | [EVENT-DRIVEN-GUIDE.md](frontend/guides/EVENT-DRIVEN-GUIDE.md) |
 | Add frontend component | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | [DESIGN_PATTERNS_MIGRATION_GUIDE.md](frontend/guides/DESIGN_PATTERNS_MIGRATION_GUIDE.md) |
+| Surface a command success/error | [command-feedback.md](frontend/patterns/command-feedback.md) | [ui-patterns.md](frontend/patterns/ui-patterns.md) |
 | Consolidate Day Zero baseline | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | [handlers/README.md](../infrastructure/supabase/handlers/README.md) |
 | Configure authentication | [frontend-auth-architecture.md](architecture/authentication/frontend-auth-architecture.md) | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) |
 | Deploy database changes | [DEPLOYMENT_INSTRUCTIONS.md](infrastructure/guides/supabase/DEPLOYMENT_INSTRUCTIONS.md) | [infrastructure/CLAUDE.md](../infrastructure/CLAUDE.md) |
@@ -105,6 +106,7 @@ purpose: agent-navigation
 | `correlation-id` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md, triggering-workflows.md |
 | `cross-tenant` | [cross_tenant_access_grants_projection.md](infrastructure/reference/database/tables/cross_tenant_access_grants_projection.md) | var-partnerships.md |
 | `canonical-values` | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | ui-patterns.md, EVENT-DRIVEN-GUIDE.md |
+| `command-feedback` / `toast-banner` | [command-feedback.md](frontend/patterns/command-feedback.md) | ui-patterns.md, danger-zone-pattern.md, frontend/CLAUDE.md |
 | `custom-claims` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | frontend-auth-architecture.md, custom-claims-setup.md |
 | `danger-zone` | [danger-zone-pattern.md](frontend/patterns/danger-zone-pattern.md) | schedule-management.md, ui-patterns.md |
 | `day0-migration` | [DAY0-MIGRATION-GUIDE.md](infrastructure/guides/supabase/DAY0-MIGRATION-GUIDE.md) | handlers/README.md, DEPLOYMENT_INSTRUCTIONS.md |
@@ -125,6 +127,7 @@ purpose: agent-navigation
 | `edge-function` | [EDGE_FUNCTION_TESTS.md](infrastructure/guides/supabase/EDGE_FUNCTION_TESTS.md) | DEPLOYMENT_INSTRUCTIONS.md, adr-edge-function-vs-sql-rpc.md |
 | `edge-function-jwt` | [JWT-CLAIMS-SETUP.md](infrastructure/guides/supabase/JWT-CLAIMS-SETUP.md) | EDGE_FUNCTION_TESTS.md |
 | `edge-function-vs-sql-rpc` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md, event-handler-pattern.md |
+| `error-surfacing` / `aria-live` / `error-sanitization` | [command-feedback.md](frontend/patterns/command-feedback.md) | adr-rpc-readback-pattern.md, frontend/CLAUDE.md |
 | `sql-rpc` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md, event-handler-pattern.md |
 | `orchestration-tier` | [adr-edge-function-vs-sql-rpc.md](architecture/decisions/adr-edge-function-vs-sql-rpc.md) | adr-rpc-readback-pattern.md |
 | `rpc-shape` | [adr-rpc-readback-pattern.md](architecture/decisions/adr-rpc-readback-pattern.md) §"Type-level enforcement (M3)" | infrastructure-guidelines/SKILL.md Rule 17, frontend-dev-guidelines/SKILL.md Rule 11, frontend/services/CLAUDE.md §3 |
@@ -362,6 +365,7 @@ purpose: agent-navigation
 | [TESTING.md](frontend/testing/TESTING.md) | Unit and E2E testing strategies | `testing`, `vitest`, `playwright` | 2100 |
 | [data-collection-applets.md](frontend/patterns/data-collection-applets.md) | **[Aspirational]** Precursor question with canonical location/status values for all data collection applets | `data-collection`, `canonical-values`, `precursor-question` | 500 |
 | [ui-patterns.md](frontend/patterns/ui-patterns.md) | Modal architecture, dropdown patterns | `modal`, `ui`, `patterns` | 1800 |
+| [command-feedback.md](frontend/patterns/command-feedback.md) | Command-result feedback standard: success→polite banner; failure→assertive banner (single announcement) + `aria-hidden` toast echo; error sanitization, focus, WCAG | `command-feedback`, `toast-banner`, `aria-live`, `error-surfacing`, `error-sanitization`, `wcag` | 1500 |
 | [role-management.md](frontend/reference/role-management.md) | Role management frontend reference (MVVM, data-driven permission selector, subset-only delegation) | `role-management`, `role-form`, `permission-selector`, `adding-permission` | 1200 |
 | [mobx-patterns.md](frontend/patterns/mobx-patterns.md) | Advanced MobX patterns: ViewModel providers, reactions, command pattern, state machines, form handling, testing | `mobx-patterns`, `mobx`, `viewmodel`, `state-machine`, `command-pattern`, `reactions`, `form-handling` | 6500 |
 | [rpc-readback-vm-patch.md](frontend/patterns/rpc-readback-vm-patch.md) | VM in-place patch convention for Pattern A v2 RPC read-back consumers; service propagation, MobX immutable splice, version-gated fallback with log.warn | `pattern-a-v2`, `vm-patch`, `in-place-update`, `refetch`, `fallback`, `rpc-readback` | 1500 |
