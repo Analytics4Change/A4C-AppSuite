@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-02-19
+last_updated: 2026-07-01
 ---
 
 <!-- TL;DR-START -->
@@ -96,18 +96,12 @@ The `invitations_projection` table is a **CQRS read model** that stores user inv
 - **PII**: Contains personally identifiable information
 - **Usage**: Personalize invitation email, reduce signup friction
 
-#### role (DEPRECATED)
-- **Type**: `text`
-- **Purpose**: Legacy single role name (use `roles` array instead)
-- **Constraints**: NULLABLE (was NOT NULL before 2026-01-05)
-- **Values**: Role names from `roles_projection` (e.g., 'clinician', 'facility_admin')
-- **Migration Note**: New invitations use `roles` JSONB array. Event processors support both formats for backward compatibility.
-- **Deprecation**: This column is maintained for backward compatibility with bootstrap workflows. New Edge Function invitations use `roles` array.
+> **Removed column — `role` (text):** the legacy single-role field was dropped 2026-05-08 by migration `20260508170054` (superseded by the `roles` jsonb array below). No emitter ever populated it — a scalar cannot express the 0..N reality of invitations — and its `role: null` reads caused an *"Invalid Invitation"* failure on the accept page. Retained here only as an audit note; the column no longer exists in the deployed schema.
 
 #### roles
 - **Type**: `jsonb`
 - **Purpose**: Multi-role assignment array for user after invitation acceptance
-- **Nullable**: YES (one of `role` or `roles` should be populated)
+- **Nullable**: YES — defaults to `'[]'::jsonb`; an empty array is valid (invitee gets no permissions until an admin assigns roles). Matches the AsyncAPI `UserInvitedData` contract (`roles: array, minItems: 0`).
 - **Format**: Array of objects with `role_id` and `role_name`:
   ```json
   [
@@ -215,7 +209,7 @@ SELECT
   email,
   first_name,
   last_name,
-  role,
+  roles,
   expires_at,
   status
 FROM invitations_projection
@@ -228,7 +222,7 @@ WHERE token = '<url-token>';
 ```sql
 SELECT
   email,
-  role,
+  roles,
   created_at,
   expires_at
 FROM invitations_projection
@@ -386,7 +380,6 @@ WHEN 'user.invited' THEN
     email,
     first_name,
     last_name,
-    role,              -- Legacy field (deprecated)
     roles,             -- Multi-role JSONB array
     token,
     expires_at,
@@ -403,7 +396,6 @@ WHEN 'user.invited' THEN
     v_event_data->>'email',
     v_event_data->>'first_name',
     v_event_data->>'last_name',
-    v_event_data->>'role',                    -- Legacy single role
     v_event_data->'roles',                    -- Multi-role array
     v_event_data->>'token',
     (v_event_data->>'expires_at')::TIMESTAMPTZ,
@@ -435,7 +427,7 @@ SELECT
   email,
   first_name,
   last_name,
-  role,
+  roles,
   expires_at,
   status
 FROM invitations_projection
@@ -457,7 +449,7 @@ SELECT
   email,
   first_name,
   last_name,
-  role,
+  roles,
   created_at,
   expires_at,
   EXTRACT(epoch FROM (expires_at - NOW())) / 86400 as days_until_expiry
@@ -775,7 +767,7 @@ ORDER BY de.occurred_at;
 ```sql
 SELECT
   email,
-  role,
+  roles,
   status,
   created_at,
   accepted_at,
