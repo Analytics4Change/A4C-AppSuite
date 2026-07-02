@@ -28,6 +28,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
 import { UserList, UserFormFields } from '@/components/users';
 import { UsersErrorBanner } from '@/components/users/UsersErrorBanner';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
 import {
   AccessDatesForm,
   NotificationPreferencesForm,
@@ -124,6 +125,8 @@ export const UsersManagePage: React.FC = observer(() => {
 
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
+  // Command-result feedback: sanitize + log + fire the aria-hidden echo toast.
+  const { failed: reportFailure, clear: clearEcho } = useCommandFeedback('users');
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -425,17 +428,13 @@ export const UsersManagePage: React.FC = observer(() => {
         selectAndLoadUser(currentItem.id, false);
       } else {
         setDialogState({ type: 'none' });
-        const message = result.error || 'Failed to deactivate user';
-        setOperationError(message);
-        toast.error(message);
+        setOperationError(reportFailure(result.error, { fallback: 'Failed to deactivate user' }));
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      const message = error instanceof Error ? error.message : 'Failed to deactivate user';
-      setOperationError(message);
-      toast.error(message);
+      setOperationError(reportFailure(error, { fallback: 'Failed to deactivate user' }));
     }
-  }, [currentItem, viewModel, selectAndLoadUser]);
+  }, [currentItem, viewModel, selectAndLoadUser, reportFailure]);
 
   // Reactivate handlers
   const handleReactivateClick = useCallback(() => {
@@ -461,17 +460,13 @@ export const UsersManagePage: React.FC = observer(() => {
         selectAndLoadUser(currentItem.id, false);
       } else {
         setDialogState({ type: 'none' });
-        const message = result.error || 'Failed to reactivate user';
-        setOperationError(message);
-        toast.error(message);
+        setOperationError(reportFailure(result.error, { fallback: 'Failed to reactivate user' }));
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      const message = error instanceof Error ? error.message : 'Failed to reactivate user';
-      setOperationError(message);
-      toast.error(message);
+      setOperationError(reportFailure(error, { fallback: 'Failed to reactivate user' }));
     }
-  }, [currentItem, viewModel, selectAndLoadUser]);
+  }, [currentItem, viewModel, selectAndLoadUser, reportFailure]);
 
   // Resend invitation handlers
   const handleResendClick = useCallback(() => {
@@ -608,17 +603,13 @@ export const UsersManagePage: React.FC = observer(() => {
         );
       } else {
         setDialogState({ type: 'none' });
-        const message = result.error || 'Failed to delete user';
-        setOperationError(message);
-        toast.error(message);
+        setOperationError(reportFailure(result.error, { fallback: 'Failed to delete user' }));
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      const message = error instanceof Error ? error.message : 'Failed to delete user';
-      setOperationError(message);
-      toast.error(message);
+      setOperationError(reportFailure(error, { fallback: 'Failed to delete user' }));
     }
-  }, [currentItem, viewModel, setSearchParams]);
+  }, [currentItem, viewModel, setSearchParams, reportFailure]);
 
   // Save notification preferences handler — routes through the ViewModel so
   // the Pattern A v2 in-place patch + isSubmitting state stay aligned with
@@ -641,23 +632,20 @@ export const UsersManagePage: React.FC = observer(() => {
           setNotificationPrefs(result.notificationPreferences ?? preferences);
           toast.success('Notification preferences updated');
         } else {
-          // RPC errors prefixed `Event processing failed:` carry handler
-          // internals (e.g. constraint names) — keep the raw form in the
-          // VM's debug log; show the user a friendly fallback.
-          const raw = result.error ?? 'Failed to save notification preferences';
-          const message = raw.startsWith('Event processing failed:')
-            ? 'Could not save notification preferences. Please try again.'
-            : raw;
-          toast.error(message);
-          // Clear so the page's role="alert" banner doesn't repeat what the
-          // toast already announced (avoids double aria-live).
+          // Failure → authoritative role="alert" banner (sanitized) + aria-hidden
+          // echo toast. Clear the VM's raw error so only the sanitized copy shows.
           viewModel.clearError();
+          setOperationError(
+            reportFailure(result.error, {
+              fallback: 'Could not save notification preferences. Please try again.',
+            })
+          );
         }
       } finally {
         setIsSavingPrefs(false);
       }
     },
-    [currentItem, organizationId, viewModel]
+    [currentItem, organizationId, viewModel, reportFailure]
   );
 
   // Get display name for current item
@@ -706,6 +694,7 @@ export const UsersManagePage: React.FC = observer(() => {
           onDismiss={() => {
             viewModel.clearError();
             setOperationError(null);
+            clearEcho();
           }}
         />
 
