@@ -29,6 +29,8 @@ import { UserList, UserFormFields } from '@/components/users';
 import { UsersErrorBanner } from '@/components/users/UsersErrorBanner';
 import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
 import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import {
   AccessDatesForm,
   NotificationPreferencesForm,
@@ -126,7 +128,7 @@ export const UsersManagePage: React.FC = observer(() => {
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
   // Command-result feedback: sanitize + log + fire the aria-hidden echo toast.
-  const { failed: reportFailure, clear: clearEcho } = useCommandFeedback('users');
+  const { failed: reportFailure, clear: clearEcho, echoMessage } = useCommandFeedback('users');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [successTestId, setSuccessTestId] = useState<string | undefined>(undefined);
 
@@ -395,6 +397,9 @@ export const UsersManagePage: React.FC = observer(() => {
                 ? `${who} reactivated and added to the organization`
                 : `Invitation sent to ${formViewModel.formData.email}`;
           showCommandSuccess(message, `invite-success-${action}`);
+        } else {
+          // Edit-mode profile/role save success.
+          showCommandSuccess('Changes saved');
         }
         await viewModel.loadAll();
         // Reset form after successful creation
@@ -716,7 +721,7 @@ export const UsersManagePage: React.FC = observer(() => {
           }}
         />
         {/* Success Banner (authoritative surface for command success) */}
-        {!operationError && !viewModel.error && (
+        {!operationError && !viewModel.error && !formViewModel?.submissionError && (
           <CommandFeedbackBanner
             kind="success"
             message={successMessage}
@@ -724,6 +729,8 @@ export const UsersManagePage: React.FC = observer(() => {
             onDismiss={() => setSuccessMessage(null)}
           />
         )}
+        {/* Failure echo — aria-hidden visual copy, scroll-independent (INV-2 by construction) */}
+        <CommandFeedbackEcho message={echoMessage} />
 
         {/* Split View Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -803,13 +810,8 @@ export const UsersManagePage: React.FC = observer(() => {
                               Failed to send invitation
                             </h4>
                             <p className="text-red-700 text-sm mt-1">
-                              {formViewModel.submissionError}
+                              {sanitizeCommandError(formViewModel.submissionError).display}
                             </p>
-                            {formViewModel.submissionErrorDetails?.details && (
-                              <p className="text-red-600 text-xs mt-2 font-mono bg-red-100 p-2 rounded">
-                                Details: {formViewModel.submissionErrorDetails.details}
-                              </p>
-                            )}
                           </div>
                           <button
                             type="button"
@@ -1110,13 +1112,8 @@ export const UsersManagePage: React.FC = observer(() => {
                             <div className="flex-1">
                               <h4 className="text-red-800 font-semibold">Failed to update</h4>
                               <p className="text-red-700 text-sm mt-1">
-                                {formViewModel.submissionError}
+                                {sanitizeCommandError(formViewModel.submissionError).display}
                               </p>
-                              {formViewModel.submissionErrorDetails?.details && (
-                                <p className="text-red-600 text-xs mt-2 font-mono bg-red-100 p-2 rounded">
-                                  Details: {formViewModel.submissionErrorDetails.details}
-                                </p>
-                              )}
                             </div>
                             <button
                               type="button"
