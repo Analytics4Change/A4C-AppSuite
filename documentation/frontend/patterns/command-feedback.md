@@ -104,12 +104,12 @@ Stable testids are mandatory (extend today's `users-error-banner` / `invite-succ
 - [ ] Form-blocking failure moves focus to the banner via `useEffect` (no `setTimeout`)
 - [ ] Banner dismiss also dismisses the paired toast; VM error cleared
 - [ ] Required `data-testid`s present
-- [ ] `@axe-core/playwright` clean + a manual NVDA/VoiceOver pass confirms a single announcement
+- [ ] Single announcement + zero `aria-hidden-focus` verified — via the `RUN_A11Y_GATE` Playwright spec (`frontend/e2e/command-feedback-a11y.spec.ts`) or deployed DevTools (console query + Accessibility-tree "not exposed" on the echo); manual NVDA/VoiceOver pass when audio is available
 
 ## Adoption status
 
 - ✅ **Phase 1** — standard defined (this doc).
-- 🚧 **Phase 2 (in progress, PR #88)** — reference implementation shipped: `useCommandFeedback` + `sanitizeCommandError` + `<CommandFeedbackBanner>` + non-Sonner `<CommandFeedbackEcho>`; `UsersManagePage` migrated (fixes the 3 double-announce sites, removes the `clearError()` workaround, closes the invite success/failure asymmetry, sanitizes the invite/edit submission banners). Merge-gated on the `@axe-core/playwright` single-announcement + `aria-hidden-focus` pass.
+- ✅ **Phase 2 (SHIPPED — PR #88, merged `a22bcab5`)** — reference implementation: `useCommandFeedback` + `sanitizeCommandError` + `<CommandFeedbackBanner>` + non-Sonner `<CommandFeedbackEcho>`; `UsersManagePage` migrated (fixes the 3 double-announce sites, removes the `clearError()` workaround, closes the invite success/failure asymmetry, sanitizes the invite/edit submission banners). **F4 a11y gate verified on the deployed build 2026-07-02** — INV-1 (one `role="alert"`) + INV-2 (zero `aria-hidden-focus`) + no raw leak, via DevTools on `a4c.firstovertheline.com`; manual audio AT pass optional. Follow-ups seeded: N4 (route form-submit through the single-announcement path), N2 (write-only `successMessage` cleanup).
 - ⏳ **Phase 3+** — progressive-enhancement rollout to the other command-feedback pages (Roles, Organizations, Org-Units, Schedules, Clients, Assignments, Auth), batched by area. Existing banners already surface every failure, so partial rollout is never broken — only less uniform.
 
 ## Related Documentation
