@@ -21,14 +21,14 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
 import { UserList, UserFormFields } from '@/components/users';
 import { UsersErrorBanner } from '@/components/users/UsersErrorBanner';
-import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
 import {
   AccessDatesForm,
   NotificationPreferencesForm,
@@ -127,6 +127,29 @@ export const UsersManagePage: React.FC = observer(() => {
   const [operationError, setOperationError] = useState<string | null>(null);
   // Command-result feedback: sanitize + log + fire the aria-hidden echo toast.
   const { failed: reportFailure, clear: clearEcho } = useCommandFeedback('users');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successTestId, setSuccessTestId] = useState<string | undefined>(undefined);
+
+  // Keep success/failure mutually exclusive; clearError() before setOperationError
+  // so the sanitized message wins over the VM's raw `error` on the banner.
+  const showCommandSuccess = useCallback(
+    (message: string, testId?: string) => {
+      viewModel.clearError();
+      setOperationError(null);
+      clearEcho();
+      setSuccessTestId(testId);
+      setSuccessMessage(message);
+    },
+    [viewModel, clearEcho]
+  );
+  const showCommandFailure = useCallback(
+    (raw: unknown, opts?: CommandFailureOptions) => {
+      setSuccessMessage(null);
+      viewModel.clearError();
+      setOperationError(reportFailure(raw, opts));
+    },
+    [viewModel, reportFailure]
+  );
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -355,9 +378,9 @@ export const UsersManagePage: React.FC = observer(() => {
 
       if (result.success) {
         log.info('Form submitted successfully', { mode: panelMode });
-        // Create mode = invite flow. Surface an action-specific toast: existing
-        // users are added directly (no email/token), so don't claim an invite was
-        // sent. data-testid carries the action for UAT assertions.
+        // Create mode = invite flow. Surface an action-specific success banner:
+        // existing users are added directly (no email/token), so don't claim an
+        // invite was sent. The banner test id carries the action for UAT assertions.
         if (panelMode === 'create') {
           const action = (result as InviteUserResult).action ?? 'invitation_sent';
           const who =
@@ -371,7 +394,7 @@ export const UsersManagePage: React.FC = observer(() => {
               : action === 'user_reactivated_and_role_assigned'
                 ? `${who} reactivated and added to the organization`
                 : `Invitation sent to ${formViewModel.formData.email}`;
-          toast.success(<span data-testid={`invite-success-${action}`}>{message}</span>);
+          showCommandSuccess(message, `invite-success-${action}`);
         }
         await viewModel.loadAll();
         // Reset form after successful creation
@@ -380,7 +403,7 @@ export const UsersManagePage: React.FC = observer(() => {
         }
       }
     },
-    [formViewModel, panelMode, viewModel]
+    [formViewModel, panelMode, viewModel, showCommandSuccess]
   );
 
   // Handle cancel in form
@@ -423,18 +446,18 @@ export const UsersManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('User deactivated successfully', { userId: currentItem.id });
-        toast.success('User deactivated');
+        showCommandSuccess('User deactivated');
         await viewModel.loadAll();
         selectAndLoadUser(currentItem.id, false);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(reportFailure(result.error, { fallback: 'Failed to deactivate user' }));
+        showCommandFailure(result.error, { fallback: 'Failed to deactivate user' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(reportFailure(error, { fallback: 'Failed to deactivate user' }));
+      showCommandFailure(error, { fallback: 'Failed to deactivate user' });
     }
-  }, [currentItem, viewModel, selectAndLoadUser, reportFailure]);
+  }, [currentItem, viewModel, selectAndLoadUser, showCommandFailure, showCommandSuccess]);
 
   // Reactivate handlers
   const handleReactivateClick = useCallback(() => {
@@ -455,18 +478,18 @@ export const UsersManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('User reactivated successfully', { userId: currentItem.id });
-        toast.success('User reactivated');
+        showCommandSuccess('User reactivated');
         await viewModel.loadAll();
         selectAndLoadUser(currentItem.id, false);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(reportFailure(result.error, { fallback: 'Failed to reactivate user' }));
+        showCommandFailure(result.error, { fallback: 'Failed to reactivate user' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(reportFailure(error, { fallback: 'Failed to reactivate user' }));
+      showCommandFailure(error, { fallback: 'Failed to reactivate user' });
     }
-  }, [currentItem, viewModel, selectAndLoadUser, reportFailure]);
+  }, [currentItem, viewModel, selectAndLoadUser, showCommandFailure, showCommandSuccess]);
 
   // Resend invitation handlers
   const handleResendClick = useCallback(() => {
@@ -492,13 +515,13 @@ export const UsersManagePage: React.FC = observer(() => {
         await viewModel.loadAll();
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to resend invitation');
+        showCommandFailure(result.error, { fallback: 'Failed to resend invitation' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to resend invitation');
+      showCommandFailure(error, { fallback: 'Failed to resend invitation' });
     }
-  }, [currentItem, viewModel]);
+  }, [currentItem, viewModel, showCommandFailure]);
 
   // Revoke invitation handlers
   const handleRevokeClick = useCallback(() => {
@@ -527,13 +550,13 @@ export const UsersManagePage: React.FC = observer(() => {
         await viewModel.loadAll();
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to revoke invitation');
+        showCommandFailure(result.error, { fallback: 'Failed to revoke invitation' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to revoke invitation');
+      showCommandFailure(error, { fallback: 'Failed to revoke invitation' });
     }
-  }, [currentItem, viewModel]);
+  }, [currentItem, viewModel, showCommandFailure]);
 
   // UserCard invitation action handlers
   // These bridge the UserCard buttons (which pass invitationId) to the dialog flow
@@ -585,7 +608,7 @@ export const UsersManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('User deleted successfully', { userId: currentItem.id });
-        toast.success('User deleted');
+        showCommandSuccess('User deleted');
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentItem(null);
@@ -603,19 +626,18 @@ export const UsersManagePage: React.FC = observer(() => {
         );
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(reportFailure(result.error, { fallback: 'Failed to delete user' }));
+        showCommandFailure(result.error, { fallback: 'Failed to delete user' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(reportFailure(error, { fallback: 'Failed to delete user' }));
+      showCommandFailure(error, { fallback: 'Failed to delete user' });
     }
-  }, [currentItem, viewModel, setSearchParams, reportFailure]);
+  }, [currentItem, viewModel, setSearchParams, showCommandFailure, showCommandSuccess]);
 
   // Save notification preferences handler — routes through the ViewModel so
   // the Pattern A v2 in-place patch + isSubmitting state stay aligned with
-  // every other write path. Surfaces a Sonner toast for confirmation; the
-  // VM's `error` is cleared on the failure branch so the page's persistent
-  // role="alert" banner doesn't double-announce alongside the toast.
+  // every other write path. Feedback follows the command-feedback standard via
+  // showCommandSuccess / showCommandFailure (banner-authoritative + echo).
   const handleSaveNotificationPreferences = useCallback(
     async (preferences: NotificationPreferences) => {
       if (!currentItem || currentItem.isInvitation || !organizationId) return;
@@ -630,22 +652,17 @@ export const UsersManagePage: React.FC = observer(() => {
 
         if (result.success) {
           setNotificationPrefs(result.notificationPreferences ?? preferences);
-          toast.success('Notification preferences updated');
+          showCommandSuccess('Notification preferences updated');
         } else {
-          // Failure → authoritative role="alert" banner (sanitized) + aria-hidden
-          // echo toast. Clear the VM's raw error so only the sanitized copy shows.
-          viewModel.clearError();
-          setOperationError(
-            reportFailure(result.error, {
-              fallback: 'Could not save notification preferences. Please try again.',
-            })
-          );
+          showCommandFailure(result.error, {
+            fallback: 'Could not save notification preferences. Please try again.',
+          });
         }
       } finally {
         setIsSavingPrefs(false);
       }
     },
-    [currentItem, organizationId, viewModel, reportFailure]
+    [currentItem, organizationId, viewModel, showCommandFailure, showCommandSuccess]
   );
 
   // Get display name for current item
@@ -694,9 +711,19 @@ export const UsersManagePage: React.FC = observer(() => {
           onDismiss={() => {
             viewModel.clearError();
             setOperationError(null);
+            setSuccessMessage(null);
             clearEcho();
           }}
         />
+        {/* Success Banner (authoritative surface for command success) */}
+        {!operationError && !viewModel.error && (
+          <CommandFeedbackBanner
+            kind="success"
+            message={successMessage}
+            data-testid={successTestId}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        )}
 
         {/* Split View Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
