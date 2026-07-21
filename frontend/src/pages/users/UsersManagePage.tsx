@@ -151,44 +151,58 @@ export const UsersManagePage: React.FC = observer(() => {
     [viewModel, reportFailure]
   );
 
-  // Form-blocking submit failures move focus to the banner on the next paint
-  // (command-feedback standard) — useEffect keyed on the error, never setTimeout.
-  // Both form banners (create/edit) are mutually exclusive, so one ref suffices.
-  const formErrorBannerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (formViewModel?.submissionError) {
-      formErrorBannerRef.current?.focus();
-    }
-  }, [formViewModel?.submissionError]);
-
-  // The rich UsersErrorBanner (role violations / partial failure / generic
-  // modify-roles error) is equally form-blocking, but its failures funnel
-  // through the submit (submissionError stays null), so it can't be keyed on a
-  // submit-only observable the way the form banner is — `viewModel.error` is
-  // also set by background loads (loadUserDetails), so keying focus on it would
-  // steal focus during navigation. Instead handleSubmit raises this flag only on
-  // the submit path, and the effect moves focus once the banner has mounted.
-  const usersErrorBannerRef = useRef<HTMLDivElement>(null);
-  const [focusUsersErrorBanner, setFocusUsersErrorBanner] = useState(false);
-  useEffect(() => {
-    if (focusUsersErrorBanner) {
-      usersErrorBannerRef.current?.focus();
-      setFocusUsersErrorBanner(false);
-    }
-  }, [focusUsersErrorBanner]);
-
-  // Focus restoration (command-feedback standard): a form-blocking failure moves
-  // focus to the alert banner, so dismissing it must return focus to the control
-  // that triggered the submit — otherwise focus drops to <body>. Captured at
-  // submit time (the trigger still holds focus then) and restored by every
-  // banner's onDismiss. Guarded on DOM presence in case the trigger unmounted.
-  const submitTriggerRef = useRef<HTMLElement | null>(null);
+  // Focus management for form-blocking failures (command-feedback standard).
+  //
+  //   - The control that triggered the submit is captured at submit time (the
+  //     one moment it still holds focus — it may be disabled/blurred by the time
+  //     an effect runs). It's the *candidate* restore target.
+  //   - When a banner actually takes focus, that candidate is promoted to the
+  //     armed `restoreTargetRef`; the effect's cleanup disarms it the moment the
+  //     banner goes away for any reason. So restoration is armed IFF a banner
+  //     currently holds focus we moved there — a background-load error banner
+  //     (which never takes focus) can never trigger a stale restore.
+  //   - `restoreFocusToTrigger` consumes-and-clears the target so it can't fire
+  //     twice.
+  const submitTriggerCandidateRef = useRef<HTMLElement | null>(null);
+  const restoreTargetRef = useRef<HTMLElement | null>(null);
   const restoreFocusToTrigger = useCallback(() => {
-    const el = submitTriggerRef.current;
+    const el = restoreTargetRef.current;
+    restoreTargetRef.current = null;
     if (el && document.contains(el)) {
       el.focus();
     }
   }, []);
+
+  // Form banner (create/edit) — mutually exclusive, so one ref suffices. Keyed
+  // on the submit-only `submissionError` observable; never setTimeout.
+  const formErrorBannerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (formViewModel?.submissionError) {
+      restoreTargetRef.current = submitTriggerCandidateRef.current;
+      formErrorBannerRef.current?.focus();
+      return () => {
+        restoreTargetRef.current = null;
+      };
+    }
+  }, [formViewModel?.submissionError]);
+
+  // Rich UsersErrorBanner (role violations / partial failure) — equally
+  // form-blocking. These two observables are set ONLY by `modifyRoles` (funneled
+  // through the submit), so keying focus on them is inherently submit-scoped and
+  // never steals focus from a background `loadUserDetails` error (which sets
+  // `viewModel.error`, not these). Declarative + cleanup-disarm, never setTimeout.
+  const usersErrorBannerRef = useRef<HTMLDivElement>(null);
+  const richBannerActive =
+    viewModel.lastRoleViolations != null || viewModel.lastRolePartialFailure != null;
+  useEffect(() => {
+    if (richBannerActive) {
+      restoreTargetRef.current = submitTriggerCandidateRef.current;
+      usersErrorBannerRef.current?.focus();
+      return () => {
+        restoreTargetRef.current = null;
+      };
+    }
+  }, [richBannerActive]);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -409,8 +423,10 @@ export const UsersManagePage: React.FC = observer(() => {
       if (!formViewModel) return;
 
       // Remember the control that triggered submit (submit button, or the field
-      // Enter was pressed in) so a banner dismiss can restore focus to it.
-      submitTriggerRef.current = (document.activeElement as HTMLElement) ?? null;
+      // Enter was pressed in) so a banner dismiss can restore focus to it. Only
+      // a candidate — it's promoted to the armed restore target if/when a banner
+      // actually takes focus (see the focus effects above).
+      submitTriggerCandidateRef.current = (document.activeElement as HTMLElement) ?? null;
 
       const commandService = getUserCommandService();
       // Pass the page VM as the second arg so that role-modification failures
@@ -462,14 +478,11 @@ export const UsersManagePage: React.FC = observer(() => {
           fallback: panelMode === 'create' ? 'Failed to send invitation' : 'Failed to update',
           correlationId: formViewModel.submissionErrorDetails?.correlationId,
         });
-      } else {
-        // Failure surfaced via the rich UsersErrorBanner (submissionError stayed
-        // null — role violations, partial failure, or a generic modify-roles
-        // error, all funneled onto the page VM by formViewModel.submit). It's
-        // form-blocking, so move focus to it once mounted. Flag + useEffect,
-        // never setTimeout (command-feedback standard).
-        setFocusUsersErrorBanner(true);
       }
+      // Role-violation / partial-failure submits leave submissionError null and
+      // surface via the rich UsersErrorBanner; focus moves there declaratively
+      // (the effect keyed on lastRoleViolations/lastRolePartialFailure), so this
+      // handler needs no explicit branch for them.
     },
     [formViewModel, panelMode, viewModel, showCommandSuccess, reportFailure]
   );
