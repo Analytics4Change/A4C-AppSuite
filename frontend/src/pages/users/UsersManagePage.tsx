@@ -56,8 +56,6 @@ import {
   RefreshCw,
   ArrowLeft,
   UserPlus,
-  AlertTriangle,
-  X,
   CheckCircle,
   XCircle,
   Save,
@@ -152,6 +150,59 @@ export const UsersManagePage: React.FC = observer(() => {
     },
     [viewModel, reportFailure]
   );
+
+  // Focus management for form-blocking failures (command-feedback standard).
+  //
+  //   - The control that triggered the submit is captured at submit time (the
+  //     one moment it still holds focus — it may be disabled/blurred by the time
+  //     an effect runs). It's the *candidate* restore target.
+  //   - When a banner actually takes focus, that candidate is promoted to the
+  //     armed `restoreTargetRef`; the effect's cleanup disarms it the moment the
+  //     banner goes away for any reason. So restoration is armed IFF a banner
+  //     currently holds focus we moved there — a background-load error banner
+  //     (which never takes focus) can never trigger a stale restore.
+  //   - `restoreFocusToTrigger` consumes-and-clears the target so it can't fire
+  //     twice.
+  const submitTriggerCandidateRef = useRef<HTMLElement | null>(null);
+  const restoreTargetRef = useRef<HTMLElement | null>(null);
+  const restoreFocusToTrigger = useCallback(() => {
+    const el = restoreTargetRef.current;
+    restoreTargetRef.current = null;
+    if (el && document.contains(el)) {
+      el.focus();
+    }
+  }, []);
+
+  // Form banner (create/edit) — mutually exclusive, so one ref suffices. Keyed
+  // on the submit-only `submissionError` observable; never setTimeout.
+  const formErrorBannerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (formViewModel?.submissionError) {
+      restoreTargetRef.current = submitTriggerCandidateRef.current;
+      formErrorBannerRef.current?.focus();
+      return () => {
+        restoreTargetRef.current = null;
+      };
+    }
+  }, [formViewModel?.submissionError]);
+
+  // Rich UsersErrorBanner (role violations / partial failure) — equally
+  // form-blocking. These two observables are set ONLY by `modifyRoles` (funneled
+  // through the submit), so keying focus on them is inherently submit-scoped and
+  // never steals focus from a background `loadUserDetails` error (which sets
+  // `viewModel.error`, not these). Declarative + cleanup-disarm, never setTimeout.
+  const usersErrorBannerRef = useRef<HTMLDivElement>(null);
+  const richBannerActive =
+    viewModel.lastRoleViolations != null || viewModel.lastRolePartialFailure != null;
+  useEffect(() => {
+    if (richBannerActive) {
+      restoreTargetRef.current = submitTriggerCandidateRef.current;
+      usersErrorBannerRef.current?.focus();
+      return () => {
+        restoreTargetRef.current = null;
+      };
+    }
+  }, [richBannerActive]);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -371,6 +422,12 @@ export const UsersManagePage: React.FC = observer(() => {
       e.preventDefault();
       if (!formViewModel) return;
 
+      // Remember the control that triggered submit (submit button, or the field
+      // Enter was pressed in) so a banner dismiss can restore focus to it. Only
+      // a candidate — it's promoted to the armed restore target if/when a banner
+      // actually takes focus (see the focus effects above).
+      submitTriggerCandidateRef.current = (document.activeElement as HTMLElement) ?? null;
+
       const commandService = getUserCommandService();
       // Pass the page VM as the second arg so that role-modification failures
       // (violations / partial) populate `viewModel.lastRoleViolations` and
@@ -406,9 +463,28 @@ export const UsersManagePage: React.FC = observer(() => {
         if (panelMode === 'create') {
           formViewModel.reset();
         }
+      } else if (formViewModel.submissionError) {
+        // Generic form-submit failure. The form's CommandFeedbackBanner (driven
+        // by formViewModel.submissionError) owns the single announcement; role
+        // violations / partial failures suppress submissionError (=> null) and
+        // are surfaced by UsersErrorBanner instead, so this branch never fights
+        // the rich banner. Clear any stale page-level error — both operationError
+        // AND the VM's raw error, mirroring showCommandFailure — so exactly one
+        // alert region is mounted (INV-1) and no stale error re-surfaces when the
+        // form banner is dismissed. Then fire the aria-hidden echo (+ log.warn).
+        viewModel.clearError();
+        setOperationError(null);
+        reportFailure(formViewModel.submissionError, {
+          fallback: panelMode === 'create' ? 'Failed to send invitation' : 'Failed to update',
+          correlationId: formViewModel.submissionErrorDetails?.correlationId,
+        });
       }
+      // Role-violation / partial-failure submits leave submissionError null and
+      // surface via the rich UsersErrorBanner; focus moves there declaratively
+      // (the effect keyed on lastRoleViolations/lastRolePartialFailure), so this
+      // handler needs no explicit branch for them.
     },
-    [formViewModel, panelMode, viewModel, showCommandSuccess]
+    [formViewModel, panelMode, viewModel, showCommandSuccess, reportFailure]
   );
 
   // Handle cancel in form
@@ -707,19 +783,26 @@ export const UsersManagePage: React.FC = observer(() => {
           </div>
         </div>
 
-        {/* Error Banner */}
-        <UsersErrorBanner
-          error={viewModel.error}
-          operationError={operationError}
-          lastRoleViolations={viewModel.lastRoleViolations}
-          lastRolePartialFailure={viewModel.lastRolePartialFailure}
-          onDismiss={() => {
-            viewModel.clearError();
-            setOperationError(null);
-            setSuccessMessage(null);
-            clearEcho();
-          }}
-        />
+        {/* Error Banner — yields to the form-submit banner so exactly one
+            role="alert" region is ever mounted (INV-1). Role violations /
+            partial failures suppress submissionError, so the rich variants of
+            this banner are unaffected by the guard. */}
+        {!formViewModel?.submissionError && (
+          <UsersErrorBanner
+            ref={usersErrorBannerRef}
+            error={viewModel.error}
+            operationError={operationError}
+            lastRoleViolations={viewModel.lastRoleViolations}
+            lastRolePartialFailure={viewModel.lastRolePartialFailure}
+            onDismiss={() => {
+              viewModel.clearError();
+              setOperationError(null);
+              setSuccessMessage(null);
+              clearEcho();
+              restoreFocusToTrigger();
+            }}
+          />
+        )}
         {/* Success Banner (authoritative surface for command success) */}
         {!operationError && !viewModel.error && !formViewModel?.submissionError && (
           <CommandFeedbackBanner
@@ -800,30 +883,26 @@ export const UsersManagePage: React.FC = observer(() => {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Submission Error */}
-                    {formViewModel.submissionError && (
-                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                          <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold">
-                              Failed to send invitation
-                            </h4>
-                            <p className="text-red-700 text-sm mt-1">
-                              {sanitizeCommandError(formViewModel.submissionError).display}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => formViewModel.clearSubmissionError()}
-                            className="text-red-600 hover:text-red-800"
-                            aria-label="Dismiss error"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* Submission Error — shared command-feedback banner (the
+                        single announcement); focus moves here on failure. */}
+                    <CommandFeedbackBanner
+                      ref={formErrorBannerRef}
+                      kind="error"
+                      message={
+                        formViewModel.submissionError
+                          ? sanitizeCommandError(
+                              formViewModel.submissionError,
+                              'Failed to send invitation'
+                            ).display
+                          : null
+                      }
+                      onDismiss={() => {
+                        formViewModel.clearSubmissionError();
+                        clearEcho();
+                        restoreFocusToTrigger();
+                      }}
+                      data-testid="invite-submission-error"
+                    />
 
                     {/* Form Fields */}
                     <UserFormFields
@@ -1101,31 +1180,26 @@ export const UsersManagePage: React.FC = observer(() => {
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Submission Error */}
-                      {formViewModel.submissionError && (
-                        <div
-                          className="p-4 rounded-lg border border-red-300 bg-red-50"
-                          role="alert"
-                        >
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                            <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">Failed to update</h4>
-                              <p className="text-red-700 text-sm mt-1">
-                                {sanitizeCommandError(formViewModel.submissionError).display}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => formViewModel.clearSubmissionError()}
-                              className="text-red-600 hover:text-red-800"
-                              aria-label="Dismiss error"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Submission Error — shared command-feedback banner (the
+                          single announcement); focus moves here on failure. */}
+                      <CommandFeedbackBanner
+                        ref={formErrorBannerRef}
+                        kind="error"
+                        message={
+                          formViewModel.submissionError
+                            ? sanitizeCommandError(
+                                formViewModel.submissionError,
+                                'Failed to update'
+                              ).display
+                            : null
+                        }
+                        onDismiss={() => {
+                          formViewModel.clearSubmissionError();
+                          clearEcho();
+                          restoreFocusToTrigger();
+                        }}
+                        data-testid="edit-submission-error"
+                      />
 
                       {/* Form Fields */}
                       <UserFormFields

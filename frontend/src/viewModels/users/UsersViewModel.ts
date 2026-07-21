@@ -134,9 +134,6 @@ export class UsersViewModel {
   /** Error message from last failed operation */
   error: string | null = null;
 
-  /** Success message for feedback */
-  successMessage: string | null = null;
-
   /**
    * Per-role violations from the last `modifyRoles` call when the RPC
    * returned `error: 'VALIDATION_FAILED'`. Cleared on `clearError()` and
@@ -829,11 +826,8 @@ export class UsersViewModel {
         if (result.success) {
           // NOTE: this method is currently unused — the live invite flow runs
           // through UserFormViewModel.submit → commandService.inviteUser, and the
-          // action-aware success message is surfaced by UsersManagePage's toast.
-          // Kept for parity; if a caller is ever added, mirror the page's
-          // action-based copy (invitation_sent / role_assigned /
-          // user_reactivated_and_role_assigned).
-          this.successMessage = `Invitation sent to ${request.email}`;
+          // action-aware success copy is surfaced by UsersManagePage's command
+          // banner (showCommandSuccess). This branch only logs.
           log.info('User invited', { email: request.email, action: result.action });
         } else {
           this.error = result.error ?? 'Failed to send invitation';
@@ -883,7 +877,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Invitation resent';
           log.info('Invitation resent', { invitationId });
         } else {
           this.error = result.error ?? 'Failed to resend invitation';
@@ -933,7 +926,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Invitation cancelled';
           this.clearSelection();
           log.info('Invitation revoked', { invitationId });
         } else {
@@ -988,7 +980,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'User deactivated';
           log.info('User deactivated', { userId });
 
           // Update local state
@@ -1047,7 +1038,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'User reactivated';
           log.info('User reactivated', { userId });
 
           // Update local state
@@ -1111,7 +1101,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'User deleted';
           this.clearSelection(); // User is removed, clear selection
           log.info('User deleted', { userId });
         } else {
@@ -1175,7 +1164,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Roles updated';
           log.info('Roles modified', { userId: request.userId });
         } else if (result.violations && result.violations.length > 0) {
           // Capture full violations array on the VM so the UI can render
@@ -1256,7 +1244,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'User added to organization';
           log.info('User added to organization', { userId });
         } else {
           this.error = result.error ?? 'Failed to add user';
@@ -1418,7 +1405,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Address added';
           log.info('Address added', { userId: request.userId });
         } else {
           this.error = result.error ?? 'Failed to add address';
@@ -1468,7 +1454,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Address updated';
           log.info('Address updated', { addressId: request.addressId });
         } else {
           this.error = result.error ?? 'Failed to update address';
@@ -1518,7 +1503,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Address removed';
           log.info('Address removed', { addressId: request.addressId });
         } else {
           this.error = result.error ?? 'Failed to remove address';
@@ -1572,7 +1556,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Phone added';
           log.info('Phone added', { userId: request.userId });
         } else {
           this.error = result.error ?? 'Failed to add phone';
@@ -1627,7 +1610,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Phone updated';
           log.info('Phone updated', { phoneId: request.phoneId });
         } else {
           this.error = result.error ?? 'Failed to update phone';
@@ -1684,7 +1666,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Phone removed';
           log.info('Phone removed', { phoneId: request.phoneId });
         } else {
           this.error = result.error ?? 'Failed to remove phone';
@@ -1738,7 +1719,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Access dates updated';
           log.info('Access dates updated', { userId: request.userId, orgId: request.orgId });
         } else {
           this.error = result.error ?? 'Failed to update access dates';
@@ -1793,7 +1773,6 @@ export class UsersViewModel {
         this.isSubmitting = false;
 
         if (result.success) {
-          this.successMessage = 'Notification preferences updated';
           log.info('Notification preferences updated', {
             userId: request.userId,
             orgId: request.orgId,
@@ -1858,21 +1837,11 @@ export class UsersViewModel {
   }
 
   /**
-   * Clear success message
-   */
-  clearSuccessMessage(): void {
-    runInAction(() => {
-      this.successMessage = null;
-    });
-  }
-
-  /**
    * Clear all messages
    */
   clearMessages(): void {
     runInAction(() => {
       this.error = null;
-      this.successMessage = null;
     });
   }
 

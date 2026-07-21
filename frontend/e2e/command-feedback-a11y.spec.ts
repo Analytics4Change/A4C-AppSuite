@@ -105,11 +105,114 @@ test.describe('command-feedback a11y gate (F4)', () => {
     await page.getByRole('checkbox', { name: /Aspen Med Viewer/i }).check();
     await page.getByRole('button', { name: /Send Invitation/i }).click();
 
-    // Failure banner mounts.
-    await expect(page.getByText('Failed to send invitation')).toBeVisible();
-    await expectSingleAlertRegion(page);
+    // Failure banner mounts as the shared command-feedback banner, showing the
+    // operation-specific fallback (the raw handler prefix is masked). Assert via
+    // testid — the echo now carries the same text, so getByText would be ambiguous.
+    const banner = page.getByTestId('invite-submission-error');
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Failed to send invitation');
+
+    // Form-blocking failure moves focus to the banner (useEffect, not setTimeout).
+    await expect(banner).toBeFocused();
+
+    // The aria-hidden echo fires on the form path too (scroll-independence) and
+    // never announces / never focuses.
+    const echo = page.getByTestId('command-feedback-toast-error');
+    await expect(echo).toBeVisible();
+    await expect(echo).toHaveAttribute('aria-hidden', 'true');
+
+    await expectSingleAlertRegion(page); // the banner announces; the echo does not
     await expectNoAriaHiddenFocus(page);
     await expectNoRawLeak(page); // the constraint name / prefix must be masked
+  });
+
+  test('invite failure: dismiss restores focus to the submit trigger', async ({ page }) => {
+    // Same forced invite failure — here we assert the *focus-restoration* half of
+    // the standard: focus moved to the banner on failure, and dismissing it must
+    // return focus to the control that triggered the submit (not drop to <body>).
+    await page.route('**/functions/v1/invite-user', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: 'Forced failure for a11y gate' }),
+      })
+    );
+
+    await loginMockAndOpenUsers(page);
+
+    await page.getByRole('button', { name: 'Invite New User' }).click();
+    await page.getByLabel('Email Address').fill('a11y-restore@example.com');
+    await page.getByLabel('First Name').fill('A11y');
+    await page.getByLabel('Last Name').fill('Restore');
+    await page.getByRole('checkbox', { name: /Aspen Med Viewer/i }).check();
+    const submit = page.getByRole('button', { name: /Send Invitation/i });
+    await submit.click();
+
+    // Focus moved to the banner on failure.
+    const banner = page.getByTestId('invite-submission-error');
+    await expect(banner).toBeVisible();
+    await expect(banner).toBeFocused();
+
+    // Dismiss → focus returns to the submit trigger, never <body>.
+    await page.getByTestId('command-feedback-banner-dismiss').click();
+    await expect(banner).toBeHidden();
+    await expect(submit).toBeFocused();
+  });
+
+  test('role-violation submit: rich banner takes focus, dismiss restores it', async ({ page }) => {
+    // Force api.modify_user_roles (PostgREST RPC — not an Edge Function) to return
+    // a VALIDATION_FAILED envelope with per-role violations. That funnels through
+    // formViewModel.submit onto the page VM's lastRoleViolations, so the rich
+    // UsersErrorBanner (not the plain form banner) is the form-blocking surface.
+    await page.route('**/rest/v1/rpc/modify_user_roles', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: 'VALIDATION_FAILED',
+          violations: [
+            {
+              role_id: '00000000-0000-0000-0000-000000000001',
+              error_code: 'ROLE_CONFLICT',
+              message: 'Cannot assign conflicting role',
+            },
+          ],
+        }),
+      })
+    );
+
+    await loginMockAndOpenUsers(page);
+
+    const firstUser = page.locator('[data-testid="user-card"]').first();
+    if (!(await firstUser.isVisible({ timeout: 5000 }).catch(() => false))) {
+      test.skip(true, 'No user rows available to edit — seed a user to run this leg.');
+      return;
+    }
+    await firstUser.click();
+
+    // Edit mode. Toggle a role so the submit performs a role modification (either
+    // add or remove is a change), then save.
+    const save = page.getByRole('button', { name: /Save Changes/i });
+    await expect(save).toBeVisible();
+    await page.getByRole('checkbox', { name: /Aspen Med Viewer/i }).click();
+    await save.click();
+
+    // The rich banner is the form-blocking surface and receives focus (it is
+    // focusable: forwardRef + tabIndex={-1}), showing the role-violation detail.
+    const richBanner = page.getByTestId('users-error-banner');
+    await expect(richBanner).toBeVisible();
+    await expect(page.getByTestId('role-modification-violation')).toBeVisible();
+    await expect(richBanner).toBeFocused();
+
+    // Exactly one assertive region; the form banner must be suppressed (INV-1).
+    await expectSingleAlertRegion(page);
+    await expectNoAriaHiddenFocus(page);
+
+    // Dismiss → focus returns to the submit trigger (Save Changes), never <body>.
+    await page.getByTestId('users-error-banner-dismiss').click();
+    await expect(richBanner).toBeHidden();
+    await expect(save).toBeFocused();
   });
 
   test('deactivate failure: aria-hidden echo present, no aria-hidden-focus', async ({ page }) => {
