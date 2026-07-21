@@ -34,7 +34,7 @@ How the frontend tells the user the outcome of a **command** (a state-changing o
 | **Success** | `role="status"` (polite), persistent, dismissible. **Banner only.** | — none — |
 | **Failure** | `role="alert"` (assertive), persistent until dismissed or superseded. **Owns the one announcement.** | Fixed-position **`aria-hidden="true"`** element (`CommandFeedbackEcho`), persistent until cleared, **no focusable content**. **Visual scroll-independence only — never announced.** |
 
-**Why the failure toast is silent to screen readers**: the installed Sonner (`<Toaster>` at `frontend/src/App.tsx`) announces **politely** via a single container `aria-live="polite"` region and never assertively (verified against `sonner` v2.0.7, 2026-07-01 — pinned; re-verify on upgrade). Errors deserve an *assertive* interrupt, which only our own `role="alert"` banner can provide. So the **banner owns the announcement** and the echo is a purely visual, non-announcing copy. Announcing both would double-speak — the defect this standard eliminates. The echo is a **non-Sonner** `aria-hidden` element (`CommandFeedbackEcho`), so it removes itself from the a11y tree **and** has no focusable descendant to neutralize (INV-2 by construction) — see INV-2 for why the Sonner-toast echo was rejected.
+**Why the failure toast is silent to screen readers**: the installed Sonner (`<Toaster>` at `frontend/src/App.tsx`) announces **politely** via a single container `aria-live="polite"` region and never assertively (verified against `sonner` v2.0.7, 2026-07-01 — lockfile-locked at 2.0.7; re-verify on upgrade). Errors deserve an *assertive* interrupt, which only our own `role="alert"` banner can provide. So the **banner owns the announcement** and the echo is a purely visual, non-announcing copy. Announcing both would double-speak — the defect this standard eliminates. The echo is a **non-Sonner** `aria-hidden` element (`CommandFeedbackEcho`), so it removes itself from the a11y tree **and** has no focusable descendant to neutralize (INV-2 by construction) — see INV-2 for why the Sonner-toast echo was rejected.
 
 **Why a toast at all on failure**: many pages scroll; an error rendered only in a top-of-page banner can be missed by a user who doesn't scroll up, who then wrongly assumes success. The `aria-hidden` toast guarantees the failure is *seen* immediately, independent of scroll position, without a second announcement.
 
@@ -65,7 +65,7 @@ Invariants that MUST hold for every command outcome:
 - **INV-2 — no focusable content under `aria-hidden`** (WCAG 4.1.2; axe-core `aria-hidden-focus`): an `aria-hidden` subtree must contain no focusable descendant. The failure echo is a plain, non-Sonner `aria-hidden` `<div>` (`CommandFeedbackEcho`) containing text only, so this holds **by construction** — nothing to neutralize. *(A Sonner-toast echo was evaluated and rejected: Sonner v2 renders each toast as `<li tabIndex=0>` + a focusable close button; neutralizing those via a `MutationObserver` proved fragile — it couples to React-reconciliation internals and mismatched the class-carrying node — so the standard uses a static element instead.)*
 - **INV-3 — durability**: every failure stays visible until the user dismisses it or issues the next command on that surface. Banners never auto-vanish; the failure echo persists as component state until cleared (no auto-dismiss timer).
 
-**Focus**: on a *form-blocking* failure, move focus to the banner container on the next paint via `useEffect` keyed on the error — **never `setTimeout`** (see [frontend/CLAUDE.md](../../../frontend/CLAUDE.md) focus rules). Non-blocking failures (e.g. a list-row action) do **not** steal focus; the assertive banner announces in place.
+**Focus**: on a *form-blocking* failure, move focus to the banner container on the next paint via `useEffect` keyed on the error — **never `setTimeout`** (see [frontend/CLAUDE.md](../../../frontend/CLAUDE.md) focus rules). Non-blocking failures (e.g. a list-row action) do **not** steal focus; the assertive banner announces in place. *(Ready but not yet exercised by the reference `UsersManagePage`: its only form-blocking case — the invite/edit submit path — is deferred to follow-up N4; the capability exists via `CommandFeedbackBanner`'s `forwardRef` + `tabIndex={-1}`.)*
 
 **Dismissal**: dismissing the banner clears the ViewModel error state **and** clears the echo (via the hook's `clear()`) so the two surfaces never desync.
 
@@ -81,7 +81,7 @@ Invariants that MUST hold for every command outcome:
 
 ## Components & abstraction
 
-Banners are already the house style (~15 pages drive `role="alert"`/`role="status"` from ViewModel state). This standard formalizes them and adds the failure toast echo. Reference points:
+Banners are already the house style (most manage pages drive `role="alert"`/`role="status"` from ViewModel state). This standard formalizes them and adds the failure echo. Reference points:
 
 - `<Toaster richColors position="top-right" />` — `frontend/src/App.tsx`
 - `UsersErrorBanner` — `frontend/src/components/users/UsersErrorBanner.tsx` (the tri-priority error banner this standard generalizes)
@@ -104,12 +104,12 @@ Stable testids are mandatory (extend today's `users-error-banner` / `invite-succ
 - [ ] Form-blocking failure moves focus to the banner via `useEffect` (no `setTimeout`)
 - [ ] Banner dismiss also dismisses the paired toast; VM error cleared
 - [ ] Required `data-testid`s present
-- [ ] `@axe-core/playwright` clean + a manual NVDA/VoiceOver pass confirms a single announcement
+- [ ] Single announcement + zero `aria-hidden-focus` verified — via the `RUN_A11Y_GATE` Playwright spec (`frontend/e2e/command-feedback-a11y.spec.ts`) or deployed DevTools (console query + Accessibility-tree "not exposed" on the echo); manual NVDA/VoiceOver pass when audio is available
 
 ## Adoption status
 
 - ✅ **Phase 1** — standard defined (this doc).
-- 🚧 **Phase 2 (in progress, PR #88)** — reference implementation shipped: `useCommandFeedback` + `sanitizeCommandError` + `<CommandFeedbackBanner>` + non-Sonner `<CommandFeedbackEcho>`; `UsersManagePage` migrated (fixes the 3 double-announce sites, removes the `clearError()` workaround, closes the invite success/failure asymmetry, sanitizes the invite/edit submission banners). Merge-gated on the `@axe-core/playwright` single-announcement + `aria-hidden-focus` pass.
+- ✅ **Phase 2 (SHIPPED — PR #88, merged `a22bcab5`)** — reference implementation: `useCommandFeedback` + `sanitizeCommandError` + `<CommandFeedbackBanner>` + non-Sonner `<CommandFeedbackEcho>`; `UsersManagePage` migrated (fixes the 3 double-announce sites, removes the notif-prefs `clearError()`-to-suppress-the-banner double-aria-live hack — `clearError()` itself is retained in the helpers for success/failure mutual exclusion — closes the invite success/failure asymmetry, sanitizes the invite/edit submission banners). **F4 a11y gate verified on the deployed build 2026-07-02** — INV-1 (one `role="alert"`) + INV-2 (zero `aria-hidden-focus`) + no raw leak, via DevTools on `a4c.firstovertheline.com`; manual audio AT pass optional. Follow-ups seeded: N4 (route form-submit through the single-announcement path), N2 (write-only `successMessage` cleanup).
 - ⏳ **Phase 3+** — progressive-enhancement rollout to the other command-feedback pages (Roles, Organizations, Org-Units, Schedules, Clients, Assignments, Auth), batched by area. Existing banners already surface every failure, so partial rollout is never broken — only less uniform.
 
 ## Related Documentation
