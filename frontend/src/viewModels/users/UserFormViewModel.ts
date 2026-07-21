@@ -108,7 +108,7 @@ export class UserFormViewModel {
   submissionError: string | null = null;
 
   /** Detailed error info from last submission attempt */
-  submissionErrorDetails: { code?: string; details?: string } | null = null;
+  submissionErrorDetails: { code?: string; details?: string; correlationId?: string } | null = null;
 
   /** Email lookup result (from UsersViewModel) */
   emailLookupResult: EmailLookupResult | null = null;
@@ -1045,13 +1045,17 @@ export class UserFormViewModel {
             // `errorDetails.message` over the bare `error` code string.
             this.submissionError =
               result.errorDetails?.message ?? result.error ?? 'An error occurred';
-            // Extract detailed error info for display.
-            // The context contains the full errorDetails from the Edge Function.
+            // Extract detailed error info for display + tracing. The context
+            // (when present) carries the rich violation detail; the
+            // correlationId is captured regardless so the page's reportFailure
+            // can log it (it's threaded through, never displayed).
             const ctx = result.errorDetails?.context as Record<string, unknown> | undefined;
-            if (ctx) {
+            const correlationId = result.errorDetails?.correlationId;
+            if (ctx || correlationId || result.errorDetails?.code) {
               this.submissionErrorDetails = {
-                code: result.errorDetails?.code ?? (ctx.code as string),
-                details: this.formatViolationDetails(ctx),
+                code: result.errorDetails?.code ?? (ctx?.code as string | undefined),
+                details: ctx ? this.formatViolationDetails(ctx) : undefined,
+                correlationId,
               };
             } else {
               this.submissionErrorDetails = null;

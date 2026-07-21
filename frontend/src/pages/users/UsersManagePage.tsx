@@ -460,6 +460,7 @@ export const UsersManagePage: React.FC = observer(() => {
         setOperationError(null);
         reportFailure(formViewModel.submissionError, {
           fallback: panelMode === 'create' ? 'Failed to send invitation' : 'Failed to update',
+          correlationId: formViewModel.submissionErrorDetails?.correlationId,
         });
       } else {
         // Failure surfaced via the rich UsersErrorBanner (submissionError stayed
