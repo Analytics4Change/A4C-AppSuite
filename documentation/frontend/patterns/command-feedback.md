@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-07-02
+last_updated: 2026-07-21
 ---
 
 <!-- TL;DR-START -->
@@ -65,7 +65,7 @@ Invariants that MUST hold for every command outcome:
 - **INV-2 — no focusable content under `aria-hidden`** (WCAG 4.1.2; axe-core `aria-hidden-focus`): an `aria-hidden` subtree must contain no focusable descendant. The failure echo is a plain, non-Sonner `aria-hidden` `<div>` (`CommandFeedbackEcho`) containing text only, so this holds **by construction** — nothing to neutralize. *(A Sonner-toast echo was evaluated and rejected: Sonner v2 renders each toast as `<li tabIndex=0>` + a focusable close button; neutralizing those via a `MutationObserver` proved fragile — it couples to React-reconciliation internals and mismatched the class-carrying node — so the standard uses a static element instead.)*
 - **INV-3 — durability**: every failure stays visible until the user dismisses it or issues the next command on that surface. Banners never auto-vanish; the failure echo persists as component state until cleared (no auto-dismiss timer).
 
-**Focus**: on a *form-blocking* failure, move focus to the banner container on the next paint via `useEffect` keyed on the error — **never `setTimeout`** (see [frontend/CLAUDE.md](../../../frontend/CLAUDE.md) focus rules). Non-blocking failures (e.g. a list-row action) do **not** steal focus; the assertive banner announces in place. *(Ready but not yet exercised by the reference `UsersManagePage`: its only form-blocking case — the invite/edit submit path — is deferred to follow-up N4; the capability exists via `CommandFeedbackBanner`'s `forwardRef` + `tabIndex={-1}`.)*
+**Focus**: on a *form-blocking* failure, move focus to the banner container on the next paint via `useEffect` keyed on the error — **never `setTimeout`** (see [frontend/CLAUDE.md](../../../frontend/CLAUDE.md) focus rules). Non-blocking failures (e.g. a list-row action) do **not** steal focus; the assertive banner announces in place. *(Exercised by the reference `UsersManagePage` as of Phase 3 / PR-N4: the invite and edit submit banners are the shared `CommandFeedbackBanner` (`forwardRef` + `tabIndex={-1}`), and a `useEffect` keyed on `formViewModel.submissionError` moves focus to the banner on a submit failure.)*
 
 **Dismissal**: dismissing the banner clears the ViewModel error state **and** clears the echo (via the hook's `clear()`) so the two surfaces never desync.
 
@@ -109,8 +109,10 @@ Stable testids are mandatory (extend today's `users-error-banner` / `invite-succ
 ## Adoption status
 
 - ✅ **Phase 1** — standard defined (this doc).
-- ✅ **Phase 2 (SHIPPED — PR #88, merged `a22bcab5`)** — reference implementation: `useCommandFeedback` + `sanitizeCommandError` + `<CommandFeedbackBanner>` + non-Sonner `<CommandFeedbackEcho>`; `UsersManagePage` migrated (fixes the 3 double-announce sites, removes the notif-prefs `clearError()`-to-suppress-the-banner double-aria-live hack — `clearError()` itself is retained in the helpers for success/failure mutual exclusion — closes the invite success/failure asymmetry, sanitizes the invite/edit submission banners). **F4 a11y gate verified on the deployed build 2026-07-02** — INV-1 (one `role="alert"`) + INV-2 (zero `aria-hidden-focus`) + no raw leak, via DevTools on `a4c.firstovertheline.com`; manual audio AT pass optional. Follow-ups seeded: N4 (route form-submit through the single-announcement path), N2 (write-only `successMessage` cleanup).
-- ⏳ **Phase 3+** — progressive-enhancement rollout to the other command-feedback pages (Roles, Organizations, Org-Units, Schedules, Clients, Assignments, Auth), batched by area. Existing banners already surface every failure, so partial rollout is never broken — only less uniform.
+- ✅ **Phase 2 (SHIPPED — PR #88, merged `a22bcab5`)** — reference implementation: `useCommandFeedback` + `sanitizeCommandError` + `<CommandFeedbackBanner>` + non-Sonner `<CommandFeedbackEcho>`; `UsersManagePage` migrated (fixes the 3 double-announce sites, removes the notif-prefs `clearError()`-to-suppress-the-banner double-aria-live hack — `clearError()` itself is retained in the helpers for success/failure mutual exclusion — closes the invite success/failure asymmetry, sanitizes the invite/edit submission banners). **F4 a11y gate verified on the deployed build 2026-07-02** — INV-1 (one `role="alert"`) + INV-2 (zero `aria-hidden-focus`) + no raw leak, via DevTools on `a4c.firstovertheline.com`; manual audio AT pass optional.
+- 🔄 **Phase 3 (in progress)** — progressive-enhancement rollout to the other command-feedback pages, batched by area. Existing banners already surface every failure, so partial rollout is never broken — only less uniform.
+  - **PR-N4 + N2** (reference page hardening): the `UsersManagePage` invite/edit **form-submit** failure now routes through the shared `CommandFeedbackBanner` + `showCommandFailure` echo + focus-to-banner, and the page-level `UsersErrorBanner` is guarded so exactly one `role="alert"` region can mount (closes the last INV-1 co-mount gap). The write-only `UsersViewModel.successMessage` observable + setters were removed (the page-level `showCommandSuccess` banner is the authoritative success surface).
+  - Remaining targets: the sibling manage pages (Roles, Organizations, Org-Units, Schedules) and Tier-2 surfaces (settings client-fields, assignments caseload, client intake, admin orphaned-deletions, auth reset-password toast→banner).
 
 ## Related Documentation
 

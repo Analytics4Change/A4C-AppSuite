@@ -105,9 +105,23 @@ test.describe('command-feedback a11y gate (F4)', () => {
     await page.getByRole('checkbox', { name: /Aspen Med Viewer/i }).check();
     await page.getByRole('button', { name: /Send Invitation/i }).click();
 
-    // Failure banner mounts.
-    await expect(page.getByText('Failed to send invitation')).toBeVisible();
-    await expectSingleAlertRegion(page);
+    // Failure banner mounts as the shared command-feedback banner, showing the
+    // operation-specific fallback (the raw handler prefix is masked). Assert via
+    // testid — the echo now carries the same text, so getByText would be ambiguous.
+    const banner = page.getByTestId('invite-submission-error');
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Failed to send invitation');
+
+    // Form-blocking failure moves focus to the banner (useEffect, not setTimeout).
+    await expect(banner).toBeFocused();
+
+    // The aria-hidden echo fires on the form path too (scroll-independence) and
+    // never announces / never focuses.
+    const echo = page.getByTestId('command-feedback-toast-error');
+    await expect(echo).toBeVisible();
+    await expect(echo).toHaveAttribute('aria-hidden', 'true');
+
+    await expectSingleAlertRegion(page); // the banner announces; the echo does not
     await expectNoAriaHiddenFocus(page);
     await expectNoRawLeak(page); // the constraint name / prefix must be masked
   });

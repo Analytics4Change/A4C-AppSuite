@@ -56,8 +56,6 @@ import {
   RefreshCw,
   ArrowLeft,
   UserPlus,
-  AlertTriangle,
-  X,
   CheckCircle,
   XCircle,
   Save,
@@ -152,6 +150,16 @@ export const UsersManagePage: React.FC = observer(() => {
     },
     [viewModel, reportFailure]
   );
+
+  // Form-blocking submit failures move focus to the banner on the next paint
+  // (command-feedback standard) — useEffect keyed on the error, never setTimeout.
+  // Both form banners (create/edit) are mutually exclusive, so one ref suffices.
+  const formErrorBannerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (formViewModel?.submissionError) {
+      formErrorBannerRef.current?.focus();
+    }
+  }, [formViewModel?.submissionError]);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -406,9 +414,21 @@ export const UsersManagePage: React.FC = observer(() => {
         if (panelMode === 'create') {
           formViewModel.reset();
         }
+      } else if (formViewModel.submissionError) {
+        // Generic form-submit failure. The form's CommandFeedbackBanner (driven
+        // by formViewModel.submissionError) owns the single announcement; role
+        // violations / partial failures suppress submissionError (=> null) and
+        // are surfaced by UsersErrorBanner instead, so this branch never fights
+        // the rich banner. Clear any stale page-level operationError so exactly
+        // one alert region is mounted (INV-1), and fire the aria-hidden echo
+        // (+ structured log.warn) for scroll-independence.
+        setOperationError(null);
+        reportFailure(formViewModel.submissionError, {
+          fallback: panelMode === 'create' ? 'Failed to send invitation' : 'Failed to update',
+        });
       }
     },
-    [formViewModel, panelMode, viewModel, showCommandSuccess]
+    [formViewModel, panelMode, viewModel, showCommandSuccess, reportFailure]
   );
 
   // Handle cancel in form
@@ -707,19 +727,24 @@ export const UsersManagePage: React.FC = observer(() => {
           </div>
         </div>
 
-        {/* Error Banner */}
-        <UsersErrorBanner
-          error={viewModel.error}
-          operationError={operationError}
-          lastRoleViolations={viewModel.lastRoleViolations}
-          lastRolePartialFailure={viewModel.lastRolePartialFailure}
-          onDismiss={() => {
-            viewModel.clearError();
-            setOperationError(null);
-            setSuccessMessage(null);
-            clearEcho();
-          }}
-        />
+        {/* Error Banner — yields to the form-submit banner so exactly one
+            role="alert" region is ever mounted (INV-1). Role violations /
+            partial failures suppress submissionError, so the rich variants of
+            this banner are unaffected by the guard. */}
+        {!formViewModel?.submissionError && (
+          <UsersErrorBanner
+            error={viewModel.error}
+            operationError={operationError}
+            lastRoleViolations={viewModel.lastRoleViolations}
+            lastRolePartialFailure={viewModel.lastRolePartialFailure}
+            onDismiss={() => {
+              viewModel.clearError();
+              setOperationError(null);
+              setSuccessMessage(null);
+              clearEcho();
+            }}
+          />
+        )}
         {/* Success Banner (authoritative surface for command success) */}
         {!operationError && !viewModel.error && !formViewModel?.submissionError && (
           <CommandFeedbackBanner
@@ -800,30 +825,25 @@ export const UsersManagePage: React.FC = observer(() => {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Submission Error */}
-                    {formViewModel.submissionError && (
-                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                          <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold">
-                              Failed to send invitation
-                            </h4>
-                            <p className="text-red-700 text-sm mt-1">
-                              {sanitizeCommandError(formViewModel.submissionError).display}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => formViewModel.clearSubmissionError()}
-                            className="text-red-600 hover:text-red-800"
-                            aria-label="Dismiss error"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* Submission Error — shared command-feedback banner (the
+                        single announcement); focus moves here on failure. */}
+                    <CommandFeedbackBanner
+                      ref={formErrorBannerRef}
+                      kind="error"
+                      message={
+                        formViewModel.submissionError
+                          ? sanitizeCommandError(
+                              formViewModel.submissionError,
+                              'Failed to send invitation'
+                            ).display
+                          : null
+                      }
+                      onDismiss={() => {
+                        formViewModel.clearSubmissionError();
+                        clearEcho();
+                      }}
+                      data-testid="invite-submission-error"
+                    />
 
                     {/* Form Fields */}
                     <UserFormFields
@@ -1101,31 +1121,25 @@ export const UsersManagePage: React.FC = observer(() => {
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Submission Error */}
-                      {formViewModel.submissionError && (
-                        <div
-                          className="p-4 rounded-lg border border-red-300 bg-red-50"
-                          role="alert"
-                        >
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                            <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">Failed to update</h4>
-                              <p className="text-red-700 text-sm mt-1">
-                                {sanitizeCommandError(formViewModel.submissionError).display}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => formViewModel.clearSubmissionError()}
-                              className="text-red-600 hover:text-red-800"
-                              aria-label="Dismiss error"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Submission Error — shared command-feedback banner (the
+                          single announcement); focus moves here on failure. */}
+                      <CommandFeedbackBanner
+                        ref={formErrorBannerRef}
+                        kind="error"
+                        message={
+                          formViewModel.submissionError
+                            ? sanitizeCommandError(
+                                formViewModel.submissionError,
+                                'Failed to update'
+                              ).display
+                            : null
+                        }
+                        onDismiss={() => {
+                          formViewModel.clearSubmissionError();
+                          clearEcho();
+                        }}
+                        data-testid="edit-submission-error"
+                      />
 
                       {/* Form Fields */}
                       <UserFormFields

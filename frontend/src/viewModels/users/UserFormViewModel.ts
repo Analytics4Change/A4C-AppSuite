@@ -1004,8 +1004,9 @@ export class UserFormViewModel {
             // error surfaces.
             result = roleResult;
           }
-          // Success path: page VM has already set `successMessage = 'Roles
-          // updated'`; no additional log here (the page VM logs internally).
+          // Success path: role changes applied. UsersManagePage surfaces the
+          // edit-save success via its `showCommandSuccess('Changes saved')`
+          // banner; the page VM logs internally, so no additional log here.
         }
       }
 
