@@ -25,6 +25,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
+import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import { OrganizationCreateForm } from '@/pages/organizations/OrganizationCreateForm';
 import { OrganizationManageListViewModel } from '@/viewModels/organization/OrganizationManageListViewModel';
 import { OrganizationManageFormViewModel } from '@/viewModels/organization/OrganizationManageFormViewModel';
@@ -40,7 +45,6 @@ import type {
 import {
   ArrowLeft,
   Building,
-  AlertTriangle,
   X,
   XCircle,
   CheckCircle,
@@ -219,6 +223,36 @@ export const OrganizationsManagePage: React.FC = observer(() => {
 
   // Error state
   const [operationError, setOperationError] = useState<string | null>(null);
+  // Command-result feedback: sanitize + log + drive the aria-hidden echo toast.
+  const {
+    failed: reportFailure,
+    clear: clearEcho,
+    echoMessage,
+  } = useCommandFeedback('organizations');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Keep success/failure mutually exclusive; clearError() before setOperationError
+  // so the sanitized message wins over the VM's raw `error` on the banner.
+  const showCommandSuccess = useCallback(
+    (message: string) => {
+      listVM.clearError();
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage(message);
+    },
+    [listVM, clearEcho]
+  );
+  const showCommandFailure = useCallback(
+    (raw: unknown, opts?: CommandFailureOptions) => {
+      setSuccessMessage(null);
+      listVM.clearError();
+      setOperationError(reportFailure(raw, opts));
+    },
+    [listVM, reportFailure]
+  );
+
+  // Focus management for the form-blocking submit banner.
+  const formFocus = useCommandFeedbackFocus(!!formVM?.submissionError);
 
   // Entity form state (for inline add/edit dialogs)
   const [contactForm, setContactForm] = useState<ContactFormState>(EMPTY_CONTACT);
@@ -398,17 +432,27 @@ export const OrganizationsManagePage: React.FC = observer(() => {
       e.preventDefault();
       if (!formVM) return;
 
+      // Remember the control that triggered submit so a banner dismiss can
+      // restore focus to it (only armed if a banner actually takes focus).
+      formFocus.captureTrigger();
+
       const result = await formVM.submit();
 
       if (result.success) {
         log.info('Organization updated successfully', { orgId: formVM.orgId });
+        showCommandSuccess('Changes saved');
         await listVM.refresh();
         await formVM.reload();
-      } else {
-        setOperationError(result.error || 'Failed to update organization');
+      } else if (formVM.submissionError) {
+        // Form-submit failure: the form's CommandFeedbackBanner (driven by
+        // submissionError) owns the single announcement. Clear any stale
+        // page-level error (INV-1) and fire the aria-hidden echo (+ log.warn).
+        listVM.clearError();
+        setOperationError(null);
+        reportFailure(formVM.submissionError, { fallback: 'Failed to update organization' });
       }
     },
-    [formVM, listVM]
+    [formVM, listVM, formFocus, showCommandSuccess, reportFailure]
   );
 
   // Navigation
@@ -436,12 +480,13 @@ export const OrganizationsManagePage: React.FC = observer(() => {
     if (result.success) {
       setDialogState({ type: 'none' });
       log.info('Organization deactivated', { orgId: formVM.orgId });
+      showCommandSuccess('Organization deactivated');
       await selectAndLoadOrg(formVM.orgId);
     } else {
       setDialogState({ type: 'none' });
-      setOperationError(result.error || 'Failed to deactivate organization');
+      showCommandFailure(result.error, { fallback: 'Failed to deactivate organization' });
     }
-  }, [formVM, listVM, selectAndLoadOrg]);
+  }, [formVM, listVM, selectAndLoadOrg, showCommandSuccess, showCommandFailure]);
 
   const handleReactivateClick = useCallback(() => {
     if (formVM && !formVM.isActive) {
@@ -461,12 +506,13 @@ export const OrganizationsManagePage: React.FC = observer(() => {
     if (result.success) {
       setDialogState({ type: 'none' });
       log.info('Organization reactivated', { orgId: formVM.orgId });
+      showCommandSuccess('Organization reactivated');
       await selectAndLoadOrg(formVM.orgId);
     } else {
       setDialogState({ type: 'none' });
-      setOperationError(result.error || 'Failed to reactivate organization');
+      showCommandFailure(result.error, { fallback: 'Failed to reactivate organization' });
     }
-  }, [formVM, listVM, selectAndLoadOrg]);
+  }, [formVM, listVM, selectAndLoadOrg, showCommandSuccess, showCommandFailure]);
 
   const handleDeleteClick = useCallback(() => {
     if (!formVM) return;
@@ -502,11 +548,12 @@ export const OrganizationsManagePage: React.FC = observer(() => {
         },
         { replace: true }
       );
+      showCommandSuccess('Organization deleted');
     } else {
       setDialogState({ type: 'none' });
-      setOperationError(result.error || 'Failed to delete organization');
+      showCommandFailure(result.error, { fallback: 'Failed to delete organization' });
     }
-  }, [formVM, listVM, setSearchParams]);
+  }, [formVM, listVM, setSearchParams, showCommandSuccess, showCommandFailure]);
 
   const handleDeactivateFirst = useCallback(() => {
     setDialogState({ type: 'deactivate', isLoading: false });
@@ -597,10 +644,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
 
     if (result.success) {
       setDialogState({ type: 'none' });
+      showCommandSuccess('Contact saved');
     } else {
-      setOperationError(result.error || 'Failed to save contact');
+      showCommandFailure(result.error, { fallback: 'Failed to save contact' });
     }
-  }, [formVM, contactForm, dialogState]);
+  }, [formVM, contactForm, dialogState, showCommandSuccess, showCommandFailure]);
 
   const handleAddressSave = useCallback(async () => {
     if (!formVM) return;
@@ -627,10 +675,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
 
     if (result.success) {
       setDialogState({ type: 'none' });
+      showCommandSuccess('Address saved');
     } else {
-      setOperationError(result.error || 'Failed to save address');
+      showCommandFailure(result.error, { fallback: 'Failed to save address' });
     }
-  }, [formVM, addressForm, dialogState]);
+  }, [formVM, addressForm, dialogState, showCommandSuccess, showCommandFailure]);
 
   const handlePhoneSave = useCallback(async () => {
     if (!formVM) return;
@@ -654,10 +703,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
 
     if (result.success) {
       setDialogState({ type: 'none' });
+      showCommandSuccess('Phone saved');
     } else {
-      setOperationError(result.error || 'Failed to save phone');
+      showCommandFailure(result.error, { fallback: 'Failed to save phone' });
     }
-  }, [formVM, phoneForm, dialogState]);
+  }, [formVM, phoneForm, dialogState, showCommandSuccess, showCommandFailure]);
 
   const handleEntityDelete = useCallback(
     async (entityType: 'contact' | 'address' | 'phone', id: string) => {
@@ -672,11 +722,13 @@ export const OrganizationsManagePage: React.FC = observer(() => {
         result = await formVM.deletePhone(id, 'Removed by administrator');
       }
 
-      if (!result.success) {
-        setOperationError(result.error || `Failed to delete ${entityType}`);
+      if (result.success) {
+        showCommandSuccess(`${entityType.charAt(0).toUpperCase() + entityType.slice(1)} removed`);
+      } else {
+        showCommandFailure(result.error, { fallback: `Failed to delete ${entityType}` });
       }
     },
-    [formVM]
+    [formVM, showCommandSuccess, showCommandFailure]
   );
 
   // ========================================================================
@@ -728,34 +780,31 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           </div>
         </div>
 
-        {/* Error Banner */}
-        {(listVM.error || operationError) && (
-          <div
-            className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50"
-            role="alert"
+        {/* Error Banner — yields to the form-submit banner so exactly one
+            role="alert" region is ever mounted (INV-1). */}
+        {!formVM?.submissionError && (
+          <CommandFeedbackBanner
+            kind="error"
+            message={listVM.error || operationError}
+            onDismiss={() => {
+              listVM.clearError();
+              setOperationError(null);
+              setSuccessMessage(null);
+              clearEcho();
+            }}
             data-testid="org-manage-error-banner"
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{listVM.error || operationError}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  listVM.clearError();
-                  setOperationError(null);
-                }}
-                className="text-red-600 border-red-300"
-                data-testid="org-manage-error-dismiss-btn"
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
+          />
         )}
+        {/* Success Banner (authoritative surface for command success) */}
+        {!operationError && !listVM.error && !formVM?.submissionError && (
+          <CommandFeedbackBanner
+            kind="success"
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        )}
+        {/* Failure echo — aria-hidden visual copy, scroll-independent (INV-2 by construction) */}
+        <CommandFeedbackEcho message={echoMessage} />
 
         {/* Split View (platform owner) or Full-Width (provider admin) */}
         <div className={isPlatformOwner ? 'grid grid-cols-1 lg:grid-cols-3 gap-6' : ''}>
@@ -988,35 +1037,26 @@ export const OrganizationsManagePage: React.FC = observer(() => {
                       </div>
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Submission Error */}
-                        {formVM.submissionError && (
-                          <div
-                            className="p-4 rounded-lg border border-red-300 bg-red-50"
-                            role="alert"
-                            data-testid="org-details-submit-error"
-                          >
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                              <div className="flex-1">
-                                <h4 className="text-red-800 font-semibold">
-                                  Failed to update organization
-                                </h4>
-                                <p className="text-red-700 text-sm mt-1">
-                                  {formVM.submissionError}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => formVM.clearSubmissionError()}
-                                className="text-red-600 hover:text-red-800"
-                                aria-label="Dismiss error"
-                                data-testid="org-details-submit-error-dismiss-btn"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        {/* Submission Error — shared command-feedback banner (the
+                            single announcement); focus moves here on failure. */}
+                        <CommandFeedbackBanner
+                          ref={formFocus.bannerRef}
+                          kind="error"
+                          message={
+                            formVM.submissionError
+                              ? sanitizeCommandError(
+                                  formVM.submissionError,
+                                  'Failed to update organization'
+                                ).display
+                              : null
+                          }
+                          onDismiss={() => {
+                            formVM.clearSubmissionError();
+                            clearEcho();
+                            formFocus.restore();
+                          }}
+                          data-testid="org-details-submit-error"
+                        />
 
                         {/* Org fields */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

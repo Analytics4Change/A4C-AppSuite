@@ -30,13 +30,16 @@ import { ScheduleFormViewModel } from '@/viewModels/schedule/ScheduleFormViewMod
 import { ScheduleAssignmentViewModel } from '@/viewModels/schedule/ScheduleAssignmentViewModel';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
 import type { ScheduleTemplateDetail } from '@/types/schedule.types';
+import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import {
   Plus,
   RefreshCw,
   ArrowLeft,
   Calendar,
-  AlertTriangle,
-  X,
   XCircle,
   CheckCircle,
   Save,
@@ -81,6 +84,33 @@ export const SchedulesManagePage: React.FC = observer(() => {
   const pendingActionRef = useRef<{ type: 'select' | 'create'; templateId?: string } | null>(null);
 
   const [operationError, setOperationError] = useState<string | null>(null);
+  // Command-result feedback: sanitize + log + drive the aria-hidden echo toast.
+  const { failed: reportFailure, clear: clearEcho, echoMessage } = useCommandFeedback('schedules');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Keep success/failure mutually exclusive; clearError() before setOperationError
+  // so the sanitized message wins over the VM's raw `error` on the banner.
+  const showCommandSuccess = useCallback(
+    (message: string) => {
+      viewModel.clearError();
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage(message);
+    },
+    [viewModel, clearEcho]
+  );
+  const showCommandFailure = useCallback(
+    (raw: unknown, opts?: CommandFailureOptions) => {
+      setSuccessMessage(null);
+      viewModel.clearError();
+      setOperationError(reportFailure(raw, opts));
+    },
+    [viewModel, reportFailure]
+  );
+
+  // Focus management for the form-blocking submit banner (create/edit are
+  // mutually exclusive, so one instance suffices). See useCommandFeedbackFocus.
+  const formFocus = useCommandFeedbackFocus(!!formViewModel?.submissionError);
 
   const [showManageAssignDialog, setShowManageAssignDialog] = useState(false);
 
@@ -214,6 +244,10 @@ export const SchedulesManagePage: React.FC = observer(() => {
       e.preventDefault();
       if (!formViewModel) return;
 
+      // Remember the control that triggered submit so a banner dismiss can
+      // restore focus to it (only armed if a banner actually takes focus).
+      formFocus.captureTrigger();
+
       const result = await formViewModel.submit();
 
       if (result.success && result.templateId) {
@@ -221,19 +255,34 @@ export const SchedulesManagePage: React.FC = observer(() => {
           mode: panelMode,
           templateId: result.templateId,
         });
+        showCommandSuccess(panelMode === 'create' ? 'Template created' : 'Changes saved');
 
         try {
           await viewModel.refresh();
           await selectAndLoadTemplate(result.templateId);
         } catch (err) {
           log.error('Failed to transition after save', err);
-          setOperationError('Template was saved but failed to reload. Please refresh the page.');
+          showCommandFailure('Template was saved but failed to reload. Please refresh the page.');
         }
-      } else if (!result.success) {
-        setOperationError(result.error || 'Failed to save template');
+      } else if (formViewModel.submissionError) {
+        // Form-submit failure: the form's CommandFeedbackBanner (driven by
+        // submissionError) owns the single announcement. Clear any stale
+        // page-level error (INV-1) and fire the aria-hidden echo (+ log.warn).
+        viewModel.clearError();
+        setOperationError(null);
+        reportFailure(formViewModel.submissionError, { fallback: 'Failed to save template' });
       }
     },
-    [formViewModel, panelMode, viewModel, selectAndLoadTemplate]
+    [
+      formViewModel,
+      panelMode,
+      viewModel,
+      selectAndLoadTemplate,
+      formFocus,
+      showCommandSuccess,
+      showCommandFailure,
+      reportFailure,
+    ]
   );
 
   // Handle cancel in form
@@ -275,16 +324,17 @@ export const SchedulesManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Template deactivated', { templateId: currentTemplate.id });
+        showCommandSuccess('Template deactivated');
         await selectAndLoadTemplate(currentTemplate.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to deactivate template');
+        showCommandFailure(result.error, { fallback: 'Failed to deactivate template' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate template');
+      showCommandFailure(error, { fallback: 'Failed to deactivate template' });
     }
-  }, [currentTemplate, viewModel, selectAndLoadTemplate]);
+  }, [currentTemplate, viewModel, selectAndLoadTemplate, showCommandSuccess, showCommandFailure]);
 
   // Reactivate handlers
   const handleReactivateClick = useCallback(() => {
@@ -308,16 +358,17 @@ export const SchedulesManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Template reactivated', { templateId: currentTemplate.id });
+        showCommandSuccess('Template reactivated');
         await selectAndLoadTemplate(currentTemplate.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to reactivate template');
+        showCommandFailure(result.error, { fallback: 'Failed to reactivate template' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate template');
+      showCommandFailure(error, { fallback: 'Failed to reactivate template' });
     }
-  }, [currentTemplate, viewModel, selectAndLoadTemplate]);
+  }, [currentTemplate, viewModel, selectAndLoadTemplate, showCommandSuccess, showCommandFailure]);
 
   // Delete handlers — with structured error handling (HAS_USERS, STILL_ACTIVE)
   const handleDeleteClick = useCallback(() => {
@@ -345,6 +396,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentTemplate(null);
+        showCommandSuccess('Template deleted');
         // Clear stale URL params so the URL→state effect doesn't re-select
         // the just-deleted template and surface a stale "could not load" error.
         setSearchParams(
@@ -366,13 +418,13 @@ export const SchedulesManagePage: React.FC = observer(() => {
         setDialogState({ type: 'activeWarning' });
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to delete template');
+        showCommandFailure(result.error, { fallback: 'Failed to delete template' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to delete template');
+      showCommandFailure(error, { fallback: 'Failed to delete template' });
     }
-  }, [currentTemplate, viewModel, setSearchParams]);
+  }, [currentTemplate, viewModel, setSearchParams, showCommandSuccess, showCommandFailure]);
 
   const handleDeactivateFirst = useCallback(() => {
     setDialogState({ type: 'deactivate', isLoading: false });
@@ -450,29 +502,30 @@ export const SchedulesManagePage: React.FC = observer(() => {
           </div>
         </div>
 
-        {/* Error Banner */}
-        {(viewModel.error || operationError) && (
-          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  viewModel.clearError();
-                  setOperationError(null);
-                }}
-                className="text-red-600 border-red-300"
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
+        {/* Error Banner — yields to the form-submit banner so exactly one
+            role="alert" region is ever mounted (INV-1). */}
+        {!formViewModel?.submissionError && (
+          <CommandFeedbackBanner
+            kind="error"
+            message={viewModel.error || operationError}
+            onDismiss={() => {
+              viewModel.clearError();
+              setOperationError(null);
+              setSuccessMessage(null);
+              clearEcho();
+            }}
+          />
         )}
+        {/* Success Banner (authoritative surface for command success) */}
+        {!operationError && !viewModel.error && !formViewModel?.submissionError && (
+          <CommandFeedbackBanner
+            kind="success"
+            message={successMessage}
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        )}
+        {/* Failure echo — aria-hidden visual copy, scroll-independent (INV-2 by construction) */}
+        <CommandFeedbackEcho message={echoMessage} />
 
         {/* Split View Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -533,30 +586,26 @@ export const SchedulesManagePage: React.FC = observer(() => {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Submission Error */}
-                    {formViewModel.submissionError && (
-                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                          <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold">
-                              Failed to create template
-                            </h4>
-                            <p className="text-red-700 text-sm mt-1">
-                              {formViewModel.submissionError}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => formViewModel.clearSubmissionError()}
-                            className="text-red-600 hover:text-red-800"
-                            aria-label="Dismiss error"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* Submission Error — shared command-feedback banner (the
+                        single announcement); focus moves here on failure. */}
+                    <CommandFeedbackBanner
+                      ref={formFocus.bannerRef}
+                      kind="error"
+                      message={
+                        formViewModel.submissionError
+                          ? sanitizeCommandError(
+                              formViewModel.submissionError,
+                              'Failed to create template'
+                            ).display
+                          : null
+                      }
+                      onDismiss={() => {
+                        formViewModel.clearSubmissionError();
+                        clearEcho();
+                        formFocus.restore();
+                      }}
+                      data-testid="schedule-create-submission-error"
+                    />
 
                     {/* Form Fields */}
                     <ScheduleFormFields
@@ -667,33 +716,26 @@ export const SchedulesManagePage: React.FC = observer(() => {
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Submission Error */}
-                      {formViewModel.submissionError && (
-                        <div
-                          className="p-4 rounded-lg border border-red-300 bg-red-50"
-                          role="alert"
-                        >
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                            <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">
-                                Failed to update template
-                              </h4>
-                              <p className="text-red-700 text-sm mt-1">
-                                {formViewModel.submissionError}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => formViewModel.clearSubmissionError()}
-                              className="text-red-600 hover:text-red-800"
-                              aria-label="Dismiss error"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Submission Error — shared command-feedback banner (the
+                          single announcement); focus moves here on failure. */}
+                      <CommandFeedbackBanner
+                        ref={formFocus.bannerRef}
+                        kind="error"
+                        message={
+                          formViewModel.submissionError
+                            ? sanitizeCommandError(
+                                formViewModel.submissionError,
+                                'Failed to update template'
+                              ).display
+                            : null
+                        }
+                        onDismiss={() => {
+                          formViewModel.clearSubmissionError();
+                          clearEcho();
+                          formFocus.restore();
+                        }}
+                        data-testid="schedule-edit-submission-error"
+                      />
 
                       {/* Form Fields */}
                       <ScheduleFormFields

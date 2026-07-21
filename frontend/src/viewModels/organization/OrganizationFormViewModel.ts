@@ -41,16 +41,15 @@ import type {
   PhoneFormData,
   ContactInfo,
   AddressInfo,
-  PhoneInfo
+  PhoneInfo,
 } from '@/types';
 import {
   validateOrganizationForm,
   formatSubdomain,
-  type ValidationError
+  type ValidationError,
 } from '@/utils/organization-validation';
 import { DEFAULT_ORGANIZATION_FORM } from '@/constants';
 import { Logger } from '@/utils/logger';
-import { toast } from 'sonner';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -118,7 +117,7 @@ export class OrganizationFormViewModel {
             this.formData.billingAddress = {
               ...this.formData.generalAddress,
               label: 'Billing Address (from General Info)',
-              type: 'billing' // Override type to 'billing'
+              type: 'billing', // Override type to 'billing'
             };
           });
           log.debug('Billing address synced from General Information');
@@ -135,7 +134,7 @@ export class OrganizationFormViewModel {
             // Copy values from generalPhone to billingPhone
             this.formData.billingPhone = {
               ...this.formData.generalPhone,
-              label: 'Billing Phone (from General Info)'
+              label: 'Billing Phone (from General Info)',
               // Keep type as 'office' from generalPhone
             };
           });
@@ -154,7 +153,7 @@ export class OrganizationFormViewModel {
             this.formData.providerAdminAddress = {
               ...this.formData.generalAddress,
               label: 'Provider Admin Address (from General Info)',
-              type: 'physical' // Keep type as 'physical'
+              type: 'physical', // Keep type as 'physical'
             };
           });
           log.debug('Provider Admin address synced from General Information');
@@ -171,7 +170,7 @@ export class OrganizationFormViewModel {
             // Copy values from generalPhone to providerAdminPhone
             this.formData.providerAdminPhone = {
               ...this.formData.generalPhone,
-              label: 'Provider Admin Phone (from General Info)'
+              label: 'Provider Admin Phone (from General Info)',
               // Keep type as 'office' from generalPhone
             };
           });
@@ -351,7 +350,7 @@ export class OrganizationFormViewModel {
       title: contact.title || undefined,
       department: contact.department || undefined,
       type: contact.type,
-      label: contact.label
+      label: contact.label,
     };
   }
 
@@ -366,7 +365,7 @@ export class OrganizationFormViewModel {
       state: address.state,
       zipCode: address.zipCode,
       type: address.type,
-      label: address.label
+      label: address.label,
     };
   }
 
@@ -378,7 +377,7 @@ export class OrganizationFormViewModel {
       number: phone.number,
       extension: phone.extension || undefined,
       type: phone.type,
-      label: phone.label
+      label: phone.label,
     };
   }
 
@@ -404,18 +403,14 @@ export class OrganizationFormViewModel {
     contacts.push(this.transformContact(this.formData.providerAdminContact));
 
     // Build addresses array (General + Billing + Provider Admin)
-    const addresses: AddressInfo[] = [
-      this.transformAddress(this.formData.generalAddress)
-    ];
+    const addresses: AddressInfo[] = [this.transformAddress(this.formData.generalAddress)];
     if (isProvider) {
       addresses.push(this.transformAddress(this.formData.billingAddress));
     }
     addresses.push(this.transformAddress(this.formData.providerAdminAddress));
 
     // Build phones array (General + Billing + Provider Admin)
-    const phones: PhoneInfo[] = [
-      this.transformPhone(this.formData.generalPhone)
-    ];
+    const phones: PhoneInfo[] = [this.transformPhone(this.formData.generalPhone)];
     if (isProvider) {
       phones.push(this.transformPhone(this.formData.billingPhone));
     }
@@ -428,8 +423,8 @@ export class OrganizationFormViewModel {
         email: providerAdmin.email,
         firstName: providerAdmin.firstName,
         lastName: providerAdmin.lastName,
-        role: 'provider_admin'
-      }
+        role: 'provider_admin',
+      },
     ];
 
     return {
@@ -442,9 +437,9 @@ export class OrganizationFormViewModel {
         addresses,
         phones,
         partnerType: this.formData.partnerType,
-        referringPartnerId: this.formData.referringPartnerId
+        referringPartnerId: this.formData.referringPartnerId,
       },
-      users
+      users,
     };
   }
 
@@ -465,7 +460,7 @@ export class OrganizationFormViewModel {
     // Validate first
     if (!this.validate()) {
       log.warn('Form validation failed', {
-        errorCount: this.validationErrors.length
+        errorCount: this.validationErrors.length,
       });
       return null;
     }
@@ -485,7 +480,7 @@ export class OrganizationFormViewModel {
         contactCount: params.orgData.contacts.length,
         addressCount: params.orgData.addresses.length,
         phoneCount: params.orgData.phones.length,
-        userCount: params.users.length
+        userCount: params.users.length,
       });
 
       // Start workflow (emits events, does NOT write to DB directly)
@@ -507,14 +502,7 @@ export class OrganizationFormViewModel {
 
       return workflowId;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to submit organization';
-
-      // Show toast notification for user visibility
-      toast.error('Organization Bootstrap Failed', {
-        description: errorMessage,
-        duration: 10000, // Show for 10 seconds since it's an error
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit organization';
 
       runInAction(() => {
         this.isSubmitting = false;
@@ -552,10 +540,7 @@ export class OrganizationFormViewModel {
    * Check if field has error
    */
   hasFieldError(field: string): boolean {
-    return (
-      this.touchedFields.has(field) &&
-      this.validationErrors.some((e) => e.field === field)
-    );
+    return this.touchedFields.has(field) && this.validationErrors.some((e) => e.field === field);
   }
 
   /**
