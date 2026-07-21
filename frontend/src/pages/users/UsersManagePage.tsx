@@ -28,6 +28,7 @@ import { DangerZone } from '@/components/ui/DangerZone';
 import { UserList, UserFormFields } from '@/components/users';
 import { UsersErrorBanner } from '@/components/users/UsersErrorBanner';
 import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
 import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
 import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
 import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
@@ -152,57 +153,20 @@ export const UsersManagePage: React.FC = observer(() => {
   );
 
   // Focus management for form-blocking failures (command-feedback standard).
+  // One useCommandFeedbackFocus instance per independently-focusable banner;
+  // both capture the submit trigger and only the active one restores.
   //
-  //   - The control that triggered the submit is captured at submit time (the
-  //     one moment it still holds focus — it may be disabled/blurred by the time
-  //     an effect runs). It's the *candidate* restore target.
-  //   - When a banner actually takes focus, that candidate is promoted to the
-  //     armed `restoreTargetRef`; the effect's cleanup disarms it the moment the
-  //     banner goes away for any reason. So restoration is armed IFF a banner
-  //     currently holds focus we moved there — a background-load error banner
-  //     (which never takes focus) can never trigger a stale restore.
-  //   - `restoreFocusToTrigger` consumes-and-clears the target so it can't fire
-  //     twice.
-  const submitTriggerCandidateRef = useRef<HTMLElement | null>(null);
-  const restoreTargetRef = useRef<HTMLElement | null>(null);
-  const restoreFocusToTrigger = useCallback(() => {
-    const el = restoreTargetRef.current;
-    restoreTargetRef.current = null;
-    if (el && document.contains(el)) {
-      el.focus();
-    }
-  }, []);
-
-  // Form banner (create/edit) — mutually exclusive, so one ref suffices. Keyed
-  // on the submit-only `submissionError` observable; never setTimeout.
-  const formErrorBannerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (formViewModel?.submissionError) {
-      restoreTargetRef.current = submitTriggerCandidateRef.current;
-      formErrorBannerRef.current?.focus();
-      return () => {
-        restoreTargetRef.current = null;
-      };
-    }
-  }, [formViewModel?.submissionError]);
-
-  // Rich UsersErrorBanner (role violations / partial failure) — equally
-  // form-blocking. These two observables are set ONLY by `modifyRoles` (funneled
-  // through the submit), so keying focus on them is inherently submit-scoped and
-  // never steals focus from a background `loadUserDetails` error (which sets
-  // `viewModel.error`, not these). Declarative + cleanup-disarm, never setTimeout.
-  const usersErrorBannerRef = useRef<HTMLDivElement>(null);
+  //   - Form banner (create/edit) — mutually exclusive by panelMode, so one
+  //     instance drives both. Keyed on the submit-only `submissionError`.
+  //   - Rich UsersErrorBanner (role violations / partial failure) — these two
+  //     observables are set ONLY by `modifyRoles` (funneled through submit), so
+  //     keying focus on them is inherently submit-scoped and never steals focus
+  //     from a background `loadUserDetails` error (which sets `viewModel.error`,
+  //     not these).
+  const formFocus = useCommandFeedbackFocus(!!formViewModel?.submissionError);
   const richBannerActive =
     viewModel.lastRoleViolations != null || viewModel.lastRolePartialFailure != null;
-  useEffect(() => {
-    if (richBannerActive) {
-      restoreTargetRef.current = submitTriggerCandidateRef.current;
-      usersErrorBannerRef.current?.focus();
-      return () => {
-        restoreTargetRef.current = null;
-      };
-    }
-  }, [richBannerActive]);
+  const richFocus = useCommandFeedbackFocus(richBannerActive);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -423,10 +387,10 @@ export const UsersManagePage: React.FC = observer(() => {
       if (!formViewModel) return;
 
       // Remember the control that triggered submit (submit button, or the field
-      // Enter was pressed in) so a banner dismiss can restore focus to it. Only
-      // a candidate — it's promoted to the armed restore target if/when a banner
-      // actually takes focus (see the focus effects above).
-      submitTriggerCandidateRef.current = (document.activeElement as HTMLElement) ?? null;
+      // Enter was pressed in) so a banner dismiss can restore focus to it. Both
+      // banners capture the same candidate; only the one that activates restores.
+      formFocus.captureTrigger();
+      richFocus.captureTrigger();
 
       const commandService = getUserCommandService();
       // Pass the page VM as the second arg so that role-modification failures
@@ -484,7 +448,7 @@ export const UsersManagePage: React.FC = observer(() => {
       // (the effect keyed on lastRoleViolations/lastRolePartialFailure), so this
       // handler needs no explicit branch for them.
     },
-    [formViewModel, panelMode, viewModel, showCommandSuccess, reportFailure]
+    [formViewModel, panelMode, viewModel, showCommandSuccess, reportFailure, formFocus, richFocus]
   );
 
   // Handle cancel in form
@@ -789,7 +753,7 @@ export const UsersManagePage: React.FC = observer(() => {
             this banner are unaffected by the guard. */}
         {!formViewModel?.submissionError && (
           <UsersErrorBanner
-            ref={usersErrorBannerRef}
+            ref={richFocus.bannerRef}
             error={viewModel.error}
             operationError={operationError}
             lastRoleViolations={viewModel.lastRoleViolations}
@@ -799,7 +763,7 @@ export const UsersManagePage: React.FC = observer(() => {
               setOperationError(null);
               setSuccessMessage(null);
               clearEcho();
-              restoreFocusToTrigger();
+              richFocus.restore();
             }}
           />
         )}
@@ -886,7 +850,7 @@ export const UsersManagePage: React.FC = observer(() => {
                     {/* Submission Error — shared command-feedback banner (the
                         single announcement); focus moves here on failure. */}
                     <CommandFeedbackBanner
-                      ref={formErrorBannerRef}
+                      ref={formFocus.bannerRef}
                       kind="error"
                       message={
                         formViewModel.submissionError
@@ -899,7 +863,7 @@ export const UsersManagePage: React.FC = observer(() => {
                       onDismiss={() => {
                         formViewModel.clearSubmissionError();
                         clearEcho();
-                        restoreFocusToTrigger();
+                        formFocus.restore();
                       }}
                       data-testid="invite-submission-error"
                     />
@@ -1183,7 +1147,7 @@ export const UsersManagePage: React.FC = observer(() => {
                       {/* Submission Error — shared command-feedback banner (the
                           single announcement); focus moves here on failure. */}
                       <CommandFeedbackBanner
-                        ref={formErrorBannerRef}
+                        ref={formFocus.bannerRef}
                         kind="error"
                         message={
                           formViewModel.submissionError
@@ -1196,7 +1160,7 @@ export const UsersManagePage: React.FC = observer(() => {
                         onDismiss={() => {
                           formViewModel.clearSubmissionError();
                           clearEcho();
-                          restoreFocusToTrigger();
+                          formFocus.restore();
                         }}
                         data-testid="edit-submission-error"
                       />
