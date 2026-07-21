@@ -313,7 +313,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
         listVM.selectOrganization(orgId);
         log.debug('Org loaded for editing', { orgId, name: newFormVM.organization?.name });
       } else {
-        setOperationError(newFormVM.submissionError || 'Organization could not be loaded.');
+        // Sanitize the raw load error before it reaches the command banner.
+        setOperationError(
+          sanitizeCommandError(newFormVM.submissionError, 'Organization could not be loaded.')
+            .display
+        );
       }
     },
     [isPlatformOwner, listVM]
