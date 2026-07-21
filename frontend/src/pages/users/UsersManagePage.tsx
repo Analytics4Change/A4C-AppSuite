@@ -419,9 +419,11 @@ export const UsersManagePage: React.FC = observer(() => {
         // by formViewModel.submissionError) owns the single announcement; role
         // violations / partial failures suppress submissionError (=> null) and
         // are surfaced by UsersErrorBanner instead, so this branch never fights
-        // the rich banner. Clear any stale page-level operationError so exactly
-        // one alert region is mounted (INV-1), and fire the aria-hidden echo
-        // (+ structured log.warn) for scroll-independence.
+        // the rich banner. Clear any stale page-level error — both operationError
+        // AND the VM's raw error, mirroring showCommandFailure — so exactly one
+        // alert region is mounted (INV-1) and no stale error re-surfaces when the
+        // form banner is dismissed. Then fire the aria-hidden echo (+ log.warn).
+        viewModel.clearError();
         setOperationError(null);
         reportFailure(formViewModel.submissionError, {
           fallback: panelMode === 'create' ? 'Failed to send invitation' : 'Failed to update',

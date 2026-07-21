@@ -1,6 +1,6 @@
 ---
 status: seed
-last_updated: 2026-07-02
+last_updated: 2026-07-21
 ---
 
 # Seed: `UsersViewModel.successMessage` is a write-only observable (N2)
