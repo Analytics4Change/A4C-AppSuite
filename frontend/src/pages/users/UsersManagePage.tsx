@@ -161,6 +161,35 @@ export const UsersManagePage: React.FC = observer(() => {
     }
   }, [formViewModel?.submissionError]);
 
+  // The rich UsersErrorBanner (role violations / partial failure / generic
+  // modify-roles error) is equally form-blocking, but its failures funnel
+  // through the submit (submissionError stays null), so it can't be keyed on a
+  // submit-only observable the way the form banner is — `viewModel.error` is
+  // also set by background loads (loadUserDetails), so keying focus on it would
+  // steal focus during navigation. Instead handleSubmit raises this flag only on
+  // the submit path, and the effect moves focus once the banner has mounted.
+  const usersErrorBannerRef = useRef<HTMLDivElement>(null);
+  const [focusUsersErrorBanner, setFocusUsersErrorBanner] = useState(false);
+  useEffect(() => {
+    if (focusUsersErrorBanner) {
+      usersErrorBannerRef.current?.focus();
+      setFocusUsersErrorBanner(false);
+    }
+  }, [focusUsersErrorBanner]);
+
+  // Focus restoration (command-feedback standard): a form-blocking failure moves
+  // focus to the alert banner, so dismissing it must return focus to the control
+  // that triggered the submit — otherwise focus drops to <body>. Captured at
+  // submit time (the trigger still holds focus then) and restored by every
+  // banner's onDismiss. Guarded on DOM presence in case the trigger unmounted.
+  const submitTriggerRef = useRef<HTMLElement | null>(null);
+  const restoreFocusToTrigger = useCallback(() => {
+    const el = submitTriggerRef.current;
+    if (el && document.contains(el)) {
+      el.focus();
+    }
+  }, []);
+
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserDisplayStatus | 'all'>('all');
@@ -379,6 +408,10 @@ export const UsersManagePage: React.FC = observer(() => {
       e.preventDefault();
       if (!formViewModel) return;
 
+      // Remember the control that triggered submit (submit button, or the field
+      // Enter was pressed in) so a banner dismiss can restore focus to it.
+      submitTriggerRef.current = (document.activeElement as HTMLElement) ?? null;
+
       const commandService = getUserCommandService();
       // Pass the page VM as the second arg so that role-modification failures
       // (violations / partial) populate `viewModel.lastRoleViolations` and
@@ -428,6 +461,13 @@ export const UsersManagePage: React.FC = observer(() => {
         reportFailure(formViewModel.submissionError, {
           fallback: panelMode === 'create' ? 'Failed to send invitation' : 'Failed to update',
         });
+      } else {
+        // Failure surfaced via the rich UsersErrorBanner (submissionError stayed
+        // null — role violations, partial failure, or a generic modify-roles
+        // error, all funneled onto the page VM by formViewModel.submit). It's
+        // form-blocking, so move focus to it once mounted. Flag + useEffect,
+        // never setTimeout (command-feedback standard).
+        setFocusUsersErrorBanner(true);
       }
     },
     [formViewModel, panelMode, viewModel, showCommandSuccess, reportFailure]
@@ -735,6 +775,7 @@ export const UsersManagePage: React.FC = observer(() => {
             this banner are unaffected by the guard. */}
         {!formViewModel?.submissionError && (
           <UsersErrorBanner
+            ref={usersErrorBannerRef}
             error={viewModel.error}
             operationError={operationError}
             lastRoleViolations={viewModel.lastRoleViolations}
@@ -744,6 +785,7 @@ export const UsersManagePage: React.FC = observer(() => {
               setOperationError(null);
               setSuccessMessage(null);
               clearEcho();
+              restoreFocusToTrigger();
             }}
           />
         )}
@@ -843,6 +885,7 @@ export const UsersManagePage: React.FC = observer(() => {
                       onDismiss={() => {
                         formViewModel.clearSubmissionError();
                         clearEcho();
+                        restoreFocusToTrigger();
                       }}
                       data-testid="invite-submission-error"
                     />
@@ -1139,6 +1182,7 @@ export const UsersManagePage: React.FC = observer(() => {
                         onDismiss={() => {
                           formViewModel.clearSubmissionError();
                           clearEcho();
+                          restoreFocusToTrigger();
                         }}
                         data-testid="edit-submission-error"
                       />
