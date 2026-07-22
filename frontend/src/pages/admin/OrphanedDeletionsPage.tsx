@@ -43,6 +43,12 @@ export const OrphanedDeletionsPage: React.FC = () => {
     clear: clearEcho,
     echoMessage,
   } = useCommandFeedback('admin-deletions');
+  // Two independent error slots: `error` is the load/refresh path (owned by
+  // fetchDeletions, cleared/overwritten by the 60s auto-refresh); `operationError`
+  // is the retry *command* (owned by handleRetry) and its paired echo. Keeping
+  // them separate stops the auto-refresh from clobbering a live retry result or
+  // orphaning the echo. The retry banner takes precedence over the load banner.
+  const [operationError, setOperationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchDeletions = useCallback(async () => {
@@ -56,6 +62,9 @@ export const OrphanedDeletionsPage: React.FC = () => {
     } else {
       // Sanitize the load error before display (no echo — load, not a command).
       setError(sanitizeCommandError(result.error, 'Failed to load orphaned deletions').display);
+      // A load failure supersedes a stale success banner (else both guards flip
+      // off and neither banner renders).
+      setSuccessMessage(null);
     }
 
     setLoading(false);
@@ -84,16 +93,20 @@ export const OrphanedDeletionsPage: React.FC = () => {
       return next;
     });
 
-    // Refresh the list first (it clears `error`), THEN apply the retry outcome so
-    // a failure isn't immediately wiped by the refresh. The org id is a caller
-    // reference only — never interpolated into the displayed (sanitized) message.
+    // Refresh the list first, THEN apply the retry outcome to the *command* slot
+    // (never touched by fetchDeletions), so a failure survives the refresh and the
+    // banner/echo stay in sync. The org id is a caller reference only — never
+    // interpolated into the displayed (sanitized) message.
     await fetchDeletions();
     if (result.success) {
-      setError(null);
+      setOperationError(null);
       clearEcho();
       setSuccessMessage('Deletion workflow retry queued.');
     } else {
-      setError(reportFailure(result.error, { fallback: 'Retry failed. Please try again.' }));
+      setSuccessMessage(null);
+      setOperationError(
+        reportFailure(result.error, { fallback: 'Retry failed. Please try again.' })
+      );
     }
   };
 
@@ -167,19 +180,21 @@ export const OrphanedDeletionsPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Command feedback — error takes precedence so exactly one live region
-          announces (INV-1); the echo is an aria-hidden visual copy. */}
+      {/* Command feedback — the retry command error takes precedence over the
+          load error, and error over success, so exactly one live region announces
+          (INV-1); the echo is an aria-hidden visual copy paired with the retry. */}
       {!successMessage && (
         <CommandFeedbackBanner
           kind="error"
-          message={error}
+          message={operationError ?? error}
           onDismiss={() => {
+            setOperationError(null);
             setError(null);
             clearEcho();
           }}
         />
       )}
-      {!error && (
+      {!operationError && !error && (
         <CommandFeedbackBanner
           kind="success"
           message={successMessage}
