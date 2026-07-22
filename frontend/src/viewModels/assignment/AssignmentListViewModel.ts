@@ -30,14 +30,16 @@ export class AssignmentListViewModel {
 
   constructor(
     private service: IAssignmentService = getAssignmentService(),
-    private settingsService: IDirectCareSettingsService = getDirectCareSettingsService(),
+    private settingsService: IDirectCareSettingsService = getDirectCareSettingsService()
   ) {
     makeAutoObservable(this);
   }
 
   /** Check whether the org has enable_staff_client_mapping enabled */
   async checkFeatureFlag(orgId: string): Promise<void> {
-    runInAction(() => { this.featureCheckLoading = true; });
+    runInAction(() => {
+      this.featureCheckLoading = true;
+    });
 
     try {
       const settings = await this.settingsService.getSettings(orgId);
@@ -82,6 +84,16 @@ export class AssignmentListViewModel {
       });
       log.error('Failed to load assignments', { error });
     }
+  }
+
+  /**
+   * Clear the load-error slot. Called when the command-feedback banner showing
+   * `error` is dismissed, and on a successful command, so the banner is actually
+   * dismissible and a swallowed background-reload failure can't strand a stale
+   * error over a successful assign/unassign.
+   */
+  clearError(): void {
+    this.error = null;
   }
 
   setFilterUserId(userId: string | null): void {

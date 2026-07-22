@@ -75,6 +75,7 @@ export const UserCaseloadPage: React.FC = observer(() => {
       setNewAssignedUntil('');
       setAssignReason('');
       setOperationError(null);
+      vm.clearError();
       clearEcho();
       setSuccessMessage('Client assigned.');
     } else {
@@ -94,6 +95,7 @@ export const UserCaseloadPage: React.FC = observer(() => {
       setUnassignTarget(null);
       setUnassignReason('');
       setOperationError(null);
+      vm.clearError();
       clearEcho();
       setSuccessMessage('Client unassigned.');
     } else {
@@ -157,26 +159,30 @@ export const UserCaseloadPage: React.FC = observer(() => {
         </div>
       )}
 
-      {/* Command feedback — error takes precedence so exactly one live region
-          announces (INV-1); the echo is an aria-hidden visual copy. operationError
-          (assign/unassign) wins over the load error. */}
-      {!successMessage && (
-        <CommandFeedbackBanner
-          kind="error"
-          message={
-            operationError ??
-            (vm.error ? sanitizeCommandError(vm.error, 'Failed to load assignments').display : null)
-          }
-          onDismiss={() => {
-            setOperationError(null);
-            clearEcho();
-          }}
-        />
-      )}
+      {/* Command feedback — the command error (operationError) takes precedence
+          over the load error, and the success banner yields to any error
+          (!operationError && !vm.error), so exactly one live region announces
+          (INV-1). The error banner self-hides on an empty message, so it needs no
+          successMessage guard — a live error is never suppressed by a stale
+          success. The echo is an aria-hidden visual copy. */}
+      <CommandFeedbackBanner
+        kind="error"
+        message={
+          operationError ??
+          (vm.error ? sanitizeCommandError(vm.error, 'Failed to load assignments').display : null)
+        }
+        data-testid="caseload-error-banner"
+        onDismiss={() => {
+          setOperationError(null);
+          vm.clearError();
+          clearEcho();
+        }}
+      />
       {!operationError && !vm.error && (
         <CommandFeedbackBanner
           kind="success"
           message={successMessage}
+          data-testid="caseload-success-banner"
           onDismiss={() => setSuccessMessage(null)}
         />
       )}

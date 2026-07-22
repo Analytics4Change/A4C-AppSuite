@@ -62,8 +62,7 @@ export const OrphanedDeletionsPage: React.FC = () => {
     } else {
       // Sanitize the load error before display (no echo — load, not a command).
       setError(sanitizeCommandError(result.error, 'Failed to load orphaned deletions').display);
-      // A load failure supersedes a stale success banner (else both guards flip
-      // off and neither banner renders).
+      // A load failure clears any stale success so only the error banner shows.
       setSuccessMessage(null);
     }
 
@@ -181,23 +180,26 @@ export const OrphanedDeletionsPage: React.FC = () => {
       </div>
 
       {/* Command feedback — the retry command error takes precedence over the
-          load error, and error over success, so exactly one live region announces
-          (INV-1); the echo is an aria-hidden visual copy paired with the retry. */}
-      {!successMessage && (
-        <CommandFeedbackBanner
-          kind="error"
-          message={operationError ?? error}
-          onDismiss={() => {
-            setOperationError(null);
-            setError(null);
-            clearEcho();
-          }}
-        />
-      )}
+          load error (operationError ?? error), and the success banner yields to
+          any error (!operationError && !error), so exactly one live region ever
+          announces (INV-1). The error banner self-hides on an empty message, so it
+          needs no successMessage guard — a live error can never be suppressed by a
+          stale success. The echo is an aria-hidden visual copy paired with retry. */}
+      <CommandFeedbackBanner
+        kind="error"
+        message={operationError ?? error}
+        data-testid="deletions-error-banner"
+        onDismiss={() => {
+          setOperationError(null);
+          setError(null);
+          clearEcho();
+        }}
+      />
       {!operationError && !error && (
         <CommandFeedbackBanner
           kind="success"
           message={successMessage}
+          data-testid="deletions-success-banner"
           onDismiss={() => setSuccessMessage(null)}
         />
       )}
