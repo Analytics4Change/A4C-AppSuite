@@ -45,6 +45,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const log = Logger.getLogger('component');
 
+/** Friendly fallback shown when the raw submit error looks internal. Shared by
+ *  the banner and the echo so the two surfaces can never desync. */
+const SUBMIT_ERROR_FALLBACK = 'Failed to create organization. Please try again or contact support.';
+
 // =============================================================================
 // Props Interface
 // =============================================================================
@@ -251,9 +255,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
         } else if (viewModel.submissionError) {
           // The banner (driven by submissionError) owns the announcement; fire the
           // aria-hidden echo for scroll-independence + log.warn the raw error.
-          reportFailure(viewModel.submissionError, {
-            fallback: 'Failed to create organization. Please try again or contact support.',
-          });
+          reportFailure(viewModel.submissionError, { fallback: SUBMIT_ERROR_FALLBACK });
         } else {
           log.warn('Organization submission returned null - staying on form');
         }
@@ -298,10 +300,7 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
             kind="error"
             message={
               viewModel.submissionError
-                ? sanitizeCommandError(
-                    viewModel.submissionError,
-                    'Failed to create organization. Please try again or contact support.'
-                  ).display
+                ? sanitizeCommandError(viewModel.submissionError, SUBMIT_ERROR_FALLBACK).display
                 : null
             }
             onDismiss={() => {
