@@ -9,8 +9,9 @@
  *      renders contextual recovery copy with
  *      `data-testid="role-modification-partial-warning"` and (if present)
  *      `data-testid="role-partial-processing-error"` for the masked PG error.
- *   3. Generic error → falls through to the message string from the VM or
- *      the page-level `operationError` state.
+ *   3. Generic error → falls through to the (already-sanitized) message string
+ *      from the VM or the page-level `operationError` state, rendered with
+ *      `data-testid="users-error-banner-message"`.
  *
  * Container always carries `data-testid="users-error-banner"`. Dismiss
  * button carries `data-testid="users-error-banner-dismiss"`. Extracted from
@@ -113,7 +114,9 @@ export const UsersErrorBanner = observer(
             ) : (
               <>
                 <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{error || operationError}</p>
+                <p className="text-red-700 text-sm mt-1" data-testid="users-error-banner-message">
+                  {error || operationError}
+                </p>
               </>
             )}
           </div>
