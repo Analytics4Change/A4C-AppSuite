@@ -29,6 +29,7 @@ import {
   EducationSection,
 } from './intake';
 import type { IntakeSectionProps } from './intake';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import { CheckCircle, AlertCircle, Circle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -199,7 +200,9 @@ export const ClientIntakePage: React.FC = observer(() => {
           </h3>
           <ul className="text-sm text-amber-700 list-disc ml-4">
             {vm.subEntityErrors.map((err, i) => (
-              <li key={i}>{err}</li>
+              <li key={i}>
+                {sanitizeCommandError(err, 'A related record could not be saved.').display}
+              </li>
             ))}
           </ul>
         </div>
@@ -212,7 +215,14 @@ export const ClientIntakePage: React.FC = observer(() => {
           role="alert"
           data-testid="intake-submit-error"
         >
-          <p className="text-sm text-red-700">{vm.submitError}</p>
+          <p className="text-sm text-red-700">
+            {
+              sanitizeCommandError(
+                vm.submitError,
+                'Client could not be registered. Please try again.'
+              ).display
+            }
+          </p>
         </div>
       )}
 
