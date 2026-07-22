@@ -41,6 +41,11 @@ import { OrganizationTree, OrganizationUnitFormFields } from '@/components/organ
 import { OrganizationUnitsViewModel } from '@/viewModels/organization/OrganizationUnitsViewModel';
 import { OrganizationUnitFormViewModel } from '@/viewModels/organization/OrganizationUnitFormViewModel';
 import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
+import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import {
   Plus,
   ChevronDown,
@@ -48,8 +53,6 @@ import {
   RefreshCw,
   Building2,
   MapPin,
-  AlertTriangle,
-  X,
   CheckCircle,
   XCircle,
   Save,
@@ -126,6 +129,33 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
 
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
+  // Command-result feedback: sanitize + log + drive the aria-hidden echo toast.
+  const { failed: reportFailure, clear: clearEcho, echoMessage } = useCommandFeedback('org-units');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Keep success/failure mutually exclusive; clearError() before setOperationError
+  // so the sanitized message wins over the VM's raw `error` on the banner.
+  const showCommandSuccess = useCallback(
+    (message: string) => {
+      viewModel.clearError();
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage(message);
+    },
+    [viewModel, clearEcho]
+  );
+  const showCommandFailure = useCallback(
+    (raw: unknown, opts?: CommandFailureOptions) => {
+      setSuccessMessage(null);
+      viewModel.clearError();
+      setOperationError(reportFailure(raw, opts));
+    },
+    [viewModel, reportFailure]
+  );
+
+  // Focus management for the form-blocking submit banner (create/edit are
+  // mutually exclusive, so one instance suffices). See useCommandFeedbackFocus.
+  const formFocus = useCommandFeedbackFocus(!!formViewModel?.submissionError);
 
   // Status filter state - read initial value from URL
   const statusParam = searchParams.get('status') as 'all' | 'active' | 'inactive' | null;
@@ -400,6 +430,10 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       e.preventDefault();
       if (!formViewModel) return;
 
+      // Remember the control that triggered submit so a banner dismiss can
+      // restore focus to it (only armed if a banner actually takes focus).
+      formFocus.captureTrigger();
+
       const result = await formViewModel.submit();
 
       if (result.success && result.unit) {
@@ -407,6 +441,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           mode: panelMode,
           unitId: result.unit.id,
         });
+        showCommandSuccess(panelMode === 'create' ? 'Organization unit created' : 'Changes saved');
 
         // Reload tree to reflect changes
         await viewModel.loadUnits();
@@ -422,9 +457,29 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           // After edit: stay on same unit, reload its data
           await selectAndLoadUnit(result.unit.id);
         }
+      } else if (formViewModel.submissionError) {
+        // Form-submit failure: the form's CommandFeedbackBanner (driven by
+        // submissionError) owns the single announcement. Clear any stale
+        // page-level error (INV-1) and fire the aria-hidden echo (+ log.warn).
+        viewModel.clearError();
+        setOperationError(null);
+        reportFailure(formViewModel.submissionError, {
+          fallback:
+            panelMode === 'create'
+              ? 'Failed to create organization unit'
+              : 'Failed to update organization unit',
+        });
       }
     },
-    [formViewModel, panelMode, viewModel, selectAndLoadUnit]
+    [
+      formViewModel,
+      panelMode,
+      viewModel,
+      selectAndLoadUnit,
+      formFocus,
+      showCommandSuccess,
+      reportFailure,
+    ]
   );
 
   // Handle cancel in form
@@ -461,17 +516,18 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Unit deactivated successfully', { unitId: currentUnit.id });
+        showCommandSuccess('Organization unit deactivated');
         await viewModel.loadUnits();
         await selectAndLoadUnit(currentUnit.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to deactivate unit');
+        showCommandFailure(result.error, { fallback: 'Failed to deactivate unit' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate unit');
+      showCommandFailure(error, { fallback: 'Failed to deactivate unit' });
     }
-  }, [currentUnit, viewModel, selectAndLoadUnit]);
+  }, [currentUnit, viewModel, selectAndLoadUnit, showCommandSuccess, showCommandFailure]);
 
   // Reactivate handlers
   const handleReactivateClick = useCallback(() => {
@@ -493,17 +549,18 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Unit reactivated successfully', { unitId: currentUnit.id });
+        showCommandSuccess('Organization unit reactivated');
         await viewModel.loadUnits();
         await selectAndLoadUnit(currentUnit.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to reactivate unit');
+        showCommandFailure(result.error, { fallback: 'Failed to reactivate unit' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate unit');
+      showCommandFailure(error, { fallback: 'Failed to reactivate unit' });
     }
-  }, [currentUnit, viewModel, selectAndLoadUnit]);
+  }, [currentUnit, viewModel, selectAndLoadUnit, showCommandSuccess, showCommandFailure]);
 
   // Delete handlers
   const handleDeleteClick = useCallback(() => {
@@ -530,6 +587,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Unit deleted successfully', { unitId: currentUnit.id });
+        showCommandSuccess('Organization unit deleted');
 
         const parentId = currentUnit.parentId;
         await viewModel.loadUnits();
@@ -562,13 +620,13 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         setDialogState({ type: 'hasRoles', count: result.errorDetails.count ?? 0 });
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to delete unit');
+        showCommandFailure(result.error, { fallback: 'Failed to delete unit' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to delete unit');
+      showCommandFailure(error, { fallback: 'Failed to delete unit' });
     }
-  }, [currentUnit, viewModel, selectAndLoadUnit]);
+  }, [currentUnit, viewModel, selectAndLoadUnit, showCommandSuccess, showCommandFailure]);
 
   // Handle "deactivate first" flow from active warning dialog
   const handleDeactivateFirst = useCallback(() => {
@@ -599,29 +657,37 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           </div>
         </div>
 
-        {/* Error Banner */}
-        {(viewModel.error || operationError) && (
-          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  viewModel.clearError();
-                  setOperationError(null);
-                }}
-                className="text-red-600 border-red-300"
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
+        {/* Error Banner — yields to the form-submit banner so exactly one
+            role="alert" region is ever mounted (INV-1). */}
+        {!formViewModel?.submissionError && (
+          <CommandFeedbackBanner
+            kind="error"
+            message={
+              viewModel.error
+                ? sanitizeCommandError(viewModel.error, 'Failed to load organization units.')
+                    .display
+                : operationError
+            }
+            data-testid="org-unit-manage-error-banner"
+            onDismiss={() => {
+              viewModel.clearError();
+              setOperationError(null);
+              setSuccessMessage(null);
+              clearEcho();
+            }}
+          />
         )}
+        {/* Success Banner (authoritative surface for command success) */}
+        {!operationError && !viewModel.error && !formViewModel?.submissionError && (
+          <CommandFeedbackBanner
+            kind="success"
+            message={successMessage}
+            data-testid="org-unit-manage-success-banner"
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        )}
+        {/* Failure echo — aria-hidden visual copy, scroll-independent (INV-2 by construction) */}
+        <CommandFeedbackEcho message={echoMessage} />
 
         {/* Layout: Full-width for view-only users, split view for users with write permissions */}
         <div className={cn('grid grid-cols-1 gap-6', hasAnyWritePermission && 'lg:grid-cols-3')}>
@@ -852,31 +918,26 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Submission Error */}
-                      {formViewModel.submissionError && (
-                        <div
-                          className="p-4 rounded-lg border border-red-300 bg-red-50"
-                          role="alert"
-                        >
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                            <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">Failed to create unit</h4>
-                              <p className="text-red-700 text-sm mt-1">
-                                {formViewModel.submissionError}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => formViewModel.clearSubmissionError()}
-                              className="text-red-600 hover:text-red-800"
-                              aria-label="Dismiss error"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Submission Error — shared command-feedback banner (the
+                          single announcement); focus moves here on failure. */}
+                      <CommandFeedbackBanner
+                        ref={formFocus.bannerRef}
+                        kind="error"
+                        message={
+                          formViewModel.submissionError
+                            ? sanitizeCommandError(
+                                formViewModel.submissionError,
+                                'Failed to create organization unit'
+                              ).display
+                            : null
+                        }
+                        onDismiss={() => {
+                          formViewModel.clearSubmissionError();
+                          clearEcho();
+                          formFocus.restore();
+                        }}
+                        data-testid="org-unit-create-submission-error"
+                      />
 
                       {/* Parent Unit Dropdown */}
                       <div className="space-y-1.5">
@@ -1024,33 +1085,26 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
                     </CardHeader>
                     <CardContent className="p-6">
                       <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Submission Error */}
-                        {formViewModel.submissionError && (
-                          <div
-                            className="p-4 rounded-lg border border-red-300 bg-red-50"
-                            role="alert"
-                          >
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                              <div className="flex-1">
-                                <h4 className="text-red-800 font-semibold">
-                                  Failed to update unit
-                                </h4>
-                                <p className="text-red-700 text-sm mt-1">
-                                  {formViewModel.submissionError}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => formViewModel.clearSubmissionError()}
-                                className="text-red-600 hover:text-red-800"
-                                aria-label="Dismiss error"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        {/* Submission Error — shared command-feedback banner (the
+                            single announcement); focus moves here on failure. */}
+                        <CommandFeedbackBanner
+                          ref={formFocus.bannerRef}
+                          kind="error"
+                          message={
+                            formViewModel.submissionError
+                              ? sanitizeCommandError(
+                                  formViewModel.submissionError,
+                                  'Failed to update organization unit'
+                                ).display
+                              : null
+                          }
+                          onDismiss={() => {
+                            formViewModel.clearSubmissionError();
+                            clearEcho();
+                            formFocus.restore();
+                          }}
+                          data-testid="org-unit-edit-submission-error"
+                        />
 
                         {/* Path Display (read-only) */}
                         <div className="space-y-1.5">

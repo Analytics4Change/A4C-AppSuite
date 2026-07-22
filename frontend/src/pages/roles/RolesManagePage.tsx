@@ -24,6 +24,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DangerZone } from '@/components/ui/DangerZone';
+import { useCommandFeedback, type CommandFailureOptions } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import {
   RoleList,
   RoleFormFields,
@@ -43,8 +48,6 @@ import {
   RefreshCw,
   ArrowLeft,
   Shield,
-  AlertTriangle,
-  X,
   CheckCircle,
   XCircle,
   Save,
@@ -108,6 +111,33 @@ export const RolesManagePage: React.FC = observer(() => {
 
   // Error states
   const [operationError, setOperationError] = useState<string | null>(null);
+  // Command-result feedback: sanitize + log + drive the aria-hidden echo toast.
+  const { failed: reportFailure, clear: clearEcho, echoMessage } = useCommandFeedback('roles');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Keep success/failure mutually exclusive; clearError() before setOperationError
+  // so the sanitized message wins over the VM's raw `error` on the banner.
+  const showCommandSuccess = useCallback(
+    (message: string) => {
+      viewModel.clearError();
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage(message);
+    },
+    [viewModel, clearEcho]
+  );
+  const showCommandFailure = useCallback(
+    (raw: unknown, opts?: CommandFailureOptions) => {
+      setSuccessMessage(null);
+      viewModel.clearError();
+      setOperationError(reportFailure(raw, opts));
+    },
+    [viewModel, reportFailure]
+  );
+
+  // Focus management for the form-blocking submit banner (create/edit are
+  // mutually exclusive, so one instance suffices). See useCommandFeedbackFocus.
+  const formFocus = useCommandFeedbackFocus(!!formViewModel?.submissionError);
 
   // OU tree nodes for scope selection
   const [ouNodes, setOuNodes] = useState<OrganizationUnitNode[]>([]);
@@ -320,6 +350,10 @@ export const RolesManagePage: React.FC = observer(() => {
       e.preventDefault();
       if (!formViewModel) return;
 
+      // Remember the control that triggered submit so a banner dismiss can
+      // restore focus to it (only armed if a banner actually takes focus).
+      formFocus.captureTrigger();
+
       const result = await formViewModel.submit();
 
       if (result.success && result.role) {
@@ -327,24 +361,36 @@ export const RolesManagePage: React.FC = observer(() => {
           mode: panelMode,
           roleId: result.role.id,
         });
+        showCommandSuccess(panelMode === 'create' ? 'Role created' : 'Changes saved');
 
         try {
           await viewModel.refresh();
-
-          if (panelMode === 'create') {
-            await selectAndLoadRole(result.role.id);
-          } else {
-            await selectAndLoadRole(result.role.id);
-          }
+          await selectAndLoadRole(result.role.id);
         } catch (err) {
           log.error('Failed to transition after save', err);
-          setOperationError('Role was saved but failed to reload. Please refresh the page.');
+          showCommandFailure('Role was saved but failed to reload. Please refresh the page.');
         }
-      } else if (!result.success) {
-        setOperationError(result.error || 'Failed to save role');
+      } else if (formViewModel.submissionError) {
+        // Form-submit failure: the form's CommandFeedbackBanner (driven by
+        // submissionError) owns the single announcement. Clear any stale
+        // page-level error (INV-1) and fire the aria-hidden echo (+ log.warn).
+        viewModel.clearError();
+        setOperationError(null);
+        reportFailure(formViewModel.submissionError, {
+          fallback: panelMode === 'create' ? 'Failed to create role' : 'Failed to update role',
+        });
       }
     },
-    [formViewModel, panelMode, viewModel, selectAndLoadRole]
+    [
+      formViewModel,
+      panelMode,
+      viewModel,
+      selectAndLoadRole,
+      formFocus,
+      showCommandSuccess,
+      showCommandFailure,
+      reportFailure,
+    ]
   );
 
   // Handle cancel in form
@@ -384,16 +430,17 @@ export const RolesManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Role deactivated successfully', { roleId: currentRole.id });
+        showCommandSuccess('Role deactivated');
         await selectAndLoadRole(currentRole.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to deactivate role');
+        showCommandFailure(result.error, { fallback: 'Failed to deactivate role' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to deactivate role');
+      showCommandFailure(error, { fallback: 'Failed to deactivate role' });
     }
-  }, [currentRole, viewModel, selectAndLoadRole]);
+  }, [currentRole, viewModel, selectAndLoadRole, showCommandSuccess, showCommandFailure]);
 
   // Reactivate handlers
   const handleReactivateClick = useCallback(() => {
@@ -414,16 +461,17 @@ export const RolesManagePage: React.FC = observer(() => {
       if (result.success) {
         setDialogState({ type: 'none' });
         log.info('Role reactivated successfully', { roleId: currentRole.id });
+        showCommandSuccess('Role reactivated');
         await selectAndLoadRole(currentRole.id);
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to reactivate role');
+        showCommandFailure(result.error, { fallback: 'Failed to reactivate role' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to reactivate role');
+      showCommandFailure(error, { fallback: 'Failed to reactivate role' });
     }
-  }, [currentRole, viewModel, selectAndLoadRole]);
+  }, [currentRole, viewModel, selectAndLoadRole, showCommandSuccess, showCommandFailure]);
 
   // Delete handlers
   const handleDeleteClick = useCallback(async () => {
@@ -466,6 +514,7 @@ export const RolesManagePage: React.FC = observer(() => {
         setPanelMode('empty');
         setFormViewModel(null);
         setCurrentRole(null);
+        showCommandSuccess('Role deleted');
         // Clear stale URL params so the URL→state effect doesn't re-select
         // the just-deleted entity and surface a stale "could not load" error.
         setSearchParams(
@@ -478,13 +527,13 @@ export const RolesManagePage: React.FC = observer(() => {
         );
       } else {
         setDialogState({ type: 'none' });
-        setOperationError(result.error || 'Failed to delete role');
+        showCommandFailure(result.error, { fallback: 'Failed to delete role' });
       }
     } catch (error) {
       setDialogState({ type: 'none' });
-      setOperationError(error instanceof Error ? error.message : 'Failed to delete role');
+      showCommandFailure(error, { fallback: 'Failed to delete role' });
     }
-  }, [currentRole, viewModel, setSearchParams]);
+  }, [currentRole, viewModel, setSearchParams, showCommandSuccess, showCommandFailure]);
 
   // Handle "deactivate first" flow from active warning dialog
   const handleDeactivateFirst = useCallback(() => {
@@ -568,29 +617,36 @@ export const RolesManagePage: React.FC = observer(() => {
           </div>
         </div>
 
-        {/* Error Banner */}
-        {(viewModel.error || operationError) && (
-          <div className="mb-6 p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-red-800 font-semibold">Error</h3>
-                <p className="text-red-700 text-sm mt-1">{viewModel.error || operationError}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  viewModel.clearError();
-                  setOperationError(null);
-                }}
-                className="text-red-600 border-red-300"
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
+        {/* Error Banner — yields to the form-submit banner so exactly one
+            role="alert" region is ever mounted (INV-1). */}
+        {!formViewModel?.submissionError && (
+          <CommandFeedbackBanner
+            kind="error"
+            message={
+              viewModel.error
+                ? sanitizeCommandError(viewModel.error, 'Failed to load roles.').display
+                : operationError
+            }
+            data-testid="role-manage-error-banner"
+            onDismiss={() => {
+              viewModel.clearError();
+              setOperationError(null);
+              setSuccessMessage(null);
+              clearEcho();
+            }}
+          />
         )}
+        {/* Success Banner (authoritative surface for command success) */}
+        {!operationError && !viewModel.error && !formViewModel?.submissionError && (
+          <CommandFeedbackBanner
+            kind="success"
+            message={successMessage}
+            data-testid="role-manage-success-banner"
+            onDismiss={() => setSuccessMessage(null)}
+          />
+        )}
+        {/* Failure echo — aria-hidden visual copy, scroll-independent (INV-2 by construction) */}
+        <CommandFeedbackEcho message={echoMessage} />
 
         {/* Split View Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -658,28 +714,26 @@ export const RolesManagePage: React.FC = observer(() => {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Submission Error */}
-                    {formViewModel.submissionError && (
-                      <div className="p-4 rounded-lg border border-red-300 bg-red-50" role="alert">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                          <div className="flex-1">
-                            <h4 className="text-red-800 font-semibold">Failed to create role</h4>
-                            <p className="text-red-700 text-sm mt-1">
-                              {formViewModel.submissionError}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => formViewModel.clearSubmissionError()}
-                            className="text-red-600 hover:text-red-800"
-                            aria-label="Dismiss error"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* Submission Error — shared command-feedback banner (the
+                        single announcement); focus moves here on failure. */}
+                    <CommandFeedbackBanner
+                      ref={formFocus.bannerRef}
+                      kind="error"
+                      message={
+                        formViewModel.submissionError
+                          ? sanitizeCommandError(
+                              formViewModel.submissionError,
+                              'Failed to create role'
+                            ).display
+                          : null
+                      }
+                      onDismiss={() => {
+                        formViewModel.clearSubmissionError();
+                        clearEcho();
+                        formFocus.restore();
+                      }}
+                      data-testid="role-create-submission-error"
+                    />
 
                     {/* Form Fields */}
                     <RoleFormFields
@@ -831,31 +885,26 @@ export const RolesManagePage: React.FC = observer(() => {
                   </CardHeader>
                   <CardContent className="p-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Submission Error */}
-                      {formViewModel.submissionError && (
-                        <div
-                          className="p-4 rounded-lg border border-red-300 bg-red-50"
-                          role="alert"
-                        >
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                            <div className="flex-1">
-                              <h4 className="text-red-800 font-semibold">Failed to update role</h4>
-                              <p className="text-red-700 text-sm mt-1">
-                                {formViewModel.submissionError}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => formViewModel.clearSubmissionError()}
-                              className="text-red-600 hover:text-red-800"
-                              aria-label="Dismiss error"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Submission Error — shared command-feedback banner (the
+                          single announcement); focus moves here on failure. */}
+                      <CommandFeedbackBanner
+                        ref={formFocus.bannerRef}
+                        kind="error"
+                        message={
+                          formViewModel.submissionError
+                            ? sanitizeCommandError(
+                                formViewModel.submissionError,
+                                'Failed to update role'
+                              ).display
+                            : null
+                        }
+                        onDismiss={() => {
+                          formViewModel.clearSubmissionError();
+                          clearEcho();
+                          formFocus.restore();
+                        }}
+                        data-testid="role-edit-submission-error"
+                      />
 
                       {/* Form Fields */}
                       <RoleFormFields
