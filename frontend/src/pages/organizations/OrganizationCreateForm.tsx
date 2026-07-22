@@ -32,8 +32,13 @@ import { PhoneInputEnhanced } from '@/components/organizations/PhoneInputEnhance
 import { ReferringPartnerDropdown } from '@/components/organizations/ReferringPartnerDropdown';
 import { SubdomainInput } from '@/components/organization/SubdomainInput';
 import { OrganizationFormViewModel } from '@/viewModels/organization/OrganizationFormViewModel';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import { US_TIME_ZONES, ORGANIZATION_TYPES, PARTNER_TYPES } from '@/constants';
-import { Save, Send, ChevronDown, AlertTriangle, X, User, MapPin, Phone } from 'lucide-react';
+import { Save, Send, ChevronDown, User, MapPin, Phone } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import { Logger } from '@/utils/logger';
 import { useAuth } from '@/contexts/AuthContext';
@@ -199,6 +204,16 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
     const [viewModel] = useState(() => new OrganizationFormViewModel());
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Command-result feedback: sanitize + log + drive the aria-hidden echo, and
+    // move focus to the banner on a form-blocking submit failure. Success
+    // navigates to the bootstrap status page, so there's no same-page success.
+    const {
+      failed: reportFailure,
+      clear: clearEcho,
+      echoMessage,
+    } = useCommandFeedback('organization-create');
+    const submitFocus = useCommandFeedbackFocus(!!viewModel.submissionError);
+
     // Auto-save effect (debounced)
     useEffect(() => {
       if (viewModel.isDirty) {
@@ -223,13 +238,22 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
       }
 
       setIsSubmitting(true);
+      // Remember the trigger so a banner dismiss can restore focus to it.
+      submitFocus.captureTrigger();
 
       try {
         const organizationId = await viewModel.submit();
 
         if (organizationId) {
           log.info('Organization workflow started', { organizationId });
+          clearEcho();
           onSubmitSuccess(organizationId);
+        } else if (viewModel.submissionError) {
+          // The banner (driven by submissionError) owns the announcement; fire the
+          // aria-hidden echo for scroll-independence + log.warn the raw error.
+          reportFailure(viewModel.submissionError, {
+            fallback: 'Failed to create organization. Please try again or contact support.',
+          });
         } else {
           log.warn('Organization submission returned null - staying on form');
         }
@@ -266,34 +290,28 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
     return (
       <div data-testid="org-create-form">
         <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-4">
-          {/* Submission Error Banner */}
-          {viewModel.submissionError && (
-            <div
-              className="p-4 rounded-lg border border-red-300 bg-red-50"
-              role="alert"
-              aria-live="assertive"
-              data-testid="org-create-submit-error"
-            >
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="text-red-800 font-semibold">Organization Submission Failed</h3>
-                  <p className="text-red-700 text-sm mt-1">{viewModel.submissionError}</p>
-                  <p className="text-red-600 text-xs mt-2">
-                    Please check the form and try again. If the problem persists, contact support.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => viewModel.clearSubmissionError()}
-                  className="flex-shrink-0 text-red-600 hover:text-red-800"
-                  aria-label="Dismiss error"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Submission Error — shared command-feedback banner (the single
+              announcement); focus moves here on failure. Success navigates to the
+              bootstrap status page, so there's no same-page success banner. */}
+          <CommandFeedbackBanner
+            ref={submitFocus.bannerRef}
+            kind="error"
+            message={
+              viewModel.submissionError
+                ? sanitizeCommandError(
+                    viewModel.submissionError,
+                    'Failed to create organization. Please try again or contact support.'
+                  ).display
+                : null
+            }
+            onDismiss={() => {
+              viewModel.clearSubmissionError();
+              clearEcho();
+              submitFocus.restore();
+            }}
+            data-testid="org-create-submit-error"
+          />
+          <CommandFeedbackEcho message={echoMessage} />
 
           {/* Organization Details Card */}
           <Card className="shadow-lg" data-testid="org-create-section-general">
