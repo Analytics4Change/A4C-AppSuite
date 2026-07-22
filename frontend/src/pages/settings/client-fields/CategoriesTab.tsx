@@ -407,6 +407,7 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                     {viewModel.updateCategoryError && (
                       <div
                         role="alert"
+                        data-testid="cat-edit-error-alert"
                         className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
                       >
                         <AlertCircle size={14} />

@@ -563,6 +563,7 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                       {viewModel.updateFieldError && (
                         <div
                           role="alert"
+                          data-testid="cf-edit-error-alert"
                           className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
                         >
                           <AlertCircle size={14} />

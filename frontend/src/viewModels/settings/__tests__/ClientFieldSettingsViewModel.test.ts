@@ -669,6 +669,9 @@ describe('ClientFieldSettingsViewModel', () => {
         expect.any(String)
       );
       expect(mockService.listFieldDefinitions).toHaveBeenCalledTimes(2);
+      // Command feedback: the deactivate bonus surfaces a success message.
+      expect(vm.successMessage).toBe('Field deactivated');
+      expect(vm.fieldLifecycleError).toBeNull();
     });
 
     it('returns false on service failure', async () => {
@@ -682,6 +685,9 @@ describe('ClientFieldSettingsViewModel', () => {
 
       const result = await vm.deactivateCustomField('field-cfg', 'reason', 'org-123');
       expect(result).toBe(false);
+      // Command feedback: failure sets the lifecycle error slot, no success.
+      expect(vm.fieldLifecycleError).toBe('Not found');
+      expect(vm.successMessage).toBeNull();
     });
 
     it('returns false on exception', async () => {
@@ -762,6 +768,9 @@ describe('ClientFieldSettingsViewModel', () => {
         expect.any(String)
       );
       expect(mockService.listFieldCategories).toHaveBeenCalledTimes(2);
+      // Command feedback: the deactivate bonus surfaces a success message.
+      expect(vm.successMessage).toBe('Category deactivated');
+      expect(vm.categoryLifecycleError).toBeNull();
     });
 
     it('returns false on service failure', async () => {
@@ -775,6 +784,9 @@ describe('ClientFieldSettingsViewModel', () => {
 
       const result = await vm.deactivateCategory('cat-01', 'reason', 'org-123');
       expect(result).toBe(false);
+      // Command feedback: failure sets the lifecycle error slot, no success.
+      expect(vm.categoryLifecycleError).toBe('System category');
+      expect(vm.successMessage).toBeNull();
     });
 
     it('returns false on exception', async () => {
