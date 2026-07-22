@@ -754,7 +754,12 @@ export const UsersManagePage: React.FC = observer(() => {
         {!formViewModel?.submissionError && (
           <UsersErrorBanner
             ref={richFocus.bannerRef}
-            error={viewModel.error}
+            error={
+              viewModel.error
+                ? sanitizeCommandError(viewModel.error, 'Something went wrong. Please try again.')
+                    .display
+                : null
+            }
             operationError={operationError}
             lastRoleViolations={viewModel.lastRoleViolations}
             lastRolePartialFailure={viewModel.lastRolePartialFailure}

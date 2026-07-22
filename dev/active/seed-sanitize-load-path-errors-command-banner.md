@@ -26,4 +26,8 @@ PR #91 already fixed the one per-page raw seed it introduced into scope (`Organi
 - `grep -rnE 'viewModel\.error \|\| operationError|error \|\| operationError' frontend/src/pages` — every hit sanitized or routed.
 - `tsc`/`eslint`/`build` green.
 
-## Not started. LOW / cleanup (pre-existing). Good companion to the Tier-2 (PR 3) command-feedback work.
+## ✅ DONE
+
+- **Siblings** (Roles, Organizations, Org-Units, Schedules): sanitized inline in PR #91 (`32ecc1fc`).
+- **Users** (`feat/command-feedback-users-load-path`, 2026-07-22): the last surface. `UsersManagePage` now sanitizes the `error` prop passed to `UsersErrorBanner` — `error={viewModel.error ? sanitizeCommandError(viewModel.error, 'Something went wrong. Please try again.').display : null}` — closing the raw load-error path (notably `UsersViewModel` L520 interpolates a raw `errorMessage` into `this.error`). The `operationError` prop was already sanitized (via `showCommandFailure`); the rich role-violation / partial-failure variants render structured messages and are out of scope. The success-banner `!viewModel.error` guard is a boolean check (unaffected).
+- `tsc`/`eslint`/`build` green; UsersErrorBanner + users VM tests pass (17).
