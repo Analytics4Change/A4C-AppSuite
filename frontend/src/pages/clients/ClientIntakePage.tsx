@@ -29,6 +29,9 @@ import {
   EducationSection,
 } from './intake';
 import type { IntakeSectionProps } from './intake';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
 import { CheckCircle, AlertCircle, Circle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -89,6 +92,15 @@ export const ClientIntakePage: React.FC = observer(() => {
 
   const vm = useMemo(() => new ClientIntakeFormViewModel(), []);
 
+  // Command-result feedback: the submit banner owns the announcement (INV-1); this
+  // drives the aria-hidden echo so a failure is seen even when the banner is
+  // scrolled off-screen on this long, multi-section form.
+  const {
+    failed: reportFailure,
+    clear: clearEcho,
+    echoMessage,
+  } = useCommandFeedback('client-intake');
+
   useEffect(() => {
     vm.loadFieldDefinitions();
     vm.loadOrganizationUnits();
@@ -107,6 +119,15 @@ export const ClientIntakePage: React.FC = observer(() => {
   const handleSubmit = async () => {
     if (!orgId) return;
     await vm.submit(orgId);
+    // Fire the scroll-independent failure echo (banner still owns the
+    // announcement). Same fallback as the banner so the two surfaces match.
+    if (vm.submitError) {
+      reportFailure(vm.submitError, {
+        fallback: 'Client could not be registered. Please try again.',
+      });
+    } else {
+      clearEcho();
+    }
   };
 
   const handlePrevious = () => {
@@ -199,7 +220,9 @@ export const ClientIntakePage: React.FC = observer(() => {
           </h3>
           <ul className="text-sm text-amber-700 list-disc ml-4">
             {vm.subEntityErrors.map((err, i) => (
-              <li key={i}>{err}</li>
+              <li key={i}>
+                {sanitizeCommandError(err, 'A related record could not be saved.').display}
+              </li>
             ))}
           </ul>
         </div>
@@ -212,9 +235,19 @@ export const ClientIntakePage: React.FC = observer(() => {
           role="alert"
           data-testid="intake-submit-error"
         >
-          <p className="text-sm text-red-700">{vm.submitError}</p>
+          <p className="text-sm text-red-700">
+            {
+              sanitizeCommandError(
+                vm.submitError,
+                'Client could not be registered. Please try again.'
+              ).display
+            }
+          </p>
         </div>
       )}
+
+      {/* Failure echo — aria-hidden visual copy, scroll-independent (INV-2 by construction) */}
+      <CommandFeedbackEcho message={echoMessage} />
 
       {/* Main layout: sidebar + content */}
       <div className="flex gap-6">

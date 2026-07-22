@@ -22,7 +22,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { orphanedDeletionService } from '@/services/admin/OrphanedDeletionService';
 import type { OrphanedDeletion } from '@/services/admin/OrphanedDeletionService';
-import { RefreshCw, RotateCcw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
+import { RefreshCw, RotateCcw, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const AUTO_REFRESH_INTERVAL = 60_000;
 
@@ -33,6 +37,19 @@ export const OrphanedDeletionsPage: React.FC = () => {
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  // Command-result feedback: sanitize + log + drive the aria-hidden echo toast.
+  const {
+    failed: reportFailure,
+    clear: clearEcho,
+    echoMessage,
+  } = useCommandFeedback('admin-deletions');
+  // Two independent error slots: `error` is the load/refresh path (owned by
+  // fetchDeletions, cleared/overwritten by the 60s auto-refresh); `operationError`
+  // is the retry *command* (owned by handleRetry) and its paired echo. Keeping
+  // them separate stops the auto-refresh from clobbering a live retry result or
+  // orphaning the echo. The retry banner takes precedence over the load banner.
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchDeletions = useCallback(async () => {
     setLoading(true);
@@ -43,7 +60,10 @@ export const OrphanedDeletionsPage: React.FC = () => {
     if (result.success && result.data) {
       setDeletions(result.data);
     } else {
-      setError(result.error ?? 'Failed to fetch data');
+      // Sanitize the load error before display (no echo — load, not a command).
+      setError(sanitizeCommandError(result.error, 'Failed to load orphaned deletions').display);
+      // A load failure clears any stale success so only the error banner shows.
+      setSuccessMessage(null);
     }
 
     setLoading(false);
@@ -62,12 +82,9 @@ export const OrphanedDeletionsPage: React.FC = () => {
 
   const handleRetry = async (orgId: string) => {
     setRetrying((prev) => new Set(prev).add(orgId));
+    setSuccessMessage(null);
 
     const result = await orphanedDeletionService.retryDeletionWorkflow(orgId);
-
-    if (!result.success) {
-      setError(`Retry failed for ${orgId}: ${result.error}`);
-    }
 
     setRetrying((prev) => {
       const next = new Set(prev);
@@ -75,8 +92,21 @@ export const OrphanedDeletionsPage: React.FC = () => {
       return next;
     });
 
-    // Refresh the list after retry
+    // Refresh the list first, THEN apply the retry outcome to the *command* slot
+    // (never touched by fetchDeletions), so a failure survives the refresh and the
+    // banner/echo stay in sync. The org id is a caller reference only — never
+    // interpolated into the displayed (sanitized) message.
     await fetchDeletions();
+    if (result.success) {
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage('Deletion workflow retry queued.');
+    } else {
+      setSuccessMessage(null);
+      setOperationError(
+        reportFailure(result.error, { fallback: 'Retry failed. Please try again.' })
+      );
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -149,16 +179,31 @@ export const OrphanedDeletionsPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-red-800">Error</p>
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        </div>
+      {/* Command feedback — the retry command error takes precedence over the
+          load error (operationError ?? error), and the success banner yields to
+          any error (!operationError && !error), so exactly one live region ever
+          announces (INV-1). The error banner self-hides on an empty message, so it
+          needs no successMessage guard — a live error can never be suppressed by a
+          stale success. The echo is an aria-hidden visual copy paired with retry. */}
+      <CommandFeedbackBanner
+        kind="error"
+        message={operationError ?? error}
+        data-testid="deletions-error-banner"
+        onDismiss={() => {
+          setOperationError(null);
+          setError(null);
+          clearEcho();
+        }}
+      />
+      {!operationError && !error && (
+        <CommandFeedbackBanner
+          kind="success"
+          message={successMessage}
+          data-testid="deletions-success-banner"
+          onDismiss={() => setSuccessMessage(null)}
+        />
       )}
+      <CommandFeedbackEcho message={echoMessage} />
 
       {/* Table */}
       <Card>

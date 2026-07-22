@@ -9,6 +9,7 @@ import { AlertCircle, ArrowLeft, Info } from 'lucide-react';
 import { isMockAuth } from '@/services/auth/AuthProviderFactory';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { toast } from 'sonner';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
@@ -145,8 +146,9 @@ export const ResetPasswordPage: React.FC = () => {
       navigate('/login', { replace: true });
     } catch (err) {
       log.error('[ResetPasswordPage] Password update failed', err);
+      // Sanitize before display; the raw error is already logged above.
       setSubmitError(
-        err instanceof Error ? err.message : 'Failed to update password. Please try again.'
+        sanitizeCommandError(err, 'Failed to update password. Please try again.').display
       );
       setPageState('form');
     }
@@ -252,7 +254,6 @@ export const ResetPasswordPage: React.FC = () => {
         <div
           className="flex items-center gap-2 text-sm text-red-600 bg-red-50/80 backdrop-blur-sm p-3 rounded-md"
           role="alert"
-          aria-live="polite"
         >
           <AlertCircle className="w-4 h-4" />
           <span>{submitError}</span>
