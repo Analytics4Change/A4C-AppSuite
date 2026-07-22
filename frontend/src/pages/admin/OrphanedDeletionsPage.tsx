@@ -22,7 +22,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { orphanedDeletionService } from '@/services/admin/OrphanedDeletionService';
 import type { OrphanedDeletion } from '@/services/admin/OrphanedDeletionService';
-import { RefreshCw, RotateCcw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
+import { RefreshCw, RotateCcw, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const AUTO_REFRESH_INTERVAL = 60_000;
 
@@ -33,6 +37,13 @@ export const OrphanedDeletionsPage: React.FC = () => {
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  // Command-result feedback: sanitize + log + drive the aria-hidden echo toast.
+  const {
+    failed: reportFailure,
+    clear: clearEcho,
+    echoMessage,
+  } = useCommandFeedback('admin-deletions');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchDeletions = useCallback(async () => {
     setLoading(true);
@@ -43,7 +54,8 @@ export const OrphanedDeletionsPage: React.FC = () => {
     if (result.success && result.data) {
       setDeletions(result.data);
     } else {
-      setError(result.error ?? 'Failed to fetch data');
+      // Sanitize the load error before display (no echo — load, not a command).
+      setError(sanitizeCommandError(result.error, 'Failed to load orphaned deletions').display);
     }
 
     setLoading(false);
@@ -62,12 +74,9 @@ export const OrphanedDeletionsPage: React.FC = () => {
 
   const handleRetry = async (orgId: string) => {
     setRetrying((prev) => new Set(prev).add(orgId));
+    setSuccessMessage(null);
 
     const result = await orphanedDeletionService.retryDeletionWorkflow(orgId);
-
-    if (!result.success) {
-      setError(`Retry failed for ${orgId}: ${result.error}`);
-    }
 
     setRetrying((prev) => {
       const next = new Set(prev);
@@ -75,8 +84,17 @@ export const OrphanedDeletionsPage: React.FC = () => {
       return next;
     });
 
-    // Refresh the list after retry
+    // Refresh the list first (it clears `error`), THEN apply the retry outcome so
+    // a failure isn't immediately wiped by the refresh. The org id is a caller
+    // reference only — never interpolated into the displayed (sanitized) message.
     await fetchDeletions();
+    if (result.success) {
+      setError(null);
+      clearEcho();
+      setSuccessMessage('Deletion workflow retry queued.');
+    } else {
+      setError(reportFailure(result.error, { fallback: 'Retry failed. Please try again.' }));
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -149,16 +167,26 @@ export const OrphanedDeletionsPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-red-800">Error</p>
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        </div>
+      {/* Command feedback — error takes precedence so exactly one live region
+          announces (INV-1); the echo is an aria-hidden visual copy. */}
+      {!successMessage && (
+        <CommandFeedbackBanner
+          kind="error"
+          message={error}
+          onDismiss={() => {
+            setError(null);
+            clearEcho();
+          }}
+        />
       )}
+      {!error && (
+        <CommandFeedbackBanner
+          kind="success"
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+        />
+      )}
+      <CommandFeedbackEcho message={echoMessage} />
 
       {/* Table */}
       <Card>

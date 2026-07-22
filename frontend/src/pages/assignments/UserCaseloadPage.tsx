@@ -11,6 +11,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, UserCheck, UserPlus, UserMinus, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignmentListViewModel } from '@/viewModels/assignment/AssignmentListViewModel';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 
 export const UserCaseloadPage: React.FC = observer(() => {
   const { userId } = useParams<{ userId: string }>();
@@ -30,6 +34,17 @@ export const UserCaseloadPage: React.FC = observer(() => {
   const [unassignTarget, setUnassignTarget] = useState<string | null>(null);
   const [unassignReason, setUnassignReason] = useState('');
   const [isUnassigning, setIsUnassigning] = useState(false);
+
+  // Command-result feedback. assignClient/unassignClient swallow the raw error
+  // (logged in the VM) and return only a boolean, so command failures surface a
+  // generic op-specific fallback; vm.error is the separate load-error surface.
+  const {
+    failed: reportFailure,
+    clear: clearEcho,
+    echoMessage,
+  } = useCommandFeedback('assignments');
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const orgId = session?.claims?.org_id;
@@ -59,6 +74,14 @@ export const UserCaseloadPage: React.FC = observer(() => {
       setNewNotes('');
       setNewAssignedUntil('');
       setAssignReason('');
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage('Client assigned.');
+    } else {
+      setSuccessMessage(null);
+      setOperationError(
+        reportFailure(null, { fallback: 'Failed to assign client. Please try again.' })
+      );
     }
   };
 
@@ -70,6 +93,14 @@ export const UserCaseloadPage: React.FC = observer(() => {
     if (success) {
       setUnassignTarget(null);
       setUnassignReason('');
+      setOperationError(null);
+      clearEcho();
+      setSuccessMessage('Client unassigned.');
+    } else {
+      setSuccessMessage(null);
+      setOperationError(
+        reportFailure(null, { fallback: 'Failed to unassign client. Please try again.' })
+      );
     }
   };
 
@@ -91,17 +122,26 @@ export const UserCaseloadPage: React.FC = observer(() => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{userName}&apos;s Caseload</h1>
           <p className="text-sm text-gray-500">
-            {vm.assignments.filter((a) => a.is_active).length} active assignment{vm.assignments.filter((a) => a.is_active).length !== 1 ? 's' : ''}
+            {vm.assignments.filter((a) => a.is_active).length} active assignment
+            {vm.assignments.filter((a) => a.is_active).length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
 
       {/* Feature flag banner */}
       {vm.featureEnabled === false && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3" role="status">
-          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3"
+          role="status"
+        >
+          <AlertTriangle
+            className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5"
+            aria-hidden="true"
+          />
           <div>
-            <p className="text-sm font-medium text-amber-800">Staff-Client Mapping is not enabled</p>
+            <p className="text-sm font-medium text-amber-800">
+              Staff-Client Mapping is not enabled
+            </p>
             <p className="text-sm text-amber-700 mt-1">
               Assignments can be managed here, but they won&apos;t affect notification routing until
               &quot;Staff-Client Mapping&quot; is enabled in{' '}
@@ -110,11 +150,37 @@ export const UserCaseloadPage: React.FC = observer(() => {
                 className="underline font-medium hover:text-amber-900"
               >
                 Organization Settings
-              </button>.
+              </button>
+              .
             </p>
           </div>
         </div>
       )}
+
+      {/* Command feedback — error takes precedence so exactly one live region
+          announces (INV-1); the echo is an aria-hidden visual copy. operationError
+          (assign/unassign) wins over the load error. */}
+      {!successMessage && (
+        <CommandFeedbackBanner
+          kind="error"
+          message={
+            operationError ??
+            (vm.error ? sanitizeCommandError(vm.error, 'Failed to load assignments').display : null)
+          }
+          onDismiss={() => {
+            setOperationError(null);
+            clearEcho();
+          }}
+        />
+      )}
+      {!operationError && !vm.error && (
+        <CommandFeedbackBanner
+          kind="success"
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+        />
+      )}
+      <CommandFeedbackEcho message={echoMessage} />
 
       {/* Assign new client button */}
       <div>
@@ -135,7 +201,9 @@ export const UserCaseloadPage: React.FC = observer(() => {
           <h3 className="text-sm font-medium text-gray-900">Assign New Client</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="client-id" className="block text-xs font-medium text-gray-700 mb-1">Client ID</label>
+              <label htmlFor="client-id" className="block text-xs font-medium text-gray-700 mb-1">
+                Client ID
+              </label>
               <input
                 id="client-id"
                 type="text"
@@ -147,7 +215,12 @@ export const UserCaseloadPage: React.FC = observer(() => {
               />
             </div>
             <div>
-              <label htmlFor="assigned-until" className="block text-xs font-medium text-gray-700 mb-1">Assigned Until (optional)</label>
+              <label
+                htmlFor="assigned-until"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
+                Assigned Until (optional)
+              </label>
               <input
                 id="assigned-until"
                 type="date"
@@ -159,7 +232,9 @@ export const UserCaseloadPage: React.FC = observer(() => {
             </div>
           </div>
           <div>
-            <label htmlFor="assign-notes" className="block text-xs font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <label htmlFor="assign-notes" className="block text-xs font-medium text-gray-700 mb-1">
+              Notes (optional)
+            </label>
             <input
               id="assign-notes"
               type="text"
@@ -208,16 +283,12 @@ export const UserCaseloadPage: React.FC = observer(() => {
       {/* Loading state */}
       {vm.isLoading && (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" role="status">
+          <div
+            className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"
+            role="status"
+          >
             <span className="sr-only">Loading assignments...</span>
           </div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {vm.error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
-          {vm.error}
         </div>
       )}
 
@@ -226,7 +297,9 @@ export const UserCaseloadPage: React.FC = observer(() => {
         <div className="text-center py-12">
           <UserCheck className="mx-auto h-12 w-12 text-gray-300" aria-hidden="true" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">No assignments</h3>
-          <p className="mt-2 text-sm text-gray-500">This staff member has no client assignments yet.</p>
+          <p className="mt-2 text-sm text-gray-500">
+            This staff member has no client assignments yet.
+          </p>
         </div>
       )}
 
@@ -244,12 +317,15 @@ export const UserCaseloadPage: React.FC = observer(() => {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className={`w-2 h-2 rounded-full ${assignment.is_active ? 'bg-green-400' : 'bg-gray-300'}`} />
+                  <span
+                    className={`w-2 h-2 rounded-full ${assignment.is_active ? 'bg-green-400' : 'bg-gray-300'}`}
+                  />
                   <div>
                     <p className="text-sm font-mono text-gray-900">{assignment.client_id}</p>
                     <p className="text-xs text-gray-500">
                       Assigned {new Date(assignment.assigned_at).toLocaleDateString()}
-                      {assignment.assigned_until && ` · Until ${assignment.assigned_until.slice(0, 10)}`}
+                      {assignment.assigned_until &&
+                        ` · Until ${assignment.assigned_until.slice(0, 10)}`}
                     </p>
                     {assignment.notes && (
                       <p className="text-xs text-gray-400 mt-0.5">{assignment.notes}</p>
@@ -279,7 +355,10 @@ export const UserCaseloadPage: React.FC = observer(() => {
                           {isUnassigning ? '...' : 'Confirm'}
                         </button>
                         <button
-                          onClick={() => { setUnassignTarget(null); setUnassignReason(''); }}
+                          onClick={() => {
+                            setUnassignTarget(null);
+                            setUnassignReason('');
+                          }}
                           className="px-2 py-1 rounded border border-gray-300 text-gray-600 text-xs hover:bg-gray-50"
                         >
                           Cancel
@@ -299,9 +378,7 @@ export const UserCaseloadPage: React.FC = observer(() => {
                   </>
                 )}
 
-                {!assignment.is_active && (
-                  <span className="text-xs text-gray-400">Inactive</span>
-                )}
+                {!assignment.is_active && <span className="text-xs text-gray-400">Inactive</span>}
               </div>
             </div>
           ))}
