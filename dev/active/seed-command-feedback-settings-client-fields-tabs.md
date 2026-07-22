@@ -25,4 +25,10 @@ The real gaps are:
 - Force a create/update/lifecycle failure with an internal-looking error → friendly text shown, raw `log`'d.
 - Confirm a success confirmation appears for each mutation.
 
-## Not started. LOW-MED (additive; contextual errors already work). Companion to the other command-feedback follow-ups: [[seed-sanitize-load-path-errors-command-banner]] (Users load-path).
+## ✅ DONE — `feat/command-feedback-settings-client-fields` (2026-07-22)
+
+- **Success**: added one `successMessage` observable to `ClientFieldSettingsViewModel` (distinct from the batch-save `saveSuccess`); each category/field CRUD success sets a specific message (`'Category created'` … `'Field deleted'`); nulled at every mutation start, on `setActiveTab`, and via `clearSuccessMessage()` (supersede, no timer — INV-3). Each tab renders a top-of-tabpanel `<CommandFeedbackBanner kind="success">` guarded on `!<its three errors>` so an assertive error always wins (INV-1).
+- **Sanitize**: wrapped the six contextual error displays (lifecycle/create/update × 2 tabs) in `sanitizeCommandError(raw, '<friendly fallback>').display` — display-layer per the standard; VM keeps raw for logs. Contextual placement unchanged.
+- **Bonus**: `deactivateCategory`/`deactivateCustomField` were silent on BOTH success and failure — brought in line with the other lifecycle methods (set the lifecycle error on failure, success message on success).
+- **Tests**: +3 (`successMessage` set / superseded-by-error / cleared-on-tab-switch); completed the latent-incomplete `createMockService` (6 missing `IClientFieldService` methods) so the test file typechecks under the hook. 67 VM tests green; tsc + lint + build green.
+- Echo left out of scope (contextual errors sit next to the action).

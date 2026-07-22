@@ -91,9 +91,15 @@ function createMockService(overrides?: Partial<IClientFieldService>): IClientFie
     updateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
     deactivateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
     listFieldCategories: vi.fn().mockResolvedValue(SEED_CATEGORIES),
+    reactivateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
+    deleteFieldDefinition: vi.fn().mockResolvedValue({ success: true }),
     createFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-new' }),
     updateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-01' }),
     deactivateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-07' }),
+    reactivateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-07' }),
+    deleteFieldCategory: vi.fn().mockResolvedValue({ success: true }),
+    getFieldUsageCount: vi.fn().mockResolvedValue({ success: true, count: 0 }),
+    getCategoryFieldCount: vi.fn().mockResolvedValue({ success: true, count: 0, fields: [] }),
     ...overrides,
   };
 }
@@ -935,6 +941,48 @@ describe('ClientFieldSettingsViewModel', () => {
 
       vm.resetChanges();
       expect(vm.sessionCorrelationId).toBeNull();
+    });
+  });
+
+  describe('successMessage (per-item CRUD command feedback)', () => {
+    beforeEach(async () => {
+      await vm.loadData('org-123');
+    });
+
+    it('sets a specific message on a successful CRUD op', async () => {
+      expect(vm.successMessage).toBeNull();
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+    });
+
+    it('is superseded (nulled) by a subsequent failing lifecycle op', async () => {
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+
+      const failService = createMockService({
+        deactivateFieldCategory: vi.fn().mockResolvedValue({ success: false, error: 'In use' }),
+      });
+      vm = new ClientFieldSettingsViewModel(failService);
+      await vm.loadData('org-123');
+      vm.successMessage = 'Category created'; // simulate a lingering success
+
+      const ok = await vm.deactivateCategory('cat-07', 'reason', 'org-123');
+      expect(ok).toBe(false);
+      expect(vm.successMessage).toBeNull();
+      expect(vm.categoryLifecycleError).toBe('In use');
+    });
+
+    it('clears on tab switch and via clearSuccessMessage()', async () => {
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+
+      vm.setActiveTab('custom_fields');
+      expect(vm.successMessage).toBeNull();
+
+      await vm.createCategory('Another', 'another', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+      vm.clearSuccessMessage();
+      expect(vm.successMessage).toBeNull();
     });
   });
 });

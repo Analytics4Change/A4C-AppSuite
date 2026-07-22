@@ -27,6 +27,8 @@ import type {
   FieldStatusFilter,
 } from '@/viewModels/settings/ClientFieldSettingsViewModel';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 
 const glassCardStyle = {
   background: 'rgba(255, 255, 255, 0.7)',
@@ -268,6 +270,19 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
               ))}
             </div>
 
+            {/* Success (polite) — yields to any contextual error so an assertive
+                failure always wins (INV-1). */}
+            {!viewModel.categoryLifecycleError &&
+              !viewModel.createCategoryError &&
+              !viewModel.updateCategoryError && (
+                <CommandFeedbackBanner
+                  kind="success"
+                  message={viewModel.successMessage}
+                  onDismiss={() => viewModel.clearSuccessMessage()}
+                  data-testid="category-success"
+                />
+              )}
+
             {viewModel.categoryLifecycleError && (
               <div
                 role="alert"
@@ -275,7 +290,12 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                 data-testid="cat-lifecycle-error"
               >
                 <AlertCircle size={14} />
-                {viewModel.categoryLifecycleError}
+                {
+                  sanitizeCommandError(
+                    viewModel.categoryLifecycleError,
+                    'Action failed. Please try again.'
+                  ).display
+                }
               </div>
             )}
 
@@ -316,7 +336,12 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                     data-testid="cat-error-alert"
                   >
                     <AlertCircle size={14} />
-                    {viewModel.createCategoryError}
+                    {
+                      sanitizeCommandError(
+                        viewModel.createCategoryError,
+                        'Failed to create category'
+                      ).display
+                    }
                   </div>
                 )}
 
@@ -385,7 +410,12 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
                         className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
                       >
                         <AlertCircle size={14} />
-                        {viewModel.updateCategoryError}
+                        {
+                          sanitizeCommandError(
+                            viewModel.updateCategoryError,
+                            'Failed to update category'
+                          ).display
+                        }
                       </div>
                     )}
                     <div className="flex gap-2">

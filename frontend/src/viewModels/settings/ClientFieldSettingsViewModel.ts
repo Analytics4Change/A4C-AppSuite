@@ -66,6 +66,13 @@ export class ClientFieldSettingsViewModel {
   isCategoryLifecycleActionInProgress = false;
   categoryLifecycleError: string | null = null;
 
+  // Command-result success for the per-item Categories/CustomFields tab CRUD
+  // (distinct from the batch-save `saveSuccess`). Set on each mutation success,
+  // nulled at the start of every mutation and on tab switch (supersede, not a
+  // timer — INV-3). The tab success banners guard on `!<error>` so an assertive
+  // error always wins over this polite success (INV-1).
+  successMessage: string | null = null;
+
   // Session-scoped correlation ID: ties all CRUD + batch save into one audit trail
   sessionCorrelationId: string | null = null;
 
@@ -302,6 +309,8 @@ export class ClientFieldSettingsViewModel {
   setActiveTab(slug: string): void {
     runInAction(() => {
       this.activeTab = slug;
+      // Don't let a per-item success from one tab bleed into another.
+      this.successMessage = null;
     });
   }
 
@@ -445,12 +454,19 @@ export class ClientFieldSettingsViewModel {
     });
   }
 
+  clearSuccessMessage(): void {
+    runInAction(() => {
+      this.successMessage = null;
+    });
+  }
+
   // ── Custom Field CRUD ──
 
   async createCustomField(params: CreateFieldDefinitionParams, orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isCreatingField = true;
       this.createFieldError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -470,6 +486,7 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCreatingField = false;
+        this.successMessage = 'Field created';
       });
       return true;
     } catch (error) {
@@ -483,13 +500,29 @@ export class ClientFieldSettingsViewModel {
   }
 
   async deactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.fieldLifecycleError = null;
+      this.successMessage = null;
+    });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deactivateFieldDefinition(fieldId, reason, correlationId);
-      if (!result.success) return false;
+      if (!result.success) {
+        runInAction(() => {
+          this.fieldLifecycleError = result.error ?? 'Failed to deactivate field';
+        });
+        return false;
+      }
       await this.loadData(orgId, true);
+      runInAction(() => {
+        this.successMessage = 'Field deactivated';
+      });
       return true;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to deactivate field';
+      runInAction(() => {
+        this.fieldLifecycleError = message;
+      });
       return false;
     }
   }
@@ -498,6 +531,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isFieldLifecycleActionInProgress = true;
       this.fieldLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
@@ -512,6 +546,7 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isFieldLifecycleActionInProgress = false;
+        this.successMessage = 'Field reactivated';
       });
       return true;
     } catch (error) {
@@ -537,6 +572,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isFieldLifecycleActionInProgress = true;
       this.fieldLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
@@ -551,6 +587,7 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isFieldLifecycleActionInProgress = false;
+        this.successMessage = 'Field deleted';
       });
       return { success: true };
     } catch (error) {
@@ -571,6 +608,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isUpdatingField = true;
       this.updateFieldError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -614,6 +652,7 @@ export class ClientFieldSettingsViewModel {
           );
         }
         this.isUpdatingField = false;
+        this.successMessage = 'Field updated';
       });
       return true;
     } catch (error) {
@@ -632,6 +671,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isCreatingCategory = true;
       this.createCategoryError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -648,6 +688,7 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCreatingCategory = false;
+        this.successMessage = 'Category created';
       });
       return true;
     } catch (error) {
@@ -664,6 +705,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isUpdatingCategory = true;
       this.updateCategoryError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -709,6 +751,7 @@ export class ClientFieldSettingsViewModel {
           );
         }
         this.isUpdatingCategory = false;
+        this.successMessage = 'Category updated';
       });
       return true;
     } catch (error) {
@@ -722,13 +765,29 @@ export class ClientFieldSettingsViewModel {
   }
 
   async deactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.categoryLifecycleError = null;
+      this.successMessage = null;
+    });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deactivateFieldCategory(categoryId, reason, correlationId);
-      if (!result.success) return false;
+      if (!result.success) {
+        runInAction(() => {
+          this.categoryLifecycleError = result.error ?? 'Failed to deactivate category';
+        });
+        return false;
+      }
       await this.loadData(orgId, true);
+      runInAction(() => {
+        this.successMessage = 'Category deactivated';
+      });
       return true;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to deactivate category';
+      runInAction(() => {
+        this.categoryLifecycleError = message;
+      });
       return false;
     }
   }
@@ -737,6 +796,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isCategoryLifecycleActionInProgress = true;
       this.categoryLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
@@ -751,6 +811,7 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCategoryLifecycleActionInProgress = false;
+        this.successMessage = 'Category reactivated';
       });
       return true;
     } catch (error) {
@@ -776,6 +837,7 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isCategoryLifecycleActionInProgress = true;
       this.categoryLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
@@ -795,6 +857,7 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCategoryLifecycleActionInProgress = false;
+        this.successMessage = 'Category deleted';
       });
       return { success: true };
     } catch (error) {
