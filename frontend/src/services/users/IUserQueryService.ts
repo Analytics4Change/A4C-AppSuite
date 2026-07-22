@@ -48,6 +48,8 @@ export interface IUserQueryService {
    * Results are unified into UserListItem format with computed displayStatus.
    *
    * @param options - Query options including filters, pagination, and sorting
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC(s) so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to paginated result
    *
    * @example
@@ -64,12 +66,17 @@ export interface IUserQueryService {
    *   pagination: { page: 1, pageSize: 10 }
    * });
    */
-  getUsersPaginated(options?: UserQueryOptions): Promise<PaginatedResult<UserListItem>>;
+  getUsersPaginated(
+    options?: UserQueryOptions,
+    correlationId?: string
+  ): Promise<PaginatedResult<UserListItem>>;
 
   /**
    * Retrieves a single user by ID with their role assignments
    *
    * @param userId - User UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to result with user data or error message
    *
    * @example
@@ -80,7 +87,7 @@ export interface IUserQueryService {
    *   console.error(result.errorMessage);
    * }
    */
-  getUserById(userId: string): Promise<GetUserByIdResult>;
+  getUserById(userId: string, correlationId?: string): Promise<GetUserByIdResult>;
 
   /**
    * Retrieves all pending invitations for the current organization
@@ -110,7 +117,7 @@ export interface IUserQueryService {
    *   console.log(invitation.email, invitation.status);
    * }
    */
-  getInvitationById(invitationId: string): Promise<Invitation | null>;
+  getInvitationById(invitationId: string, correlationId?: string): Promise<Invitation | null>;
 
   /**
    * Performs smart email lookup to determine appropriate action
@@ -160,7 +167,7 @@ export interface IUserQueryService {
    * // Only show roles the user can actually assign
    * setRoleOptions(assignableRoles);
    */
-  getAssignableRoles(): Promise<RoleReference[]>;
+  getAssignableRoles(correlationId?: string): Promise<RoleReference[]>;
 
   /**
    * Retrieves organizations the current user has access to

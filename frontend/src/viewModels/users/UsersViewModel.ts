@@ -32,6 +32,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IUserQueryService } from '@/services/users/IUserQueryService';
 import type { IUserCommandService } from '@/services/users/IUserCommandService';
 import { getUserQueryService, getUserCommandService } from '@/services/users/UserServiceFactory';
@@ -418,6 +419,10 @@ export class UsersViewModel {
       this.error = null;
     });
 
+    // One correlation id per load; pinned as X-Correlation-ID on the RPC (so the
+    // server logs the same id) and logged here so a read failure joins the trace.
+    const correlationId = generateCorrelationId();
+
     try {
       const options: UserQueryOptions = {
         filters: this.filters,
@@ -425,7 +430,7 @@ export class UsersViewModel {
         pagination: this.pagination,
       };
 
-      const result = await this.queryService.getUsersPaginated(options);
+      const result = await this.queryService.getUsersPaginated(options, correlationId);
 
       runInAction(() => {
         this.rawItems = result.items;
@@ -441,7 +446,7 @@ export class UsersViewModel {
         this.error = errorMessage;
       });
 
-      log.error('Failed to load users', error);
+      log.error('Failed to load users', { error, correlationId });
     }
   }
 
@@ -451,15 +456,17 @@ export class UsersViewModel {
   async loadAssignableRoles(): Promise<void> {
     log.debug('Loading assignable roles');
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const roles = await this.queryService.getAssignableRoles();
+      const roles = await this.queryService.getAssignableRoles(correlationId);
 
       runInAction(() => {
         this.assignableRoles = roles;
         log.info('Loaded assignable roles', { count: roles.length });
       });
     } catch (error) {
-      log.error('Failed to load assignable roles', error);
+      log.error('Failed to load assignable roles', { error, correlationId });
     }
   }
 
@@ -492,8 +499,10 @@ export class UsersViewModel {
       this.error = null; // Clear previous error
     });
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const result = await this.queryService.getUserById(userId);
+      const result = await this.queryService.getUserById(userId, correlationId);
 
       runInAction(() => {
         this.isLoadingDetails = false;
@@ -506,13 +515,21 @@ export class UsersViewModel {
           this.error =
             result.errorMessage ||
             'Failed to load user details. The user may not exist or you may not have permission to view them.';
-          log.warn('User details load failed', { userId, errorMessage: result.errorMessage });
+          log.warn('User details load failed', {
+            userId,
+            correlationId,
+            errorMessage: result.errorMessage,
+          });
         }
       });
     } catch (error) {
       // This catch handles unexpected exceptions (e.g., network failures)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      log.error('Failed to load user details (exception)', { userId, error: errorMessage });
+      log.error('Failed to load user details (exception)', {
+        userId,
+        correlationId,
+        error: errorMessage,
+      });
 
       runInAction(() => {
         this.isLoadingDetails = false;
@@ -533,8 +550,10 @@ export class UsersViewModel {
       this.selectedInvitationDetails = null;
     });
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const invitation = await this.queryService.getInvitationById(invitationId);
+      const invitation = await this.queryService.getInvitationById(invitationId, correlationId);
 
       runInAction(() => {
         this.selectedInvitationDetails = invitation;
@@ -544,7 +563,7 @@ export class UsersViewModel {
         }
       });
     } catch (error) {
-      log.error('Failed to load invitation details', error);
+      log.error('Failed to load invitation details', { error, correlationId });
 
       runInAction(() => {
         this.isLoadingDetails = false;

@@ -120,10 +120,19 @@ class SupabaseService {
    */
   async apiRpc<T>(
     functionName: ReadRpcs,
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
+    opts?: { correlationId?: string }
   ): Promise<{ data: T | null; error: PostgrestError | null }> {
     const apiClient = this.client as AnySchemaSupabaseClient;
-    const result = await apiClient.schema('api').rpc(functionName, params);
+    const builder = apiClient.schema('api').rpc(functionName, params);
+    // End-to-end tracing: pin the caller's correlation id as X-Correlation-ID so
+    // the server logs the SAME id the caller logs. `tracingFetch` (supabase-ssr.ts)
+    // only auto-generates when the header is absent, so this overrides it.
+    // See documentation/infrastructure/guides/event-observability.md.
+    if (opts?.correlationId) {
+      builder.setHeader('X-Correlation-ID', opts.correlationId);
+    }
+    const result = await builder;
     if (result.error) {
       const masked = maskPostgrestError(result.error);
       return {

@@ -637,7 +637,10 @@ export class MockUserQueryService implements IUserQueryService {
     };
   }
 
-  async getUsersPaginated(options?: UserQueryOptions): Promise<PaginatedResult<UserListItem>> {
+  async getUsersPaginated(
+    options?: UserQueryOptions,
+    _correlationId?: string
+  ): Promise<PaginatedResult<UserListItem>> {
     await this.simulateDelay();
     log.debug('Mock: Fetching users paginated', { options });
 
@@ -737,7 +740,7 @@ export class MockUserQueryService implements IUserQueryService {
     };
   }
 
-  async getUserById(userId: string): Promise<GetUserByIdResult> {
+  async getUserById(userId: string, _correlationId?: string): Promise<GetUserByIdResult> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user by ID', { userId });
 
@@ -766,7 +769,10 @@ export class MockUserQueryService implements IUserQueryService {
     return pendingInvitations;
   }
 
-  async getInvitationById(invitationId: string): Promise<Invitation | null> {
+  async getInvitationById(
+    invitationId: string,
+    _correlationId?: string
+  ): Promise<Invitation | null> {
     await this.simulateDelay();
     log.debug('Mock: Fetching invitation by ID', { invitationId });
 
@@ -856,7 +862,7 @@ export class MockUserQueryService implements IUserQueryService {
     };
   }
 
-  async getAssignableRoles(): Promise<RoleReference[]> {
+  async getAssignableRoles(_correlationId?: string): Promise<RoleReference[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching assignable roles');
 

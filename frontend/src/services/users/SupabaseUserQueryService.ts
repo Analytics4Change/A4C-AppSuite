@@ -234,7 +234,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
   /**
    * Get paginated list of users and invitations
    */
-  async getUsersPaginated(options?: UserQueryOptions): Promise<PaginatedResult<UserListItem>> {
+  async getUsersPaginated(
+    options?: UserQueryOptions,
+    correlationId?: string
+  ): Promise<PaginatedResult<UserListItem>> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
@@ -312,15 +315,19 @@ export class SupabaseUserQueryService implements IUserQueryService {
           null;
 
         try {
-          const result = await supabaseService.apiRpc<RpcUserRow[]>('list_users', {
-            p_org_id: claims.org_id,
-            p_status: statusFilter,
-            p_search_term: options?.filters?.searchTerm ?? null,
-            p_sort_by: options?.sort?.sortBy ?? 'name',
-            p_sort_desc: options?.sort?.sortOrder === 'desc',
-            p_page: rpcPage,
-            p_page_size: rpcPageSize,
-          });
+          const result = await supabaseService.apiRpc<RpcUserRow[]>(
+            'list_users',
+            {
+              p_org_id: claims.org_id,
+              p_status: statusFilter,
+              p_search_term: options?.filters?.searchTerm ?? null,
+              p_sort_by: options?.sort?.sortBy ?? 'name',
+              p_sort_desc: options?.sort?.sortOrder === 'desc',
+              p_page: rpcPage,
+              p_page_size: rpcPageSize,
+            },
+            { correlationId }
+          );
           data = result.data;
           usersError = result.error;
         } catch (rpcException) {
@@ -399,7 +406,8 @@ export class SupabaseUserQueryService implements IUserQueryService {
             p_org_id: claims.org_id,
             p_status: ['pending', 'expired'],
             p_search_term: options?.filters?.searchTerm ?? null,
-          }
+          },
+          { correlationId }
         );
 
         if (invError) {
@@ -512,7 +520,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * Returns structured result with error message for user-visible error display.
    */
-  async getUserById(userId: string): Promise<GetUserByIdResult> {
+  async getUserById(userId: string, correlationId?: string): Promise<GetUserByIdResult> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
@@ -563,10 +571,14 @@ export class SupabaseUserQueryService implements IUserQueryService {
       }
 
       // Use RPC function (CQRS pattern) - NEVER use direct table queries with PostgREST embedding
-      const { data, error } = await supabaseService.apiRpc<RpcUserByIdRow[]>('get_user_by_id', {
-        p_user_id: userId,
-        p_org_id: claims.org_id,
-      });
+      const { data, error } = await supabaseService.apiRpc<RpcUserByIdRow[]>(
+        'get_user_by_id',
+        {
+          p_user_id: userId,
+          p_org_id: claims.org_id,
+        },
+        { correlationId }
+      );
 
       // Log full response for debugging
       log.info('apiRpc get_user_by_id response', {
@@ -717,14 +729,18 @@ export class SupabaseUserQueryService implements IUserQueryService {
   /**
    * Get invitation by ID
    */
-  async getInvitationById(invitationId: string): Promise<Invitation | null> {
+  async getInvitationById(
+    invitationId: string,
+    correlationId?: string
+  ): Promise<Invitation | null> {
     try {
       // Use RPC function for CQRS-compliant query (not direct table access)
       const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>(
         'get_invitation_by_id',
         {
           p_invitation_id: invitationId,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
@@ -918,7 +934,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * This prevents privilege escalation during user invitation.
    */
-  async getAssignableRoles(): Promise<RoleReference[]> {
+  async getAssignableRoles(correlationId?: string): Promise<RoleReference[]> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
@@ -945,7 +961,8 @@ export class SupabaseUserQueryService implements IUserQueryService {
         'get_assignable_roles',
         {
           p_org_id: claims.org_id,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
