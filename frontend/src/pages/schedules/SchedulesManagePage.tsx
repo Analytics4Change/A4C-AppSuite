@@ -270,7 +270,10 @@ export const SchedulesManagePage: React.FC = observer(() => {
         // page-level error (INV-1) and fire the aria-hidden echo (+ log.warn).
         viewModel.clearError();
         setOperationError(null);
-        reportFailure(formViewModel.submissionError, { fallback: 'Failed to save template' });
+        reportFailure(formViewModel.submissionError, {
+          fallback:
+            panelMode === 'create' ? 'Failed to create template' : 'Failed to update template',
+        });
       }
     },
     [
@@ -507,7 +510,12 @@ export const SchedulesManagePage: React.FC = observer(() => {
         {!formViewModel?.submissionError && (
           <CommandFeedbackBanner
             kind="error"
-            message={viewModel.error || operationError}
+            message={
+              viewModel.error
+                ? sanitizeCommandError(viewModel.error, 'Failed to load schedules.').display
+                : operationError
+            }
+            data-testid="schedule-manage-error-banner"
             onDismiss={() => {
               viewModel.clearError();
               setOperationError(null);
@@ -521,6 +529,7 @@ export const SchedulesManagePage: React.FC = observer(() => {
           <CommandFeedbackBanner
             kind="success"
             message={successMessage}
+            data-testid="schedule-manage-success-banner"
             onDismiss={() => setSuccessMessage(null)}
           />
         )}

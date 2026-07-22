@@ -464,7 +464,10 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         viewModel.clearError();
         setOperationError(null);
         reportFailure(formViewModel.submissionError, {
-          fallback: 'Failed to save organization unit',
+          fallback:
+            panelMode === 'create'
+              ? 'Failed to create organization unit'
+              : 'Failed to update organization unit',
         });
       }
     },
@@ -659,7 +662,13 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
         {!formViewModel?.submissionError && (
           <CommandFeedbackBanner
             kind="error"
-            message={viewModel.error || operationError}
+            message={
+              viewModel.error
+                ? sanitizeCommandError(viewModel.error, 'Failed to load organization units.')
+                    .display
+                : operationError
+            }
+            data-testid="org-unit-manage-error-banner"
             onDismiss={() => {
               viewModel.clearError();
               setOperationError(null);
@@ -673,6 +682,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           <CommandFeedbackBanner
             kind="success"
             message={successMessage}
+            data-testid="org-unit-manage-success-banner"
             onDismiss={() => setSuccessMessage(null)}
           />
         )}

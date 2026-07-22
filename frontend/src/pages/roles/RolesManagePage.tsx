@@ -376,7 +376,9 @@ export const RolesManagePage: React.FC = observer(() => {
         // page-level error (INV-1) and fire the aria-hidden echo (+ log.warn).
         viewModel.clearError();
         setOperationError(null);
-        reportFailure(formViewModel.submissionError, { fallback: 'Failed to save role' });
+        reportFailure(formViewModel.submissionError, {
+          fallback: panelMode === 'create' ? 'Failed to create role' : 'Failed to update role',
+        });
       }
     },
     [
@@ -620,7 +622,12 @@ export const RolesManagePage: React.FC = observer(() => {
         {!formViewModel?.submissionError && (
           <CommandFeedbackBanner
             kind="error"
-            message={viewModel.error || operationError}
+            message={
+              viewModel.error
+                ? sanitizeCommandError(viewModel.error, 'Failed to load roles.').display
+                : operationError
+            }
+            data-testid="role-manage-error-banner"
             onDismiss={() => {
               viewModel.clearError();
               setOperationError(null);
@@ -634,6 +641,7 @@ export const RolesManagePage: React.FC = observer(() => {
           <CommandFeedbackBanner
             kind="success"
             message={successMessage}
+            data-testid="role-manage-success-banner"
             onDismiss={() => setSuccessMessage(null)}
           />
         )}

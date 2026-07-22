@@ -789,7 +789,11 @@ export const OrganizationsManagePage: React.FC = observer(() => {
         {!formVM?.submissionError && (
           <CommandFeedbackBanner
             kind="error"
-            message={listVM.error || operationError}
+            message={
+              listVM.error
+                ? sanitizeCommandError(listVM.error, 'Failed to load organizations.').display
+                : operationError
+            }
             onDismiss={() => {
               listVM.clearError();
               setOperationError(null);
@@ -804,6 +808,7 @@ export const OrganizationsManagePage: React.FC = observer(() => {
           <CommandFeedbackBanner
             kind="success"
             message={successMessage}
+            data-testid="org-manage-success-banner"
             onDismiss={() => setSuccessMessage(null)}
           />
         )}

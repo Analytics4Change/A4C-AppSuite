@@ -1,11 +1,13 @@
 ---
 status: seed
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 ---
 
 # Seed: Sanitize load-path errors before the command-feedback banner
 
 **Origin**: `software-architect-dbc` review of PR #91 (command-feedback Phase 3 siblings), finding **#2** (LOW, **pre-existing** — not introduced by #91).
+
+> **Update 2026-07-22 (PR #91 follow-up review, S1)**: the 4 migrated sibling pages the PR already touched — `roles`, `organizations`, `organization-units`, `schedules` — now sanitize the page-level `viewModel.error`/`listVM.error` inline (`sanitizeCommandError(viewModel.error, '<friendly load fallback>').display`). **Remaining scope: `UsersManagePage` only** — the raw error flows through the `UsersErrorBanner` component (out of scope for #91), where the decision is whether to sanitize inside the component or at the prop. Narrow this card to that one surface.
 
 ## Problem
 The command-feedback page banners render `{viewModel.error || operationError}` (Users uses `UsersErrorBanner`'s `{error || operationError}`). `operationError` is now always sanitized (it flows through `showCommandFailure` → `reportFailure` → `sanitizeCommandError`), but **`viewModel.error` / `listVM.error` is raw** — a VM *load/query* failure (e.g. `loadAll`, `loadDetails`, `refresh`) can put handler-internal text (`Event processing failed: …`, PG SQLSTATE) straight into the standard banner, bypassing the display-layer sanitizer.

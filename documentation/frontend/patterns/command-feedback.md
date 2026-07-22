@@ -89,6 +89,8 @@ Banners are already the house style (most manage pages drive `role="alert"`/`rol
 
 > **Implemented (Phase 2, PR #88)**: `useCommandFeedback()` (`frontend/src/hooks/useCommandFeedback.ts`) sanitizes + `log.warn`s and drives the echo state; the pure `sanitizeCommandError(raw)` util (`frontend/src/utils/sanitizeCommandError.ts`); `<CommandFeedbackBanner>` and the non-Sonner `<CommandFeedbackEcho>` (`frontend/src/components/ui/`). These centralize INV-1..3 so call sites can't reintroduce a double-announce. The hook **orchestrates presentation only** — writes stay on the ViewModel path (no dual-write, no bypass of the VM). Tests cover the **pure sanitizer** and the **echo component** (INV-2); the hook itself is deliberately not unit-tested (it's a multi-caller abstraction for the Phase-3 rollout, not a one-caller test-seam extraction).
 
+> **Implemented (Phase 3, PR #91)**: `useCommandFeedbackFocus()` (`frontend/src/hooks/useCommandFeedbackFocus.ts`) — the sanctioned focus primitive for form-blocking banners. It captures the submit trigger, moves focus to the banner via `useEffect` (no `setTimeout`), and restores focus to the trigger on dismiss — armed only when the banner actually took focus, so a background-load-error banner can never restore to a stale trigger (the "airtight restoration" contract). One instance per form-blocking banner; unit-tested (`useCommandFeedbackFocus.test.ts`) for the arm/restore/consume/disarm contract.
+
 ## data-testid requirements
 
 Stable testids are mandatory (extend today's `users-error-banner` / `invite-success-${action}`):
