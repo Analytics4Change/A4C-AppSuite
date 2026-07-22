@@ -466,6 +466,8 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isCreatingField = true;
       this.createFieldError = null;
+      this.updateFieldError = null;
+      this.fieldLifecycleError = null;
       this.successMessage = null;
     });
 
@@ -501,6 +503,8 @@ export class ClientFieldSettingsViewModel {
 
   async deactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
     runInAction(() => {
+      this.createFieldError = null;
+      this.updateFieldError = null;
       this.fieldLifecycleError = null;
       this.successMessage = null;
     });
@@ -530,6 +534,8 @@ export class ClientFieldSettingsViewModel {
   async reactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isFieldLifecycleActionInProgress = true;
+      this.createFieldError = null;
+      this.updateFieldError = null;
       this.fieldLifecycleError = null;
       this.successMessage = null;
     });
@@ -571,6 +577,8 @@ export class ClientFieldSettingsViewModel {
   ): Promise<{ success: boolean; error?: string; usageCount?: number }> {
     runInAction(() => {
       this.isFieldLifecycleActionInProgress = true;
+      this.createFieldError = null;
+      this.updateFieldError = null;
       this.fieldLifecycleError = null;
       this.successMessage = null;
     });
@@ -607,7 +615,9 @@ export class ClientFieldSettingsViewModel {
   ): Promise<boolean> {
     runInAction(() => {
       this.isUpdatingField = true;
+      this.createFieldError = null;
       this.updateFieldError = null;
+      this.fieldLifecycleError = null;
       this.successMessage = null;
     });
 
@@ -671,6 +681,8 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isCreatingCategory = true;
       this.createCategoryError = null;
+      this.updateCategoryError = null;
+      this.categoryLifecycleError = null;
       this.successMessage = null;
     });
 
@@ -704,7 +716,9 @@ export class ClientFieldSettingsViewModel {
   async updateCategory(categoryId: string, name: string, _orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isUpdatingCategory = true;
+      this.createCategoryError = null;
       this.updateCategoryError = null;
+      this.categoryLifecycleError = null;
       this.successMessage = null;
     });
 
@@ -766,6 +780,8 @@ export class ClientFieldSettingsViewModel {
 
   async deactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
     runInAction(() => {
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
       this.categoryLifecycleError = null;
       this.successMessage = null;
     });
@@ -795,6 +811,8 @@ export class ClientFieldSettingsViewModel {
   async reactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isCategoryLifecycleActionInProgress = true;
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
       this.categoryLifecycleError = null;
       this.successMessage = null;
     });
@@ -836,6 +854,8 @@ export class ClientFieldSettingsViewModel {
   ): Promise<{ success: boolean; error?: string; childCount?: number; childNames?: string[] }> {
     runInAction(() => {
       this.isCategoryLifecycleActionInProgress = true;
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
       this.categoryLifecycleError = null;
       this.successMessage = null;
     });

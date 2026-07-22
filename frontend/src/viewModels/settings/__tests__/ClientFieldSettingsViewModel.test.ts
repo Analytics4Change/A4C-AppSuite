@@ -956,20 +956,39 @@ describe('ClientFieldSettingsViewModel', () => {
     });
 
     it('is superseded (nulled) by a subsequent failing lifecycle op', async () => {
-      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
-      expect(vm.successMessage).toBe('Category created');
-
       const failService = createMockService({
         deactivateFieldCategory: vi.fn().mockResolvedValue({ success: false, error: 'In use' }),
       });
       vm = new ClientFieldSettingsViewModel(failService);
       await vm.loadData('org-123');
-      vm.successMessage = 'Category created'; // simulate a lingering success
 
+      // A real success leaves successMessage set...
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+
+      // ...then a failing op nulls it and shows its error instead.
       const ok = await vm.deactivateCategory('cat-07', 'reason', 'org-123');
       expect(ok).toBe(false);
       expect(vm.successMessage).toBeNull();
       expect(vm.categoryLifecycleError).toBe('In use');
+    });
+
+    it('a fresh success clears a lingering sibling error (INV-3 supersede)', async () => {
+      const failFirst = createMockService({
+        deactivateFieldCategory: vi.fn().mockResolvedValue({ success: false, error: 'In use' }),
+      });
+      vm = new ClientFieldSettingsViewModel(failFirst);
+      await vm.loadData('org-123');
+
+      // A failed lifecycle op leaves a contextual error (no dismiss button)...
+      await vm.deactivateCategory('cat-07', 'reason', 'org-123');
+      expect(vm.categoryLifecycleError).toBe('In use');
+
+      // ...a subsequent successful create must clear it so the success shows.
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+      expect(vm.categoryLifecycleError).toBeNull();
+      expect(vm.createCategoryError).toBeNull();
     });
 
     it('clears on tab switch and via clearSuccessMessage()', async () => {
