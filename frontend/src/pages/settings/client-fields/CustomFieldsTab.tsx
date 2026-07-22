@@ -19,6 +19,8 @@ import type {
 } from '@/viewModels/settings/ClientFieldSettingsViewModel';
 import { EnumValuesInput } from './EnumValuesInput';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 
 const glassCardStyle = {
   background: 'rgba(255, 255, 255, 0.7)',
@@ -321,6 +323,19 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
               ))}
             </div>
 
+            {/* Success (polite) — yields to any contextual error so an assertive
+                failure always wins (INV-1). */}
+            {!viewModel.fieldLifecycleError &&
+              !viewModel.createFieldError &&
+              !viewModel.updateFieldError && (
+                <CommandFeedbackBanner
+                  kind="success"
+                  message={viewModel.successMessage}
+                  onDismiss={() => viewModel.clearSuccessMessage()}
+                  data-testid="field-success"
+                />
+              )}
+
             {viewModel.fieldLifecycleError && (
               <div
                 role="alert"
@@ -328,7 +343,12 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                 data-testid="cf-lifecycle-error"
               >
                 <AlertCircle size={14} />
-                {viewModel.fieldLifecycleError}
+                {
+                  sanitizeCommandError(
+                    viewModel.fieldLifecycleError,
+                    'Action failed. Please try again.'
+                  ).display
+                }
               </div>
             )}
 
@@ -415,7 +435,10 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                     data-testid="cf-error-alert"
                   >
                     <AlertCircle size={14} />
-                    {viewModel.createFieldError}
+                    {
+                      sanitizeCommandError(viewModel.createFieldError, 'Failed to create field')
+                        .display
+                    }
                   </div>
                 )}
 
@@ -540,10 +563,16 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
                       {viewModel.updateFieldError && (
                         <div
                           role="alert"
+                          data-testid="cf-edit-error-alert"
                           className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm"
                         >
                           <AlertCircle size={14} />
-                          {viewModel.updateFieldError}
+                          {
+                            sanitizeCommandError(
+                              viewModel.updateFieldError,
+                              'Failed to update field'
+                            ).display
+                          }
                         </div>
                       )}
                       <div className="flex gap-2">

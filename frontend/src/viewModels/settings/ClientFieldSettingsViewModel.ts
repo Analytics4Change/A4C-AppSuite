@@ -66,6 +66,13 @@ export class ClientFieldSettingsViewModel {
   isCategoryLifecycleActionInProgress = false;
   categoryLifecycleError: string | null = null;
 
+  // Command-result success for the per-item Categories/CustomFields tab CRUD
+  // (distinct from the batch-save `saveSuccess`). Set on each mutation success,
+  // nulled at the start of every mutation and on tab switch (supersede, not a
+  // timer — INV-3). The tab success banners guard on `!<error>` so an assertive
+  // error always wins over this polite success (INV-1).
+  successMessage: string | null = null;
+
   // Session-scoped correlation ID: ties all CRUD + batch save into one audit trail
   sessionCorrelationId: string | null = null;
 
@@ -92,6 +99,18 @@ export class ClientFieldSettingsViewModel {
       });
     }
     return this.sessionCorrelationId!;
+  }
+
+  /**
+   * Observability for a command failure. The command-feedback standard renders
+   * only the sanitized message at the display layer, so the raw error MUST be
+   * logged here (with the session correlation id) — it never reaches the DOM.
+   */
+  private logCommandFailure(op: string, raw: unknown): void {
+    log.warn(`${op} failed`, {
+      error: raw instanceof Error ? raw.message : raw,
+      correlationId: this.sessionCorrelationId,
+    });
   }
 
   async loadData(orgId: string, preserveChanges = false): Promise<void> {
@@ -302,6 +321,8 @@ export class ClientFieldSettingsViewModel {
   setActiveTab(slug: string): void {
     runInAction(() => {
       this.activeTab = slug;
+      // Don't let a per-item success from one tab bleed into another.
+      this.successMessage = null;
     });
   }
 
@@ -445,12 +466,21 @@ export class ClientFieldSettingsViewModel {
     });
   }
 
+  clearSuccessMessage(): void {
+    runInAction(() => {
+      this.successMessage = null;
+    });
+  }
+
   // ── Custom Field CRUD ──
 
   async createCustomField(params: CreateFieldDefinitionParams, orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isCreatingField = true;
       this.createFieldError = null;
+      this.updateFieldError = null;
+      this.fieldLifecycleError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -460,6 +490,7 @@ export class ClientFieldSettingsViewModel {
         const friendlyError = result.error?.includes('Field key already exists')
           ? `"${params.display_name}" already exists. Choose another name.`
           : (result.error ?? 'Failed to create field');
+        this.logCommandFailure('createCustomField', result.error);
         runInAction(() => {
           this.createFieldError = friendlyError;
           this.isCreatingField = false;
@@ -470,10 +501,12 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCreatingField = false;
+        this.successMessage = 'Field created';
       });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create field';
+      this.logCommandFailure('createCustomField', error);
       runInAction(() => {
         this.createFieldError = message;
         this.isCreatingField = false;
@@ -483,13 +516,33 @@ export class ClientFieldSettingsViewModel {
   }
 
   async deactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.createFieldError = null;
+      this.updateFieldError = null;
+      this.fieldLifecycleError = null;
+      this.successMessage = null;
+    });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deactivateFieldDefinition(fieldId, reason, correlationId);
-      if (!result.success) return false;
+      if (!result.success) {
+        this.logCommandFailure('deactivateCustomField', result.error);
+        runInAction(() => {
+          this.fieldLifecycleError = result.error ?? 'Failed to deactivate field';
+        });
+        return false;
+      }
       await this.loadData(orgId, true);
+      runInAction(() => {
+        this.successMessage = 'Field deactivated';
+      });
       return true;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to deactivate field';
+      this.logCommandFailure('deactivateCustomField', error);
+      runInAction(() => {
+        this.fieldLifecycleError = message;
+      });
       return false;
     }
   }
@@ -497,12 +550,16 @@ export class ClientFieldSettingsViewModel {
   async reactivateCustomField(fieldId: string, reason: string, orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isFieldLifecycleActionInProgress = true;
+      this.createFieldError = null;
+      this.updateFieldError = null;
       this.fieldLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.reactivateFieldDefinition(fieldId, reason, correlationId);
       if (!result.success) {
+        this.logCommandFailure('reactivateCustomField', result.error);
         runInAction(() => {
           this.fieldLifecycleError = result.error ?? 'Failed to reactivate field';
           this.isFieldLifecycleActionInProgress = false;
@@ -512,10 +569,12 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isFieldLifecycleActionInProgress = false;
+        this.successMessage = 'Field reactivated';
       });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reactivate field';
+      this.logCommandFailure('reactivateCustomField', error);
       runInAction(() => {
         this.fieldLifecycleError = message;
         this.isFieldLifecycleActionInProgress = false;
@@ -536,12 +595,16 @@ export class ClientFieldSettingsViewModel {
   ): Promise<{ success: boolean; error?: string; usageCount?: number }> {
     runInAction(() => {
       this.isFieldLifecycleActionInProgress = true;
+      this.createFieldError = null;
+      this.updateFieldError = null;
       this.fieldLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deleteFieldDefinition(fieldId, reason, correlationId);
       if (!result.success) {
+        this.logCommandFailure('deleteCustomField', result.error);
         runInAction(() => {
           this.fieldLifecycleError = result.error ?? 'Failed to delete field';
           this.isFieldLifecycleActionInProgress = false;
@@ -551,10 +614,12 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isFieldLifecycleActionInProgress = false;
+        this.successMessage = 'Field deleted';
       });
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete field';
+      this.logCommandFailure('deleteCustomField', error);
       runInAction(() => {
         this.fieldLifecycleError = message;
         this.isFieldLifecycleActionInProgress = false;
@@ -570,7 +635,10 @@ export class ClientFieldSettingsViewModel {
   ): Promise<boolean> {
     runInAction(() => {
       this.isUpdatingField = true;
+      this.createFieldError = null;
       this.updateFieldError = null;
+      this.fieldLifecycleError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -580,6 +648,7 @@ export class ClientFieldSettingsViewModel {
         correlation_id: correlationId,
       });
       if (!result.success) {
+        this.logCommandFailure('updateCustomField', result.error);
         runInAction(() => {
           this.updateFieldError = result.error ?? 'Failed to update field';
           this.isUpdatingField = false;
@@ -614,10 +683,12 @@ export class ClientFieldSettingsViewModel {
           );
         }
         this.isUpdatingField = false;
+        this.successMessage = 'Field updated';
       });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update field';
+      this.logCommandFailure('updateCustomField', error);
       runInAction(() => {
         this.updateFieldError = message;
         this.isUpdatingField = false;
@@ -632,12 +703,16 @@ export class ClientFieldSettingsViewModel {
     runInAction(() => {
       this.isCreatingCategory = true;
       this.createCategoryError = null;
+      this.updateCategoryError = null;
+      this.categoryLifecycleError = null;
+      this.successMessage = null;
     });
 
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.createFieldCategory(name, slug, undefined, correlationId);
       if (!result.success) {
+        this.logCommandFailure('createCategory', result.error);
         runInAction(() => {
           this.createCategoryError = result.error ?? 'Failed to create category';
           this.isCreatingCategory = false;
@@ -648,10 +723,12 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCreatingCategory = false;
+        this.successMessage = 'Category created';
       });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create category';
+      this.logCommandFailure('createCategory', error);
       runInAction(() => {
         this.createCategoryError = message;
         this.isCreatingCategory = false;
@@ -663,7 +740,10 @@ export class ClientFieldSettingsViewModel {
   async updateCategory(categoryId: string, name: string, _orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isUpdatingCategory = true;
+      this.createCategoryError = null;
       this.updateCategoryError = null;
+      this.categoryLifecycleError = null;
+      this.successMessage = null;
     });
 
     try {
@@ -675,6 +755,7 @@ export class ClientFieldSettingsViewModel {
         correlationId
       );
       if (!result.success) {
+        this.logCommandFailure('updateCategory', result.error);
         runInAction(() => {
           this.updateCategoryError = result.error ?? 'Failed to update category';
           this.isUpdatingCategory = false;
@@ -709,10 +790,12 @@ export class ClientFieldSettingsViewModel {
           );
         }
         this.isUpdatingCategory = false;
+        this.successMessage = 'Category updated';
       });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update category';
+      this.logCommandFailure('updateCategory', error);
       runInAction(() => {
         this.updateCategoryError = message;
         this.isUpdatingCategory = false;
@@ -722,13 +805,33 @@ export class ClientFieldSettingsViewModel {
   }
 
   async deactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
+    runInAction(() => {
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
+      this.categoryLifecycleError = null;
+      this.successMessage = null;
+    });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deactivateFieldCategory(categoryId, reason, correlationId);
-      if (!result.success) return false;
+      if (!result.success) {
+        this.logCommandFailure('deactivateCategory', result.error);
+        runInAction(() => {
+          this.categoryLifecycleError = result.error ?? 'Failed to deactivate category';
+        });
+        return false;
+      }
       await this.loadData(orgId, true);
+      runInAction(() => {
+        this.successMessage = 'Category deactivated';
+      });
       return true;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to deactivate category';
+      this.logCommandFailure('deactivateCategory', error);
+      runInAction(() => {
+        this.categoryLifecycleError = message;
+      });
       return false;
     }
   }
@@ -736,12 +839,16 @@ export class ClientFieldSettingsViewModel {
   async reactivateCategory(categoryId: string, reason: string, orgId: string): Promise<boolean> {
     runInAction(() => {
       this.isCategoryLifecycleActionInProgress = true;
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
       this.categoryLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.reactivateFieldCategory(categoryId, reason, correlationId);
       if (!result.success) {
+        this.logCommandFailure('reactivateCategory', result.error);
         runInAction(() => {
           this.categoryLifecycleError = result.error ?? 'Failed to reactivate category';
           this.isCategoryLifecycleActionInProgress = false;
@@ -751,10 +858,12 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCategoryLifecycleActionInProgress = false;
+        this.successMessage = 'Category reactivated';
       });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reactivate category';
+      this.logCommandFailure('reactivateCategory', error);
       runInAction(() => {
         this.categoryLifecycleError = message;
         this.isCategoryLifecycleActionInProgress = false;
@@ -775,12 +884,16 @@ export class ClientFieldSettingsViewModel {
   ): Promise<{ success: boolean; error?: string; childCount?: number; childNames?: string[] }> {
     runInAction(() => {
       this.isCategoryLifecycleActionInProgress = true;
+      this.createCategoryError = null;
+      this.updateCategoryError = null;
       this.categoryLifecycleError = null;
+      this.successMessage = null;
     });
     try {
       const correlationId = this.getSessionCorrelationId();
       const result = await this.service.deleteFieldCategory(categoryId, reason, correlationId);
       if (!result.success) {
+        this.logCommandFailure('deleteCategory', result.error);
         runInAction(() => {
           this.categoryLifecycleError = result.error ?? 'Failed to delete category';
           this.isCategoryLifecycleActionInProgress = false;
@@ -795,10 +908,12 @@ export class ClientFieldSettingsViewModel {
       await this.loadData(orgId, true);
       runInAction(() => {
         this.isCategoryLifecycleActionInProgress = false;
+        this.successMessage = 'Category deleted';
       });
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete category';
+      this.logCommandFailure('deleteCategory', error);
       runInAction(() => {
         this.categoryLifecycleError = message;
         this.isCategoryLifecycleActionInProgress = false;

@@ -91,9 +91,15 @@ function createMockService(overrides?: Partial<IClientFieldService>): IClientFie
     updateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
     deactivateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
     listFieldCategories: vi.fn().mockResolvedValue(SEED_CATEGORIES),
+    reactivateFieldDefinition: vi.fn().mockResolvedValue({ success: true, field_id: 'field-cfg' }),
+    deleteFieldDefinition: vi.fn().mockResolvedValue({ success: true }),
     createFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-new' }),
     updateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-01' }),
     deactivateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-07' }),
+    reactivateFieldCategory: vi.fn().mockResolvedValue({ success: true, category_id: 'cat-07' }),
+    deleteFieldCategory: vi.fn().mockResolvedValue({ success: true }),
+    getFieldUsageCount: vi.fn().mockResolvedValue({ success: true, count: 0 }),
+    getCategoryFieldCount: vi.fn().mockResolvedValue({ success: true, count: 0, fields: [] }),
     ...overrides,
   };
 }
@@ -663,6 +669,9 @@ describe('ClientFieldSettingsViewModel', () => {
         expect.any(String)
       );
       expect(mockService.listFieldDefinitions).toHaveBeenCalledTimes(2);
+      // Command feedback: the deactivate bonus surfaces a success message.
+      expect(vm.successMessage).toBe('Field deactivated');
+      expect(vm.fieldLifecycleError).toBeNull();
     });
 
     it('returns false on service failure', async () => {
@@ -676,6 +685,9 @@ describe('ClientFieldSettingsViewModel', () => {
 
       const result = await vm.deactivateCustomField('field-cfg', 'reason', 'org-123');
       expect(result).toBe(false);
+      // Command feedback: failure sets the lifecycle error slot, no success.
+      expect(vm.fieldLifecycleError).toBe('Not found');
+      expect(vm.successMessage).toBeNull();
     });
 
     it('returns false on exception', async () => {
@@ -756,6 +768,9 @@ describe('ClientFieldSettingsViewModel', () => {
         expect.any(String)
       );
       expect(mockService.listFieldCategories).toHaveBeenCalledTimes(2);
+      // Command feedback: the deactivate bonus surfaces a success message.
+      expect(vm.successMessage).toBe('Category deactivated');
+      expect(vm.categoryLifecycleError).toBeNull();
     });
 
     it('returns false on service failure', async () => {
@@ -769,6 +784,9 @@ describe('ClientFieldSettingsViewModel', () => {
 
       const result = await vm.deactivateCategory('cat-01', 'reason', 'org-123');
       expect(result).toBe(false);
+      // Command feedback: failure sets the lifecycle error slot, no success.
+      expect(vm.categoryLifecycleError).toBe('System category');
+      expect(vm.successMessage).toBeNull();
     });
 
     it('returns false on exception', async () => {
@@ -935,6 +953,67 @@ describe('ClientFieldSettingsViewModel', () => {
 
       vm.resetChanges();
       expect(vm.sessionCorrelationId).toBeNull();
+    });
+  });
+
+  describe('successMessage (per-item CRUD command feedback)', () => {
+    beforeEach(async () => {
+      await vm.loadData('org-123');
+    });
+
+    it('sets a specific message on a successful CRUD op', async () => {
+      expect(vm.successMessage).toBeNull();
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+    });
+
+    it('is superseded (nulled) by a subsequent failing lifecycle op', async () => {
+      const failService = createMockService({
+        deactivateFieldCategory: vi.fn().mockResolvedValue({ success: false, error: 'In use' }),
+      });
+      vm = new ClientFieldSettingsViewModel(failService);
+      await vm.loadData('org-123');
+
+      // A real success leaves successMessage set...
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+
+      // ...then a failing op nulls it and shows its error instead.
+      const ok = await vm.deactivateCategory('cat-07', 'reason', 'org-123');
+      expect(ok).toBe(false);
+      expect(vm.successMessage).toBeNull();
+      expect(vm.categoryLifecycleError).toBe('In use');
+    });
+
+    it('a fresh success clears a lingering sibling error (INV-3 supersede)', async () => {
+      const failFirst = createMockService({
+        deactivateFieldCategory: vi.fn().mockResolvedValue({ success: false, error: 'In use' }),
+      });
+      vm = new ClientFieldSettingsViewModel(failFirst);
+      await vm.loadData('org-123');
+
+      // A failed lifecycle op leaves a contextual error (no dismiss button)...
+      await vm.deactivateCategory('cat-07', 'reason', 'org-123');
+      expect(vm.categoryLifecycleError).toBe('In use');
+
+      // ...a subsequent successful create must clear it so the success shows.
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+      expect(vm.categoryLifecycleError).toBeNull();
+      expect(vm.createCategoryError).toBeNull();
+    });
+
+    it('clears on tab switch and via clearSuccessMessage()', async () => {
+      await vm.createCategory('Custom Cat', 'custom_cat', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+
+      vm.setActiveTab('custom_fields');
+      expect(vm.successMessage).toBeNull();
+
+      await vm.createCategory('Another', 'another', 'org-123');
+      expect(vm.successMessage).toBe('Category created');
+      vm.clearSuccessMessage();
+      expect(vm.successMessage).toBeNull();
     });
   });
 });
