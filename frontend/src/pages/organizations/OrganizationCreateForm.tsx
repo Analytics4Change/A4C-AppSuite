@@ -257,7 +257,11 @@ export const OrganizationCreateForm: React.FC<OrganizationCreateFormProps> = obs
           // aria-hidden echo for scroll-independence + log.warn the raw error.
           reportFailure(viewModel.submissionError, { fallback: SUBMIT_ERROR_FALLBACK });
         } else {
+          // Defensive: submit() returned null without setting submissionError
+          // (a VM-contract violation that pre-validation makes unreachable). Surface
+          // a generic failure via the echo so the path can never be silent.
           log.warn('Organization submission returned null - staying on form');
+          reportFailure(null, { fallback: SUBMIT_ERROR_FALLBACK });
         }
       } catch (error) {
         log.error('Failed to submit organization', error);
