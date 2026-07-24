@@ -1,13 +1,15 @@
 ---
-status: seed
-last_updated: 2026-07-01
+status: archived
+last_updated: 2026-07-24
 ---
 
 # Seed: Investigate toast vs inline-banner notification inconsistency (User Management)
 
+> **✅ RESOLVED — archived 2026-07-24.** Confirmed fully delivered: the command-feedback rollout that superseded this shipped end-to-end (Phase 2 PR #88 through Phase 3 PRs #91–#95). Verified in current `UsersManagePage.tsx` — invite **success** routes through `showCommandSuccess` (polite `role="status"` banner, ~:420), **failure** through `showCommandFailure`/`reportFailure` (assertive `role="alert"` banner + `aria-hidden` echo); **zero `toast.*` calls remain** on the page. Single-announcement holds by construction (INV-1). No further action.
+
 > **✅ SUPERSEDED 2026-07-01 — folded into the command-feedback standard.** `software-architect-dbc` resolved this: it is **not** an ad-hoc inconsistency to "converge to one paradigm" but (mostly) the intended pattern, now formalized as **Banner-authoritative, toast-as-visual-echo** in [`documentation/frontend/patterns/command-feedback.md`](../../documentation/frontend/patterns/command-feedback.md). The concrete `UsersManagePage` fixes (3 double-announce sites, the `clearError()` workaround, invite success/failure asymmetry) are tracked as **Phase 2** of that standard's rollout. Retained for evidence/history only.
 
-**Origin**: Observed during PR #85 invite-user routing UAT (scenarios S1–S5, 2026-07-01). Success outcomes appeared as transient floating pop-ups; the S5 failure appeared as an anchored, persistent banner. See `dev/active/uat-pr85-invite-user-routing/runbook.md`.
+**Origin**: Observed during PR #85 invite-user routing UAT (scenarios S1–S5, 2026-07-01). Success outcomes appeared as transient floating pop-ups; the S5 failure appeared as an anchored, persistent banner. See `dev/archived/uat-pr85-invite-user-routing/runbook.md`.
 
 ## Problem
 The User Management page surfaces operation results through **two different, inconsistently-applied mechanisms**, so the same action's success and failure look like different UI paradigms:
