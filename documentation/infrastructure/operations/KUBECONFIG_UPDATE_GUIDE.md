@@ -437,10 +437,38 @@ After successful KUBECONFIG update:
 ## Reference
 
 - Original Cloudflare Tunnel plan: `.plans/cloudflare-remote-access/plan.md`
-- Cloudflare Tunnel config: `frontend/cloudflared-config.yml`
+- Cloudflare Tunnel config: maintained in the k3s host's dotfiles repo
+  ([lars-tice/dotfiles](https://github.com/lars-tice/dotfiles) → `cloudflared/config.yml`),
+  deployed to `/etc/cloudflared/config.yml` on the tunnel host. **Not** mirrored
+  in this repo — see the note below.
 - Frontend deployment workflow: `.github/workflows/frontend-deploy.yml`
 - k3s documentation: https://docs.k3s.io/
 - Cloudflare Tunnel docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+
+### Note: why the tunnel config is not kept here
+
+`frontend/cloudflared-config.yml` used to sit in this repo as a copy of the
+tunnel config. It was never read by anything — no workflow references it — but
+it had drifted badly from the live file, and that made it actively dangerous:
+
+- it was missing the `api-a4c`, `media`, `requests`, and wildcard ingress rules
+- it pointed SSH at `192.168.122.1` rather than `127.0.0.1`
+
+An operator following this guide during an incident could reasonably have copied
+it onto the host, which would have broken the tunnel rather than repaired it. It
+has been removed so there is exactly one source of truth.
+
+**CI does not depend on the tunnel config.** GitHub Actions learns where to
+deploy solely from the `KUBECONFIG` repository secret, which carries
+`server: https://k8s.firstovertheline.com`. The tunnel config lives on the host
+and determines what that hostname resolves to on the far side.
+
+To inspect or change the live config, work on the tunnel host:
+
+```bash
+sudo cat /etc/cloudflared/config.yml
+sudo systemctl status cloudflared     # must be active for deployments to work
+```
 
 ## Change History
 
