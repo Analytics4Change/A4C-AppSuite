@@ -1,7 +1,22 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2026-07-25
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: How the RBAC-secured `KUBECONFIG` for GitHub Actions deployments is structured and rotated — a namespace-scoped (NOT cluster-admin) `github-actions` service-account token reaching the k3s cluster through the public Cloudflare Tunnel endpoint `https://k8s.firstovertheline.com`.
+
+**When to read**:
+- Rotating or regenerating the `KUBECONFIG` GitHub Actions secret
+- A deploy workflow fails to reach the cluster (auth/endpoint errors)
+- Auditing the least-privilege RBAC for CI/CD
+
+**Key topics**: `kubeconfig`, `github-actions`, `rbac`, `service-account`, `cloudflare-tunnel`, `k3s`, `ci-cd`, `secret-rotation`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # KUBECONFIG Update Guide for GitHub Actions Deployment
 
@@ -436,11 +451,39 @@ After successful KUBECONFIG update:
 
 ## Reference
 
-- Original Cloudflare Tunnel plan: `.plans/cloudflare-remote-access/plan.md`
-- Cloudflare Tunnel config: `frontend/cloudflared-config.yml`
+- Original Cloudflare Tunnel plan: `documentation/infrastructure/guides/cloudflare/remote-access-plan.md`
+- Cloudflare Tunnel config: maintained in the k3s host's dotfiles repo
+  ([lars-tice/dotfiles](https://github.com/lars-tice/dotfiles) → `cloudflared/config.yml`),
+  deployed to `/etc/cloudflared/config.yml` on the tunnel host. **Not** mirrored
+  in this repo — see the note below.
 - Frontend deployment workflow: `.github/workflows/frontend-deploy.yml`
 - k3s documentation: https://docs.k3s.io/
 - Cloudflare Tunnel docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+
+### Note: why the tunnel config is not kept here
+
+`frontend/cloudflared-config.yml` used to sit in this repo as a copy of the
+tunnel config. It was never read by anything — no workflow references it — but
+it had drifted badly from the live file, and that made it actively dangerous:
+
+- it was missing the `api-a4c`, `media`, `requests`, and wildcard ingress rules
+- it pointed SSH at `192.168.122.1` rather than `127.0.0.1`
+
+An operator following this guide during an incident could reasonably have copied
+it onto the host, which would have broken the tunnel rather than repaired it. It
+has been removed so there is exactly one source of truth.
+
+**CI does not depend on the tunnel config.** GitHub Actions learns where to
+deploy solely from the `KUBECONFIG` repository secret, which carries
+`server: https://k8s.firstovertheline.com`. The tunnel config lives on the host
+and determines what that hostname resolves to on the far side.
+
+To inspect or change the live config, work on the tunnel host:
+
+```bash
+sudo cat /etc/cloudflared/config.yml
+sudo systemctl status cloudflared     # must be active for deployments to work
+```
 
 ## Change History
 
