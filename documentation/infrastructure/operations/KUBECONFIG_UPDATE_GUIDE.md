@@ -1,7 +1,22 @@
 ---
 status: current
-last_updated: 2025-01-13
+last_updated: 2026-07-25
 ---
+
+<!-- TL;DR-START -->
+## TL;DR
+
+**Summary**: How the RBAC-secured `KUBECONFIG` for GitHub Actions deployments is structured and rotated — a namespace-scoped (NOT cluster-admin) `github-actions` service-account token reaching the k3s cluster through the public Cloudflare Tunnel endpoint `https://k8s.firstovertheline.com`.
+
+**When to read**:
+- Rotating or regenerating the `KUBECONFIG` GitHub Actions secret
+- A deploy workflow fails to reach the cluster (auth/endpoint errors)
+- Auditing the least-privilege RBAC for CI/CD
+
+**Key topics**: `kubeconfig`, `github-actions`, `rbac`, `service-account`, `cloudflare-tunnel`, `k3s`, `ci-cd`, `secret-rotation`
+
+**Estimated read time**: 8 minutes
+<!-- TL;DR-END -->
 
 # KUBECONFIG Update Guide for GitHub Actions Deployment
 
@@ -436,7 +451,7 @@ After successful KUBECONFIG update:
 
 ## Reference
 
-- Original Cloudflare Tunnel plan: `.plans/cloudflare-remote-access/plan.md`
+- Original Cloudflare Tunnel plan: `documentation/infrastructure/guides/cloudflare/remote-access-plan.md`
 - Cloudflare Tunnel config: maintained in the k3s host's dotfiles repo
   ([lars-tice/dotfiles](https://github.com/lars-tice/dotfiles) → `cloudflared/config.yml`),
   deployed to `/etc/cloudflared/config.yml` on the tunnel host. **Not** mirrored
