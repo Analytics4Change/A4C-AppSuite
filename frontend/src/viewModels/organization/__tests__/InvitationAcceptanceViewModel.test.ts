@@ -1,310 +1,291 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InvitationAcceptanceViewModel } from '../InvitationAcceptanceViewModel';
 import type { IInvitationService } from '@/services/invitation/IInvitationService';
+import type { IAuthProvider } from '@/services/auth/IAuthProvider';
+import type { InvitationDetails, AcceptInvitationResult } from '@/types';
+
+// Shared storage mock so OAuth-context persistence is assertable (vi.mock is hoisted).
+const { mockStorage } = vi.hoisted(() => ({
+  mockStorage: {
+    setItem: vi.fn().mockResolvedValue(undefined),
+    getItem: vi.fn().mockResolvedValue(null),
+    removeItem: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('@/services/storage', () => ({
+  getAuthContextStorage: () => mockStorage,
+}));
+
+vi.mock('@/utils/platform', () => ({
+  detectPlatform: () => 'web',
+  getCallbackUrl: () => 'https://app.example.com/auth/callback',
+}));
+
+// ── Test fixtures ──────────────────────────────────────────────────────────
+
+function validDetails(overrides: Partial<InvitationDetails> = {}): InvitationDetails {
+  return {
+    orgName: 'Acme Health',
+    roles: [{ role_id: 'role-1', role_name: 'Viewer' }],
+    inviterName: 'Jane Admin',
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    email: 'invitee@example.com',
+    ...overrides,
+  };
+}
+
+const validResult: AcceptInvitationResult = {
+  userId: 'user-1',
+  orgId: 'org-1',
+  redirectUrl: '/dashboard',
+};
+
+function makeService(overrides: Partial<IInvitationService> = {}): IInvitationService {
+  return {
+    validateInvitation: vi.fn().mockResolvedValue(validDetails()),
+    acceptInvitation: vi.fn().mockResolvedValue(validResult),
+    resendInvitation: vi.fn().mockResolvedValue(true),
+    ...overrides,
+  };
+}
+
+function makeAuthProvider(): IAuthProvider {
+  return { loginWithOAuth: vi.fn().mockResolvedValue(undefined) } as unknown as IAuthProvider;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('InvitationAcceptanceViewModel', () => {
-  let viewModel: InvitationAcceptanceViewModel;
-  let mockInvitationService: IInvitationService;
-
   beforeEach(() => {
-    // Mock invitation service
-    mockInvitationService = {
-      validateToken: vi.fn().mockResolvedValue({
-        valid: true,
-        email: 'john@example.com',
-        organizationName: 'Test Organization',
-        organizationId: 'org-123',
-        expiresAt: new Date(Date.now() + 86400000).toISOString(), // 24 hours from now
-        expired: false,
-        alreadyAccepted: false,
-      }),
-      acceptInvitation: vi.fn().mockResolvedValue({
-        success: true,
-        userId: 'user-123',
-        organizationId: 'org-123',
-        redirectUrl: '/organizations/org-123/dashboard',
-      }),
-    };
-
-    // Create view model with mocked dependency
-    viewModel = new InvitationAcceptanceViewModel(mockInvitationService);
+    vi.clearAllMocks();
   });
 
-  describe('Initialization', () => {
-    it('should initialize with null invitation data', () => {
-      expect(viewModel.invitationData).toBeNull();
-    });
-
-    it('should not be loading initially', () => {
-      expect(viewModel.isLoading).toBe(false);
-    });
-
-    it('should not be validating initially', () => {
-      expect(viewModel.isValidating).toBe(false);
-    });
-
-    it('should have no error initially', () => {
-      expect(viewModel.error).toBeNull();
-    });
-
-    it('should have empty password field', () => {
-      expect(viewModel.password).toBe('');
+  describe('initialization', () => {
+    it('starts with no invitation details, idle state, and empty credentials', () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      expect(vm.invitationDetails).toBeNull();
+      expect(vm.isValidatingToken).toBe(false);
+      expect(vm.isAccepting).toBe(false);
+      expect(vm.validationError).toBeNull();
+      expect(vm.acceptanceError).toBeNull();
+      expect(vm.password).toBe('');
+      expect(vm.isTokenValid).toBe(false);
     });
   });
 
-  describe('Token Validation', () => {
-    it('should validate a valid token', async () => {
-      await viewModel.validateToken('valid-token-123');
+  describe('validateToken', () => {
+    it('stores details, pre-fills email, and marks the token valid', async () => {
+      const service = makeService();
+      const vm = new InvitationAcceptanceViewModel(service);
 
-      expect(mockInvitationService.validateToken).toHaveBeenCalledWith('valid-token-123');
-      expect(viewModel.invitationData).not.toBeNull();
-      expect(viewModel.invitationData?.email).toBe('john@example.com');
-      expect(viewModel.invitationData?.organizationName).toBe('Test Organization');
+      const ok = await vm.validateToken('tok-123');
+
+      expect(ok).toBe(true);
+      expect(service.validateInvitation).toHaveBeenCalledWith('tok-123');
+      expect(vm.invitationDetails?.orgName).toBe('Acme Health');
+      expect(vm.email).toBe('invitee@example.com');
+      expect(vm.isTokenValid).toBe(true);
+      expect(vm.isValidatingToken).toBe(false);
     });
 
-    it('should set isValidating during validation', async () => {
-      const validatePromise = viewModel.validateToken('token-123');
-      expect(viewModel.isValidating).toBe(true);
-      await validatePromise;
-      expect(viewModel.isValidating).toBe(false);
+    it('sets isValidatingToken while the request is in flight', async () => {
+      const d = deferred<InvitationDetails>();
+      const service = makeService({ validateInvitation: vi.fn().mockReturnValue(d.promise) });
+      const vm = new InvitationAcceptanceViewModel(service);
+
+      const pending = vm.validateToken('tok');
+      expect(vm.isValidatingToken).toBe(true);
+
+      d.resolve(validDetails());
+      await pending;
+      expect(vm.isValidatingToken).toBe(false);
     });
 
-    it('should handle invalid token', async () => {
-      mockInvitationService.validateToken = vi.fn().mockResolvedValue({
-        valid: false,
-        expired: true,
+    it('surfaces an invalid/expired/already-accepted token as a validationError', async () => {
+      const service = makeService({
+        validateInvitation: vi.fn().mockRejectedValue(new Error('Invitation has expired')),
       });
+      const vm = new InvitationAcceptanceViewModel(service);
 
-      await viewModel.validateToken('invalid-token');
+      const ok = await vm.validateToken('tok');
 
-      expect(viewModel.invitationData).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(viewModel.error).toContain('expired');
-    });
-
-    it('should handle already accepted invitation', async () => {
-      mockInvitationService.validateToken = vi.fn().mockResolvedValue({
-        valid: false,
-        alreadyAccepted: true,
-      });
-
-      await viewModel.validateToken('used-token');
-
-      expect(viewModel.invitationData).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(viewModel.error).toContain('already been accepted');
-    });
-
-    it('should handle validation errors', async () => {
-      mockInvitationService.validateToken = vi.fn().mockRejectedValue(
-        new Error('Network error')
-      );
-
-      await viewModel.validateToken('token-123');
-
-      expect(viewModel.invitationData).toBeNull();
-      expect(viewModel.error).toBeDefined();
+      expect(ok).toBe(false);
+      expect(vm.validationError).toBe('Invitation has expired');
+      expect(vm.isTokenValid).toBe(false);
+      expect(vm.invitationDetails).toBeNull();
     });
   });
 
-  describe('Password Updates', () => {
-    it('should update password field', () => {
-      viewModel.setPassword('SecurePassword123!');
-      expect(viewModel.password).toBe('SecurePassword123!');
+  describe('credential setters', () => {
+    it('updates fields and clears the corresponding field error', () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      vm.setPassword('secret12');
+      vm.setConfirmPassword('secret12');
+      vm.setEmail('user@example.com');
+      expect(vm.password).toBe('secret12');
+      expect(vm.confirmPassword).toBe('secret12');
+      expect(vm.email).toBe('user@example.com');
+      expect(vm.passwordError).toBeNull();
+      expect(vm.emailError).toBeNull();
     });
   });
 
-  describe('Accept Invitation with Email/Password', () => {
-    beforeEach(async () => {
-      await viewModel.validateToken('valid-token-123');
+  describe('acceptWithEmailPassword', () => {
+    async function validatedVm(service = makeService()) {
+      const vm = new InvitationAcceptanceViewModel(service);
+      await vm.validateToken('tok-123');
+      return vm;
+    }
+
+    it('accepts with valid credentials and returns the result', async () => {
+      const service = makeService();
+      const vm = await validatedVm(service);
+      vm.setPassword('SecurePass123');
+      vm.setConfirmPassword('SecurePass123');
+
+      const result = await vm.acceptWithEmailPassword();
+
+      expect(result).toEqual(validResult);
+      expect(service.acceptInvitation).toHaveBeenCalledWith('tok-123', {
+        email: 'invitee@example.com',
+        password: 'SecurePass123',
+      });
+      expect(vm.acceptanceResult).toEqual(validResult);
+      expect(vm.redirectUrl).toBe('/dashboard');
     });
 
-    it('should accept invitation with valid password', async () => {
-      viewModel.setPassword('SecurePassword123!');
-      const result = await viewModel.acceptWithEmailPassword();
+    it('does not accept without a password', async () => {
+      const service = makeService();
+      const vm = await validatedVm(service);
 
-      expect(mockInvitationService.acceptInvitation).toHaveBeenCalledWith(
-        'valid-token-123',
-        'email_password',
-        { password: 'SecurePassword123!' }
-      );
-      expect(result).not.toBeNull();
-      expect(result?.success).toBe(true);
-      expect(result?.redirectUrl).toBeDefined();
-    });
-
-    it('should not accept without password', async () => {
-      const result = await viewModel.acceptWithEmailPassword();
-      expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(mockInvitationService.acceptInvitation).not.toHaveBeenCalled();
-    });
-
-    it('should not accept without valid invitation data', async () => {
-      viewModel.invitationData = null;
-      viewModel.setPassword('Password123!');
-
-      const result = await viewModel.acceptWithEmailPassword();
-      expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(mockInvitationService.acceptInvitation).not.toHaveBeenCalled();
-    });
-
-    it('should set isLoading during acceptance', async () => {
-      viewModel.setPassword('Password123!');
-      const acceptPromise = viewModel.acceptWithEmailPassword();
-      expect(viewModel.isLoading).toBe(true);
-      await acceptPromise;
-      expect(viewModel.isLoading).toBe(false);
-    });
-
-    it('should validate password strength', async () => {
-      viewModel.setPassword('weak');
-      const result = await viewModel.acceptWithEmailPassword();
-      expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(viewModel.error).toContain('at least 8 characters');
-    });
-
-    it('should handle acceptance errors', async () => {
-      mockInvitationService.acceptInvitation = vi.fn().mockRejectedValue(
-        new Error('Server error')
-      );
-
-      viewModel.setPassword('Password123!');
-      const result = await viewModel.acceptWithEmailPassword();
+      const result = await vm.acceptWithEmailPassword();
 
       expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(viewModel.isLoading).toBe(false);
+      expect(vm.passwordError).toBe('Password is required');
+      expect(service.acceptInvitation).not.toHaveBeenCalled();
+    });
+
+    it('rejects a too-short password and a confirmation mismatch', async () => {
+      const vm = await validatedVm();
+      vm.setPassword('short');
+      vm.setConfirmPassword('short');
+      expect(await vm.acceptWithEmailPassword()).toBeNull();
+      expect(vm.passwordError).toMatch(/at least 8/);
+
+      vm.setPassword('SecurePass123');
+      vm.setConfirmPassword('different');
+      expect(await vm.acceptWithEmailPassword()).toBeNull();
+      expect(vm.confirmPasswordError).toMatch(/do not match/);
+    });
+
+    it('does not accept without a validated token', async () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      vm.setPassword('SecurePass123');
+      vm.setConfirmPassword('SecurePass123');
+      expect(await vm.acceptWithEmailPassword()).toBeNull();
+    });
+
+    it('sets isAccepting while the request is in flight', async () => {
+      const d = deferred<AcceptInvitationResult>();
+      const service = makeService({ acceptInvitation: vi.fn().mockReturnValue(d.promise) });
+      const vm = await validatedVm(service);
+      vm.setPassword('SecurePass123');
+      vm.setConfirmPassword('SecurePass123');
+
+      const pending = vm.acceptWithEmailPassword();
+      expect(vm.isAccepting).toBe(true);
+
+      d.resolve(validResult);
+      await pending;
+      expect(vm.isAccepting).toBe(false);
+    });
+
+    it('surfaces an acceptance error', async () => {
+      const service = makeService({
+        acceptInvitation: vi.fn().mockRejectedValue(new Error('Email already registered')),
+      });
+      const vm = await validatedVm(service);
+      vm.setPassword('SecurePass123');
+      vm.setConfirmPassword('SecurePass123');
+
+      const result = await vm.acceptWithEmailPassword();
+
+      expect(result).toBeNull();
+      expect(vm.acceptanceError).toBe('Email already registered');
     });
   });
 
-  describe('Accept Invitation with Google OAuth', () => {
-    beforeEach(async () => {
-      await viewModel.validateToken('valid-token-123');
-    });
+  describe('acceptWithOAuth', () => {
+    it('stores the invitation context and initiates the provider redirect', async () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      await vm.validateToken('tok-123'); // pre-fills a valid email
+      const authProvider = makeAuthProvider();
 
-    it('should accept invitation with OAuth user ID', async () => {
-      const result = await viewModel.acceptWithGoogleOAuth('oauth-user-456');
+      await vm.acceptWithOAuth('google', authProvider);
 
-      expect(mockInvitationService.acceptInvitation).toHaveBeenCalledWith(
-        'valid-token-123',
-        'google_oauth',
-        { oauthUserId: 'oauth-user-456', oauthProvider: 'google' }
+      expect(mockStorage.setItem).toHaveBeenCalled();
+      expect(authProvider.loginWithOAuth).toHaveBeenCalledWith(
+        'google',
+        expect.objectContaining({ redirectTo: expect.any(String) })
       );
-      expect(result).not.toBeNull();
-      expect(result?.success).toBe(true);
     });
 
-    it('should not accept without OAuth user ID', async () => {
-      const result = await viewModel.acceptWithGoogleOAuth('');
-      expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
+    it('sets acceptanceError when there is no token', async () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      const authProvider = makeAuthProvider();
+
+      await vm.acceptWithOAuth('google', authProvider);
+
+      expect(vm.acceptanceError).toBe('Missing invitation token');
+      expect(authProvider.loginWithOAuth).not.toHaveBeenCalled();
     });
 
-    it('should not accept without valid invitation data', async () => {
-      viewModel.invitationData = null;
-      const result = await viewModel.acceptWithGoogleOAuth('oauth-user-456');
-      expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
-    });
+    it('sets emailError when the email is invalid', async () => {
+      const service = makeService({
+        validateInvitation: vi.fn().mockResolvedValue(validDetails({ email: undefined })),
+      });
+      const vm = new InvitationAcceptanceViewModel(service);
+      await vm.validateToken('tok-123');
+      vm.setEmail('not-an-email');
+      const authProvider = makeAuthProvider();
 
-    it('should set isLoading during OAuth acceptance', async () => {
-      const acceptPromise = viewModel.acceptWithGoogleOAuth('oauth-user-456');
-      expect(viewModel.isLoading).toBe(true);
-      await acceptPromise;
-      expect(viewModel.isLoading).toBe(false);
-    });
+      await vm.acceptWithOAuth('google', authProvider);
 
-    it('should handle OAuth acceptance errors', async () => {
-      mockInvitationService.acceptInvitation = vi.fn().mockRejectedValue(
-        new Error('OAuth error')
-      );
-
-      const result = await viewModel.acceptWithGoogleOAuth('oauth-user-456');
-
-      expect(result).toBeNull();
-      expect(viewModel.error).toBeDefined();
-      expect(viewModel.isLoading).toBe(false);
+      expect(vm.emailError).toMatch(/Valid email is required/);
+      expect(authProvider.loginWithOAuth).not.toHaveBeenCalled();
     });
   });
 
-  describe('Computed Properties', () => {
-    it('should compute isValid correctly for valid invitation', async () => {
-      await viewModel.validateToken('valid-token-123');
-      expect(viewModel.isValid).toBe(true);
+  describe('computed properties & reset', () => {
+    it('canSubmit reflects a valid token, non-empty email, and not-accepting', async () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      expect(vm.canSubmit).toBe(false);
+      await vm.validateToken('tok-123');
+      expect(vm.canSubmit).toBe(true);
     });
 
-    it('should compute isValid as false without invitation data', () => {
-      expect(viewModel.isValid).toBe(false);
-    });
+    it('reset returns the ViewModel to its initial state', async () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      await vm.validateToken('tok-123');
+      vm.setPassword('SecurePass123');
 
-    it('should compute isExpired correctly', async () => {
-      mockInvitationService.validateToken = vi.fn().mockResolvedValue({
-        valid: false,
-        expired: true,
-        expiresAt: new Date(Date.now() - 1000).toISOString(), // Past date
-      });
+      vm.reset();
 
-      await viewModel.validateToken('expired-token');
-      expect(viewModel.isExpired).toBe(true);
-    });
-
-    it('should compute isAlreadyAccepted correctly', async () => {
-      mockInvitationService.validateToken = vi.fn().mockResolvedValue({
-        valid: false,
-        alreadyAccepted: true,
-      });
-
-      await viewModel.validateToken('used-token');
-      expect(viewModel.isAlreadyAccepted).toBe(true);
-    });
-  });
-
-  describe('Error Clearing', () => {
-    it('should clear error on new validation attempt', async () => {
-      // First validation fails
-      mockInvitationService.validateToken = vi.fn().mockRejectedValue(
-        new Error('Error 1')
-      );
-      await viewModel.validateToken('token-1');
-      expect(viewModel.error).toBeDefined();
-
-      // Second validation succeeds
-      mockInvitationService.validateToken = vi.fn().mockResolvedValue({
-        valid: true,
-        email: 'test@example.com',
-        organizationName: 'Org',
-        organizationId: 'org-123',
-        expiresAt: new Date(Date.now() + 86400000).toISOString(),
-        expired: false,
-        alreadyAccepted: false,
-      });
-      await viewModel.validateToken('token-2');
-      expect(viewModel.error).toBeNull();
-    });
-
-    it('should clear error on new acceptance attempt', async () => {
-      await viewModel.validateToken('valid-token-123');
-
-      // First attempt fails
-      mockInvitationService.acceptInvitation = vi.fn().mockRejectedValue(
-        new Error('Error')
-      );
-      viewModel.setPassword('Password123!');
-      await viewModel.acceptWithEmailPassword();
-      expect(viewModel.error).toBeDefined();
-
-      // Second attempt succeeds
-      mockInvitationService.acceptInvitation = vi.fn().mockResolvedValue({
-        success: true,
-        userId: 'user-123',
-        organizationId: 'org-123',
-        redirectUrl: '/organizations/org-123/dashboard',
-      });
-      await viewModel.acceptWithEmailPassword();
-      expect(viewModel.error).toBeNull();
+      expect(vm.token).toBeNull();
+      expect(vm.invitationDetails).toBeNull();
+      expect(vm.password).toBe('');
+      expect(vm.isTokenValid).toBe(false);
     });
   });
 });
