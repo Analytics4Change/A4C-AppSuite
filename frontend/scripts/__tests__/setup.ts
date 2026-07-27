@@ -13,25 +13,25 @@ import { pluginRegistry } from '../plugins/registry.js';
 beforeAll(async () => {
   // Set test environment
   process.env.NODE_ENV = 'test';
-  
+
   // Configure for testing
   configManager.override({
     logging: {
       level: 'error', // Suppress logs during tests
       enableColors: false,
       enableTimestamps: false,
-      format: 'simple'
+      format: 'simple',
     },
     progress: {
-      style: 'none' // Disable progress bars in tests
+      style: 'none', // Disable progress bars in tests
     },
     cache: {
-      enabled: false // Disable caching in tests
+      enabled: false, // Disable caching in tests
     },
     performance: {
       concurrency: 1, // Run sequentially in tests
-      timeoutMs: 5000 // Shorter timeout for tests
-    }
+      timeoutMs: 5000, // Shorter timeout for tests
+    },
   });
 });
 
@@ -49,7 +49,7 @@ afterAll(async () => {
 beforeEach(async () => {
   // Reset plugin registry
   pluginRegistry.resetMetrics();
-  
+
   // Clear any test-specific configuration overrides
   // (would need to implement reset functionality in ConfigManager)
 });
@@ -70,11 +70,11 @@ const originalConsole = {
   warn: console.warn,
   error: console.error,
   info: console.info,
-  debug: console.debug
+  debug: console.debug,
 };
 
 // Store original methods for potential restoration
-globalThis.__originalConsole = originalConsole;
+(globalThis as Record<string, unknown>).__originalConsole = originalConsole;
 
 // Override console methods in test environment
 if (process.env.NODE_ENV === 'test') {
@@ -109,9 +109,9 @@ export async function createTempDir(): Promise<string> {
   const { mkdtemp, rm } = await import('fs/promises');
   const { join } = await import('path');
   const { tmpdir } = await import('os');
-  
+
   const tempDir = await mkdtemp(join(tmpdir(), 'docs-scripts-test-'));
-  
+
   // Register cleanup
   afterEach(async () => {
     try {
@@ -120,24 +120,27 @@ export async function createTempDir(): Promise<string> {
       // Ignore cleanup errors
     }
   });
-  
+
   return tempDir;
 }
 
 /**
  * Create a mock file system structure for testing
  */
-export async function createMockFileSystem(structure: Record<string, string>, baseDir: string): Promise<void> {
+export async function createMockFileSystem(
+  structure: Record<string, string>,
+  baseDir: string
+): Promise<void> {
   const { mkdir, writeFile } = await import('fs/promises');
   const { dirname, join } = await import('path');
-  
+
   for (const [filePath, content] of Object.entries(structure)) {
     const fullPath = join(baseDir, filePath);
     const dir = dirname(fullPath);
-    
+
     // Create directory structure
     await mkdir(dir, { recursive: true });
-    
+
     // Write file
     await writeFile(fullPath, content, 'utf-8');
   }
@@ -158,10 +161,10 @@ export function createMockPlugin(name: string, overrides: any = {}) {
         data: null,
         errors: [],
         warnings: [],
-        metadata: {}
+        metadata: {},
       };
     },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -169,7 +172,7 @@ export function createMockPlugin(name: string, overrides: any = {}) {
  * Wait for a specified amount of time (useful for async testing)
  */
 export function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -177,22 +180,22 @@ export function wait(ms: number): Promise<void> {
  */
 export function captureConsole() {
   const captured: { method: string; args: any[] }[] = [];
-  
+
   const originalMethods = {
     log: console.log,
     warn: console.warn,
     error: console.error,
-    info: console.info
+    info: console.info,
   };
-  
+
   // Override console methods to capture output
   console.log = (...args) => captured.push({ method: 'log', args });
   console.warn = (...args) => captured.push({ method: 'warn', args });
   console.error = (...args) => captured.push({ method: 'error', args });
   console.info = (...args) => captured.push({ method: 'info', args });
-  
+
   return {
     captured,
-    restore: () => Object.assign(console, originalMethods)
+    restore: () => Object.assign(console, originalMethods),
   };
 }
