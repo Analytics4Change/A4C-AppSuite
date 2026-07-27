@@ -20,9 +20,10 @@ export interface IDirectCareSettingsService {
    * Get direct care settings for an organization
    *
    * @param orgId - Organization UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the read.
    * @returns Settings object (defaults if never set)
    */
-  getSettings(orgId: string): Promise<DirectCareSettings>;
+  getSettings(orgId: string, correlationId?: string): Promise<DirectCareSettings>;
 
   /**
    * Update direct care settings for an organization
@@ -37,6 +38,6 @@ export interface IDirectCareSettingsService {
     orgId: string,
     enableStaffClientMapping: boolean | null,
     enableScheduleEnforcement: boolean | null,
-    reason: string,
+    reason: string
   ): Promise<DirectCareSettings>;
 }

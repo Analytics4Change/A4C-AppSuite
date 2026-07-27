@@ -87,4 +87,57 @@ describe('SupabaseUserQueryService — correlation-id threading', () => {
       { correlationId: undefined }
     );
   });
+
+  // Secondary reads threaded in the residual-apirpc-reads sweep.
+
+  it('getInvitations (standalone) pins the correlation id', async () => {
+    await service.getInvitations('corr-inv-list');
+    const call = mockApiRpc.mock.calls.find((c) => c[0] === 'list_invitations');
+    expect(call?.[2]).toEqual({ correlationId: 'corr-inv-list' });
+  });
+
+  it('getUserOrganizations pins the correlation id', async () => {
+    await service.getUserOrganizations('corr-orgs');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'list_user_org_access',
+      { p_user_id: 'user-test' },
+      { correlationId: 'corr-orgs' }
+    );
+  });
+
+  it('getUserAddresses pins the correlation id', async () => {
+    await service.getUserAddresses('u1', 'corr-addr');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'get_user_addresses',
+      { p_user_id: 'u1' },
+      { correlationId: 'corr-addr' }
+    );
+  });
+
+  it('getUserPhones pins the correlation id', async () => {
+    await service.getUserPhones('u1', 'corr-phones');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'get_user_phones',
+      { p_user_id: 'u1', p_organization_id: 'org-test' },
+      { correlationId: 'corr-phones' }
+    );
+  });
+
+  it('getUserOrgAccess pins the correlation id', async () => {
+    await service.getUserOrgAccess('u1', 'org-9', 'corr-access');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'get_user_org_access',
+      { p_user_id: 'u1', p_org_id: 'org-9' },
+      { correlationId: 'corr-access' }
+    );
+  });
+
+  it('getUserNotificationPreferences pins the correlation id', async () => {
+    await service.getUserNotificationPreferences('u1', 'corr-prefs');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'get_user_notification_preferences',
+      { p_user_id: 'u1', p_organization_id: 'org-test' },
+      { correlationId: 'corr-prefs' }
+    );
+  });
 });

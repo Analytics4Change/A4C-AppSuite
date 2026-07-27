@@ -33,6 +33,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IScheduleService } from '@/services/schedule/IScheduleService';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
 import type {
@@ -308,6 +309,8 @@ export class ScheduleAssignmentViewModel {
   async loadUsers(): Promise<void> {
     if (this.isLoading) return;
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -320,12 +323,15 @@ export class ScheduleAssignmentViewModel {
         offset: this.offset,
       });
 
-      const users = await this.service.listUsersForScheduleManagement({
-        templateId: this.template.id,
-        searchTerm: this.searchTerm || undefined,
-        limit: this.pageSize,
-        offset: this.offset,
-      });
+      const users = await this.service.listUsersForScheduleManagement(
+        {
+          templateId: this.template.id,
+          searchTerm: this.searchTerm || undefined,
+          limit: this.pageSize,
+          offset: this.offset,
+        },
+        correlationId
+      );
 
       runInAction(() => {
         // Map to ScheduleManageableUserState with checkbox state
@@ -368,7 +374,7 @@ export class ScheduleAssignmentViewModel {
         this.error = err instanceof Error ? err.message : 'Failed to load users';
         this.isLoading = false;
       });
-      log.error('Failed to load users', err);
+      log.error('Failed to load users', { error: err, correlationId });
     }
   }
 

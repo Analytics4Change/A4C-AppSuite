@@ -818,7 +818,8 @@ export class MockRoleService implements IRoleService {
    * Lists users eligible for bulk role assignment
    */
   async listUsersForBulkAssignment(
-    params: ListUsersForBulkAssignmentParams
+    params: ListUsersForBulkAssignmentParams,
+    _correlationId?: string
   ): Promise<SelectableUser[]> {
     await this.simulateDelay();
     log.debug('Mock: Listing users for bulk assignment', { params });
@@ -994,7 +995,8 @@ export class MockRoleService implements IRoleService {
    * Lists ALL users for role management with their current assignment status
    */
   async listUsersForRoleManagement(
-    params: ListUsersForRoleManagementParams
+    params: ListUsersForRoleManagementParams,
+    _correlationId?: string
   ): Promise<ManageableUser[]> {
     await this.simulateDelay();
     log.debug('Mock: Listing users for role management', { params });

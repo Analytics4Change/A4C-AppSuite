@@ -60,7 +60,7 @@ describe('DirectCareSettingsViewModel', () => {
     it('loads settings successfully', async () => {
       await vm.loadSettings('org-123');
 
-      expect(mockService.getSettings).toHaveBeenCalledWith('org-123');
+      expect(mockService.getSettings).toHaveBeenCalledWith('org-123', expect.any(String));
       expect(vm.settings).toEqual({
         enable_staff_client_mapping: false,
         enable_schedule_enforcement: false,

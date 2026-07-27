@@ -663,7 +663,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
   /**
    * Get all pending invitations for current org
    */
-  async getInvitations(): Promise<Invitation[]> {
+  async getInvitations(correlationId?: string): Promise<Invitation[]> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client
@@ -683,14 +683,18 @@ export class SupabaseUserQueryService implements IUserQueryService {
 
     try {
       // Use RPC function for CQRS-compliant query (not direct table access)
-      const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>('list_invitations', {
-        p_org_id: claims.org_id,
-        p_status: ['pending', 'expired'],
-        p_search_term: null,
-      });
+      const { data, error } = await supabaseService.apiRpc<DbInvitationRow[]>(
+        'list_invitations',
+        {
+          p_org_id: claims.org_id,
+          p_status: ['pending', 'expired'],
+          p_search_term: null,
+        },
+        { correlationId }
+      );
 
       if (error) {
-        log.error('Failed to fetch invitations', error);
+        log.error('Failed to fetch invitations', { error, correlationId });
         return [];
       }
 
@@ -721,7 +725,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         updatedAt: new Date(inv.updated_at ?? inv.created_at),
       }));
     } catch (error) {
-      log.error('Error in getInvitations', error);
+      log.error('Error in getInvitations', { error, correlationId });
       return [];
     }
   }
@@ -990,7 +994,9 @@ export class SupabaseUserQueryService implements IUserQueryService {
    * Uses api.list_user_org_access RPC to fetch user's organization access
    * with active status calculated server-side.
    */
-  async getUserOrganizations(): Promise<Array<{ id: string; name: string; type: string }>> {
+  async getUserOrganizations(
+    correlationId?: string
+  ): Promise<Array<{ id: string; name: string; type: string }>> {
     const client = supabaseService.getClient();
 
     // Get session from Supabase client (already authenticated)
@@ -1013,11 +1019,12 @@ export class SupabaseUserQueryService implements IUserQueryService {
       // Use RPC function instead of direct table access
       const { data, error } = await supabaseService.apiRpc<DbUserOrgAccessListItem[]>(
         'list_user_org_access',
-        { p_user_id: claims.sub }
+        { p_user_id: claims.sub },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch user organizations via RPC', error);
+        log.error('Failed to fetch user organizations via RPC', { error, correlationId });
         return [];
       }
 
@@ -1033,7 +1040,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
           type: uoa.org_type,
         }));
     } catch (error) {
-      log.error('Error in getUserOrganizations', error);
+      log.error('Error in getUserOrganizations', { error, correlationId });
       return [];
     }
   }
@@ -1042,16 +1049,17 @@ export class SupabaseUserQueryService implements IUserQueryService {
   // Extended Data Collection Methods
   // ============================================================================
 
-  async getUserAddresses(userId: string): Promise<UserAddress[]> {
+  async getUserAddresses(userId: string, correlationId?: string): Promise<UserAddress[]> {
     try {
       // Use RPC function for CQRS compliance
       const { data, error } = await supabaseService.apiRpc<DbUserAddressRow[]>(
         'get_user_addresses',
-        { p_user_id: userId }
+        { p_user_id: userId },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch user addresses via RPC', error);
+        log.error('Failed to fetch user addresses via RPC', { error, correlationId });
         return [];
       }
 
@@ -1074,7 +1082,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         updatedAt: new Date(addr.updated_at),
       }));
     } catch (error) {
-      log.error('Error in getUserAddresses', error);
+      log.error('Error in getUserAddresses', { error, correlationId });
       return [];
     }
   }
@@ -1084,7 +1092,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * Returns the user's global phones (user_phones table).
    */
-  async getUserPhones(userId: string): Promise<UserPhone[]> {
+  async getUserPhones(userId: string, correlationId?: string): Promise<UserPhone[]> {
     const client = supabaseService.getClient();
 
     try {
@@ -1101,13 +1109,17 @@ export class SupabaseUserQueryService implements IUserQueryService {
       const orgId = claims.org_id;
 
       // Use the RPC that returns both global and org-specific phones
-      const { data, error } = await supabaseService.apiRpc<UserPhoneRow[]>('get_user_phones', {
-        p_user_id: userId,
-        p_organization_id: orgId ?? null,
-      });
+      const { data, error } = await supabaseService.apiRpc<UserPhoneRow[]>(
+        'get_user_phones',
+        {
+          p_user_id: userId,
+          p_organization_id: orgId ?? null,
+        },
+        { correlationId }
+      );
 
       if (error) {
-        log.error('Failed to fetch user phones via RPC', error);
+        log.error('Failed to fetch user phones via RPC', { error, correlationId });
         return [];
       }
 
@@ -1128,7 +1140,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         updatedAt: new Date(),
       }));
     } catch (error) {
-      log.error('Error in getUserPhones', error);
+      log.error('Error in getUserPhones', { error, correlationId });
       return [];
     }
   }
@@ -1138,7 +1150,11 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * Uses api.get_user_org_access RPC instead of direct table access.
    */
-  async getUserOrgAccess(userId: string, orgId: string): Promise<UserOrgAccess | null> {
+  async getUserOrgAccess(
+    userId: string,
+    orgId: string,
+    correlationId?: string
+  ): Promise<UserOrgAccess | null> {
     try {
       // Use RPC function instead of direct table access
       const { data, error } = await supabaseService.apiRpc<DbUserOrgAccessRow[]>(
@@ -1146,11 +1162,12 @@ export class SupabaseUserQueryService implements IUserQueryService {
         {
           p_user_id: userId,
           p_org_id: orgId,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch user org access via RPC', error);
+        log.error('Failed to fetch user org access via RPC', { error, correlationId });
         return null;
       }
 
@@ -1174,7 +1191,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         updatedAt: new Date(access.updated_at),
       };
     } catch (error) {
-      log.error('Error in getUserOrgAccess', error);
+      log.error('Error in getUserOrgAccess', { error, correlationId });
       return null;
     }
   }
@@ -1185,7 +1202,10 @@ export class SupabaseUserQueryService implements IUserQueryService {
    * Uses api.get_user_notification_preferences RPC to read from the
    * normalized notification preferences projection table.
    */
-  async getUserNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+  async getUserNotificationPreferences(
+    userId: string,
+    correlationId?: string
+  ): Promise<NotificationPreferences> {
     const client = supabaseService.getClient();
 
     try {
@@ -1212,18 +1232,19 @@ export class SupabaseUserQueryService implements IUserQueryService {
         {
           p_user_id: userId,
           p_organization_id: orgId,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch notification preferences via RPC', error);
+        log.error('Failed to fetch notification preferences via RPC', { error, correlationId });
         return DEFAULT_NOTIFICATION_PREFERENCES;
       }
 
       // RPC returns properly structured preferences or defaults
       return data ?? DEFAULT_NOTIFICATION_PREFERENCES;
     } catch (error) {
-      log.error('Error in getUserNotificationPreferences', error);
+      log.error('Error in getUserNotificationPreferences', { error, correlationId });
       return DEFAULT_NOTIFICATION_PREFERENCES;
     }
   }

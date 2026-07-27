@@ -38,19 +38,21 @@ export class AssignmentListViewModel {
 
   /** Check whether the org has enable_staff_client_mapping enabled */
   async checkFeatureFlag(orgId: string): Promise<void> {
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.featureCheckLoading = true;
     });
 
     try {
-      const settings = await this.settingsService.getSettings(orgId);
+      const settings = await this.settingsService.getSettings(orgId, correlationId);
       runInAction(() => {
         this.featureEnabled = settings.enable_staff_client_mapping;
         this.featureCheckLoading = false;
       });
       log.debug('Feature flag checked', { enable_staff_client_mapping: this.featureEnabled });
     } catch (error) {
-      log.warn('Failed to check feature flag, assuming enabled', { error });
+      log.warn('Failed to check feature flag, assuming enabled', { error, correlationId });
       runInAction(() => {
         this.featureEnabled = true;
         this.featureCheckLoading = false;

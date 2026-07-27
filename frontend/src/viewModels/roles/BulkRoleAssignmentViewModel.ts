@@ -33,6 +33,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IRoleService } from '@/services/roles/IRoleService';
 import { getRoleService } from '@/services/roles/RoleServiceFactory';
 import type {
@@ -223,9 +224,7 @@ export class BulkRoleAssignmentViewModel {
    * Whether the operation had partial success (some failures)
    */
   get isPartialSuccess(): boolean {
-    return (
-      this.result !== null && this.result.totalSucceeded > 0 && this.result.totalFailed > 0
-    );
+    return this.result !== null && this.result.totalSucceeded > 0 && this.result.totalFailed > 0;
   }
 
   /**
@@ -245,6 +244,8 @@ export class BulkRoleAssignmentViewModel {
   async loadUsers(): Promise<void> {
     if (this.isLoading) return;
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -259,13 +260,16 @@ export class BulkRoleAssignmentViewModel {
         offset: this.offset,
       });
 
-      const users = await this.service.listUsersForBulkAssignment({
-        roleId: this.role.id,
-        scopePath: this.scopePath,
-        searchTerm: this.searchTerm || undefined,
-        limit: this.pageSize,
-        offset: this.offset,
-      });
+      const users = await this.service.listUsersForBulkAssignment(
+        {
+          roleId: this.role.id,
+          scopePath: this.scopePath,
+          searchTerm: this.searchTerm || undefined,
+          limit: this.pageSize,
+          offset: this.offset,
+        },
+        correlationId
+      );
 
       runInAction(() => {
         // Map to UserSelectionState with isSelected tracking
@@ -295,7 +299,7 @@ export class BulkRoleAssignmentViewModel {
         this.error = err instanceof Error ? err.message : 'Failed to load users';
         this.isLoading = false;
       });
-      log.error('Failed to load users', err);
+      log.error('Failed to load users', { error: err, correlationId });
     }
   }
 

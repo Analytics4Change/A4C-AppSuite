@@ -347,7 +347,8 @@ export class MockScheduleService implements IScheduleService {
   }
 
   async listUsersForScheduleManagement(
-    params: ListUsersForScheduleManagementParams
+    params: ListUsersForScheduleManagementParams,
+    _correlationId?: string
   ): Promise<ScheduleManageableUser[]> {
     log.debug('[Mock] Listing users for schedule management', params);
     await this.simulateDelay();

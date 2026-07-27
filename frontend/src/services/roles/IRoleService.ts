@@ -238,7 +238,10 @@ export interface IRoleService {
    * // Filter out already-assigned users for selection UI
    * const assignable = users.filter(u => !u.isAlreadyAssigned);
    */
-  listUsersForBulkAssignment(params: ListUsersForBulkAssignmentParams): Promise<SelectableUser[]>;
+  listUsersForBulkAssignment(
+    params: ListUsersForBulkAssignmentParams,
+    correlationId?: string
+  ): Promise<SelectableUser[]>;
 
   /**
    * Assigns a role to multiple users in a single operation
@@ -297,7 +300,10 @@ export interface IRoleService {
    *   checkboxStates[u.id] = true;
    * });
    */
-  listUsersForRoleManagement(params: ListUsersForRoleManagementParams): Promise<ManageableUser[]>;
+  listUsersForRoleManagement(
+    params: ListUsersForRoleManagementParams,
+    correlationId?: string
+  ): Promise<ManageableUser[]>;
 
   /**
    * Syncs role assignments by adding and removing users in a single operation

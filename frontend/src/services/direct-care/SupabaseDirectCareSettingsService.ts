@@ -21,16 +21,17 @@ const DEFAULT_SETTINGS: DirectCareSettings = {
 };
 
 export class SupabaseDirectCareSettingsService implements IDirectCareSettingsService {
-  async getSettings(orgId: string): Promise<DirectCareSettings> {
+  async getSettings(orgId: string, correlationId?: string): Promise<DirectCareSettings> {
     log.debug('Fetching direct care settings', { orgId });
 
     const { data, error } = await supabaseService.apiRpc<DirectCareSettings | null>(
       'get_organization_direct_care_settings',
-      { p_org_id: orgId }
+      { p_org_id: orgId },
+      { correlationId }
     );
 
     if (error) {
-      log.error('Failed to fetch direct care settings', { error, orgId });
+      log.error('Failed to fetch direct care settings', { error, orgId, correlationId });
       throw new Error(`Failed to fetch settings: ${error.message}`);
     }
 

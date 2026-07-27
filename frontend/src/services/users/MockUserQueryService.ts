@@ -760,7 +760,7 @@ export class MockUserQueryService implements IUserQueryService {
     };
   }
 
-  async getInvitations(): Promise<Invitation[]> {
+  async getInvitations(_correlationId?: string): Promise<Invitation[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching invitations');
 
@@ -873,7 +873,9 @@ export class MockUserQueryService implements IUserQueryService {
     return assignableRoles;
   }
 
-  async getUserOrganizations(): Promise<Array<{ id: string; name: string; type: string }>> {
+  async getUserOrganizations(
+    _correlationId?: string
+  ): Promise<Array<{ id: string; name: string; type: string }>> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user organizations');
 
@@ -886,7 +888,7 @@ export class MockUserQueryService implements IUserQueryService {
   // Extended Data Collection Query Methods (Phase 0A)
   // ============================================================================
 
-  async getUserAddresses(userId: string): Promise<UserAddress[]> {
+  async getUserAddresses(userId: string, _correlationId?: string): Promise<UserAddress[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user addresses', { userId });
 
@@ -896,7 +898,7 @@ export class MockUserQueryService implements IUserQueryService {
     return addresses;
   }
 
-  async getUserPhones(userId: string): Promise<UserPhone[]> {
+  async getUserPhones(userId: string, _correlationId?: string): Promise<UserPhone[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user phones', { userId });
 
@@ -906,7 +908,11 @@ export class MockUserQueryService implements IUserQueryService {
     return phones;
   }
 
-  async getUserOrgAccess(userId: string, orgId: string): Promise<UserOrgAccess | null> {
+  async getUserOrgAccess(
+    userId: string,
+    orgId: string,
+    _correlationId?: string
+  ): Promise<UserOrgAccess | null> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user org access', { userId, orgId });
 
@@ -925,7 +931,10 @@ export class MockUserQueryService implements IUserQueryService {
     return access || null;
   }
 
-  async getUserNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+  async getUserNotificationPreferences(
+    userId: string,
+    _correlationId?: string
+  ): Promise<NotificationPreferences> {
     await this.simulateDelay();
     log.debug('Mock: Fetching user notification preferences', { userId });
 

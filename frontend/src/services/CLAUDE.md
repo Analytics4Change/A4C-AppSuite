@@ -348,6 +348,16 @@ selection rule as above. **Envelope WRITES do NOT pass it**: they carry correlat
 RPC body's `p_correlation_id` param (a separate channel), so leave the transport header off
 write calls — only reads pin it.
 
+**Service-mints variant (where the mint site follows the log site):** the rule above assumes
+a MobX VM/component that logs the read failure and passes a fresh id in. When a leaf
+service/function **owns its own read-failure logging and has no logging caller** (the caller
+only sets error state), it mints the id *inside* the read via a **defaulted** param —
+`correlationId: string = generateCorrelationId()` — pins it, and logs it. Same header/log
+guarantee, zero caller plumbing. Instances: `EventMonitoringService`, `OrphanedDeletionService`,
+`getOrganizationSubdomainInfo`. (The completeness gate for "every read is threaded" is a
+committed `grep -rE 'supabaseService\.apiRpc<' src` sweep — every hit carries a 3rd
+`{ correlationId }` arg or is a documented write.)
+
 ## Related Documentation
 
 - [Frontend CLAUDE.md](../../CLAUDE.md) — Tech stack, MVVM, MobX, accessibility (parent)

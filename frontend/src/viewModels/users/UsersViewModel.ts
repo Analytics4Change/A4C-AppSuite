@@ -1304,15 +1304,19 @@ export class UsersViewModel {
   async loadUserExtendedData(userId: string): Promise<void> {
     log.debug('Loading extended data', { userId });
 
+    // One id shared across the three batched reads → the single failure log
+    // below correlates with whichever read failed.
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoadingExtendedData = true;
     });
 
     try {
       const [addresses, phones, orgAccess] = await Promise.all([
-        this.queryService.getUserAddresses(userId),
-        this.queryService.getUserPhones(userId),
-        this.queryService.getUserOrgAccess(userId, this.currentOrgId),
+        this.queryService.getUserAddresses(userId, correlationId),
+        this.queryService.getUserPhones(userId, correlationId),
+        this.queryService.getUserOrgAccess(userId, this.currentOrgId, correlationId),
       ]);
 
       runInAction(() => {
@@ -1328,7 +1332,7 @@ export class UsersViewModel {
         });
       });
     } catch (error) {
-      log.error('Failed to load extended data', error);
+      log.error('Failed to load extended data', { error, correlationId });
 
       runInAction(() => {
         this.isLoadingExtendedData = false;
@@ -1342,15 +1346,17 @@ export class UsersViewModel {
   async loadUserAddresses(userId: string): Promise<void> {
     log.debug('Loading user addresses', { userId });
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const addresses = await this.queryService.getUserAddresses(userId);
+      const addresses = await this.queryService.getUserAddresses(userId, correlationId);
 
       runInAction(() => {
         this.userAddresses = addresses;
         log.info('Loaded user addresses', { userId, count: addresses.length });
       });
     } catch (error) {
-      log.error('Failed to load user addresses', error);
+      log.error('Failed to load user addresses', { error, correlationId });
     }
   }
 
@@ -1360,15 +1366,17 @@ export class UsersViewModel {
   async loadUserPhones(userId: string): Promise<void> {
     log.debug('Loading user phones', { userId });
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const phones = await this.queryService.getUserPhones(userId);
+      const phones = await this.queryService.getUserPhones(userId, correlationId);
 
       runInAction(() => {
         this.userPhones = phones;
         log.info('Loaded user phones', { userId, count: phones.length });
       });
     } catch (error) {
-      log.error('Failed to load user phones', error);
+      log.error('Failed to load user phones', { error, correlationId });
     }
   }
 
@@ -1379,15 +1387,21 @@ export class UsersViewModel {
     const targetOrgId = orgId ?? this.currentOrgId;
     log.debug('Loading user org access', { userId, orgId: targetOrgId });
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const orgAccess = await this.queryService.getUserOrgAccess(userId, targetOrgId);
+      const orgAccess = await this.queryService.getUserOrgAccess(
+        userId,
+        targetOrgId,
+        correlationId
+      );
 
       runInAction(() => {
         this.userOrgAccess = orgAccess;
         log.info('Loaded user org access', { userId, orgId: targetOrgId, hasAccess: !!orgAccess });
       });
     } catch (error) {
-      log.error('Failed to load user org access', error);
+      log.error('Failed to load user org access', { error, correlationId });
     }
   }
 

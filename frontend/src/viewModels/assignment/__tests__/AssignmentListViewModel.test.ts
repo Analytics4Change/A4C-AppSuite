@@ -89,7 +89,7 @@ describe('AssignmentListViewModel', () => {
     it('sets featureEnabled from settings', async () => {
       await vm.checkFeatureFlag('org-1');
 
-      expect(mockSettingsService.getSettings).toHaveBeenCalledWith('org-1');
+      expect(mockSettingsService.getSettings).toHaveBeenCalledWith('org-1', expect.any(String));
       expect(vm.featureEnabled).toBe(true);
       expect(vm.featureCheckLoading).toBe(false);
     });

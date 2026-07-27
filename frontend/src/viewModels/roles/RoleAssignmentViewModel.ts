@@ -32,6 +32,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IRoleService } from '@/services/roles/IRoleService';
 import { getRoleService } from '@/services/roles/RoleServiceFactory';
 import type {
@@ -272,8 +273,7 @@ export class RoleAssignmentViewModel {
     if (!this.result) return false;
     const hasSuccess =
       this.result.added.successful.length > 0 || this.result.removed.successful.length > 0;
-    const hasFailure =
-      this.result.added.failed.length > 0 || this.result.removed.failed.length > 0;
+    const hasFailure = this.result.added.failed.length > 0 || this.result.removed.failed.length > 0;
     return hasSuccess && hasFailure;
   }
 
@@ -303,6 +303,8 @@ export class RoleAssignmentViewModel {
   async loadUsers(): Promise<void> {
     if (this.isLoading) return;
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -316,13 +318,16 @@ export class RoleAssignmentViewModel {
         offset: this.offset,
       });
 
-      const users = await this.service.listUsersForRoleManagement({
-        roleId: this.role.id,
-        scopePath: this.scopePath,
-        searchTerm: this.searchTerm || undefined,
-        limit: this.pageSize,
-        offset: this.offset,
-      });
+      const users = await this.service.listUsersForRoleManagement(
+        {
+          roleId: this.role.id,
+          scopePath: this.scopePath,
+          searchTerm: this.searchTerm || undefined,
+          limit: this.pageSize,
+          offset: this.offset,
+        },
+        correlationId
+      );
 
       runInAction(() => {
         // Map to ManageableUserState with checkbox state
@@ -335,9 +340,7 @@ export class RoleAssignmentViewModel {
           this.users = userStates;
 
           // Initialize tracking sets from loaded data
-          this.initialAssignedUserIds = new Set(
-            users.filter((u) => u.isAssigned).map((u) => u.id)
-          );
+          this.initialAssignedUserIds = new Set(users.filter((u) => u.isAssigned).map((u) => u.id));
           this.selectedUserIds = new Set(this.initialAssignedUserIds);
         } else {
           // Append for pagination
@@ -367,7 +370,7 @@ export class RoleAssignmentViewModel {
         this.error = err instanceof Error ? err.message : 'Failed to load users';
         this.isLoading = false;
       });
-      log.error('Failed to load users', err);
+      log.error('Failed to load users', { error: err, correlationId });
     }
   }
 
