@@ -14,6 +14,7 @@
 import { supabaseService } from '@/services/auth/supabase.service';
 import { WorkflowClientFactory } from '@/services/workflow/WorkflowClientFactory';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('api');
 
@@ -41,17 +42,21 @@ export interface RetryResult {
 }
 
 export class OrphanedDeletionService {
-  async getOrphanedDeletions(hoursThreshold: number = 24): Promise<OrphanedDeletionResult> {
+  async getOrphanedDeletions(
+    hoursThreshold: number = 24,
+    correlationId: string = generateCorrelationId()
+  ): Promise<OrphanedDeletionResult> {
     try {
       log.info('Fetching orphaned deletions', { hoursThreshold });
 
       const { data, error } = await supabaseService.apiRpc<OrphanedDeletion[]>(
         'get_orphaned_deletions',
-        { p_hours_threshold: hoursThreshold }
+        { p_hours_threshold: hoursThreshold },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch orphaned deletions', error);
+        log.error('Failed to fetch orphaned deletions', { error, correlationId });
 
         if (
           error.code === '42501' ||
@@ -70,7 +75,7 @@ export class OrphanedDeletionService {
       log.info(`Fetched ${data?.length ?? 0} orphaned deletions`);
       return { success: true, data: data ?? [] };
     } catch (error) {
-      log.error('Unexpected error fetching orphaned deletions', error);
+      log.error('Unexpected error fetching orphaned deletions', { error, correlationId });
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
