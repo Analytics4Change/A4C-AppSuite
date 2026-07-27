@@ -182,7 +182,9 @@ describe('useKeyboardNavigation', () => {
     it('should restore focus on unmount when restoreFocus is true', () => {
       const previousElement = document.createElement('button');
       document.body.appendChild(previousElement);
-      previousElement.focus();
+      act(() => {
+        previousElement.focus();
+      });
 
       const containerRef = { current: container };
 
@@ -190,11 +192,15 @@ describe('useKeyboardNavigation', () => {
         useKeyboardNavigation({ containerRef, enabled: true, restoreFocus: true })
       );
 
-      input1.focus();
+      act(() => {
+        input1.focus();
+      });
       expect(document.activeElement).toBe(input1);
 
       const focusSpy = vi.spyOn(previousElement, 'focus');
-      unmount();
+      act(() => {
+        unmount();
+      });
 
       expect(focusSpy).toHaveBeenCalled();
     });
@@ -202,7 +208,9 @@ describe('useKeyboardNavigation', () => {
     it('should not restore focus when restoreFocus is false', () => {
       const previousElement = document.createElement('button');
       document.body.appendChild(previousElement);
-      previousElement.focus();
+      act(() => {
+        previousElement.focus();
+      });
 
       const containerRef = { current: container };
 
@@ -210,9 +218,13 @@ describe('useKeyboardNavigation', () => {
         useKeyboardNavigation({ containerRef, enabled: true, restoreFocus: false })
       );
 
-      input1.focus();
+      act(() => {
+        input1.focus();
+      });
       const focusSpy = vi.spyOn(previousElement, 'focus');
-      unmount();
+      act(() => {
+        unmount();
+      });
 
       expect(focusSpy).not.toHaveBeenCalled();
     });

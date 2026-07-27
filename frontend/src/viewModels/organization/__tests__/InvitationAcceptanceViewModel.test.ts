@@ -139,6 +139,18 @@ describe('InvitationAcceptanceViewModel', () => {
       expect(vm.passwordError).toBeNull();
       expect(vm.emailError).toBeNull();
     });
+
+    it('setAuthMethod switches the method and clears field errors', async () => {
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      await vm.validateToken('tok-123');
+      await vm.acceptWithEmailPassword(); // no password → sets passwordError
+      expect(vm.passwordError).toBe('Password is required');
+
+      vm.setAuthMethod('oauth');
+
+      expect(vm.authMethodSelection).toBe('oauth');
+      expect(vm.passwordError).toBeNull();
+    });
   });
 
   describe('acceptWithEmailPassword', () => {
@@ -224,6 +236,20 @@ describe('InvitationAcceptanceViewModel', () => {
       expect(result).toBeNull();
       expect(vm.acceptanceError).toBe('Email already registered');
     });
+
+    it('rejects an invalid email format', async () => {
+      const service = makeService({
+        validateInvitation: vi.fn().mockResolvedValue(validDetails({ email: undefined })),
+      });
+      const vm = new InvitationAcceptanceViewModel(service);
+      await vm.validateToken('tok-123');
+      vm.setEmail('not-an-email');
+      vm.setPassword('SecurePass123');
+      vm.setConfirmPassword('SecurePass123');
+
+      expect(await vm.acceptWithEmailPassword()).toBeNull();
+      expect(vm.emailError).toBe('Invalid email format');
+    });
   });
 
   describe('acceptWithOAuth', () => {
@@ -263,6 +289,18 @@ describe('InvitationAcceptanceViewModel', () => {
       await vm.acceptWithOAuth('google', authProvider);
 
       expect(vm.emailError).toMatch(/Valid email is required/);
+      expect(authProvider.loginWithOAuth).not.toHaveBeenCalled();
+    });
+
+    it('sets acceptanceError when persisting the OAuth context fails', async () => {
+      mockStorage.setItem.mockRejectedValueOnce(new Error('storage unavailable'));
+      const vm = new InvitationAcceptanceViewModel(makeService());
+      await vm.validateToken('tok-123');
+      const authProvider = makeAuthProvider();
+
+      await vm.acceptWithOAuth('google', authProvider);
+
+      expect(vm.acceptanceError).toMatch(/Failed to initiate google sign-in/);
       expect(authProvider.loginWithOAuth).not.toHaveBeenCalled();
     });
   });
