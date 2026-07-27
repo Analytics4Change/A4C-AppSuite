@@ -45,7 +45,7 @@ jobs:
 
     - name: Run tests
       working-directory: ./frontend
-      run: echo "Skipping tests - no unit tests configured"
+      run: npm run test
 
     - name: Create production environment file
       working-directory: ./frontend
