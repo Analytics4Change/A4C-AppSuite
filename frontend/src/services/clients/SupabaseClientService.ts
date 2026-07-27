@@ -14,6 +14,7 @@
 import { supabaseService } from '@/services/auth/supabase.service';
 import { throwIfPostgrestError, logIfPostgrestError } from '@/services/api/envelope';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type {
   Client,
   ClientListItem,
@@ -137,10 +138,11 @@ export class SupabaseClientService implements IClientService {
     // `unknown` because `ClientUpdateResult.client` is typed against `ClientProjectionRow`.
     let client = env.client;
     if (!client) {
+      const correlationId = generateCorrelationId();
       try {
-        client = (await this.getClient(clientId)) as unknown as ClientProjectionRow;
+        client = (await this.getClient(clientId, correlationId)) as unknown as ClientProjectionRow;
       } catch (err) {
-        log.warn('Failed to refetch client after update fallback', { err });
+        log.warn('Failed to refetch client after update fallback', { err, correlationId });
       }
     }
 

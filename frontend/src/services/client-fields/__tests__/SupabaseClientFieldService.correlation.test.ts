@@ -90,4 +90,14 @@ describe('SupabaseClientFieldService — correlation-id threading', () => {
       { correlationId: undefined }
     );
   });
+
+  it('getFieldUsageCount omits the id cleanly when none is supplied', async () => {
+    mockApiRpcEnvelope.mockResolvedValueOnce({ success: true, count: 0 });
+    await service.getFieldUsageCount('weekend_hours');
+    expect(mockApiRpcEnvelope).toHaveBeenCalledWith(
+      'get_field_usage_count',
+      { p_field_key: 'weekend_hours' },
+      { correlationId: undefined }
+    );
+  });
 });
