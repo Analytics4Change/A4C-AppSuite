@@ -3,14 +3,16 @@ name: Frontend CI
 # Pull-request gate for the frontend: type-check, lint, unit tests, and build.
 # This is the check that keeps `main` green — before this workflow the unit tests
 # ran nowhere (tsconfig excludes tests; the deploy workflow stubbed the test step).
+#
+# NOTE: this job is intended to be a REQUIRED status check. It therefore triggers on
+# EVERY pull request with NO `paths:` filter — a path-filtered workflow is *skipped*
+# on PRs that don't touch frontend/, and a skipped required check never reports,
+# which wedges the merge box. Instead we always run (so the check always reports) and
+# gate the expensive steps on whether frontend / CI files actually changed.
 
 on:
   pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
 
-# Cancel superseded runs on the same PR branch.
 concurrency:
   group: frontend-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -25,8 +27,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect frontend changes
+        id: changes
+        working-directory: .
+        run: |
+          BASE='${{ github.event.pull_request.base.sha }}'
+          HEAD='${{ github.event.pull_request.head.sha }}'
+          if git diff --name-only "$BASE" "$HEAD" \
+              | grep -qE '^(frontend/|\.github/workflows/frontend-ci\.yml)'; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+            echo "No frontend or CI changes in this PR — skipping checks (job still reports success)."
+          fi
 
       - name: Setup Node.js
+        if: steps.changes.outputs.frontend == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '20'
@@ -34,21 +53,27 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        if: steps.changes.outputs.frontend == 'true'
         run: npm ci
 
       # Generated event types are required before `tsc` runs (build does this too,
       # but `typecheck` runs bare `tsc --noEmit` and would fail without them).
       - name: Generate types
+        if: steps.changes.outputs.frontend == 'true'
         run: npm run sync-schemas
 
       - name: Type-check
+        if: steps.changes.outputs.frontend == 'true'
         run: npm run typecheck
 
       - name: Lint
+        if: steps.changes.outputs.frontend == 'true'
         run: npm run lint
 
       - name: Unit tests
+        if: steps.changes.outputs.frontend == 'true'
         run: npm run test
 
       - name: Build
+        if: steps.changes.outputs.frontend == 'true'
         run: npm run build
