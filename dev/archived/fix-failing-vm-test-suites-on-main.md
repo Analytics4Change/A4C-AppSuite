@@ -1,7 +1,9 @@
 ---
-status: seed
-last_updated: 2026-07-24
+status: archived
+last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27 (PR #97, `464d298b`).** Scope was actually **56 failures across 5 suites** (the "30" was only 2 of them). All test-drift, zero product bugs. Fixed + added the missing `frontend-ci` gate, now a REQUIRED check on `main`. Detail: [[pr-97-close-out]].
 
 # Seed: Fix the 30 failing VM test suites red on `main`
 
