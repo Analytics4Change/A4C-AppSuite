@@ -1,7 +1,9 @@
 ---
-status: in-progress
+status: archived
 last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27 (PR #98, dbc APPROVE-with-in-PR-fixes).** The `apiRpc` read-path rollout is complete across Users (#94) + roles/organizations/org-units/client-fields (#98, incl. all page-level + `ClientIntakeFormViewModel` caller sites). **The only OPEN remainder — pinning the id on `apiRpcEnvelope` reads (`get_organization_details`, schedules, field usage-counts) — is carved out to its own card: [[surface-correlation-id-on-apiRpcEnvelope-reads]].**
 
 # Seed: Surface the transport correlation-id into read-path failure logs (app-wide)
 
