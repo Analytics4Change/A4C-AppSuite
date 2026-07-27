@@ -1,7 +1,9 @@
 ---
-status: seed
+status: archived
 last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27 (PR #99, merge `8d66bf00`; dbc APPROVE-w/-in-PR-fixes).** Extended `apiRpcEnvelope` with `{ correlationId }` (mirrors `apiRpc`) and threaded all **8 envelope reads across 5 services** (clients/org-details/schedule-templates/client-field-counts/assignments) + all callers. Client-field counts REUSE the session id; writes untouched (body `p_correlation_id`). Closes the `apiRpcEnvelope` read surface. **Residual `apiRpc` pocket + O1 count-read UX carved to new cards** → [[pr-99-close-out]]. Two follow-ups: `seed-thread-correlation-id-residual-apirpc-reads.md`, `seed-surface-client-field-count-read-failures.md`.
 
 # Seed: Pin the correlation-id on `apiRpcEnvelope` reads
 
