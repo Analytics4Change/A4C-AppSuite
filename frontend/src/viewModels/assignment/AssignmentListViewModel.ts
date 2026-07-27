@@ -12,6 +12,7 @@ import type { IDirectCareSettingsService } from '@/services/direct-care/IDirectC
 import { getAssignmentService } from '@/services/assignment/AssignmentServiceFactory';
 import { getDirectCareSettingsService } from '@/services/direct-care/DirectCareSettingsServiceFactory';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -58,17 +59,22 @@ export class AssignmentListViewModel {
   }
 
   async loadAssignments(): Promise<void> {
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
     });
 
     try {
-      const assignments = await this.service.listAssignments({
-        userId: this.filterUserId ?? undefined,
-        clientId: this.filterClientId ?? undefined,
-        activeOnly: !this.showInactive,
-      });
+      const assignments = await this.service.listAssignments(
+        {
+          userId: this.filterUserId ?? undefined,
+          clientId: this.filterClientId ?? undefined,
+          activeOnly: !this.showInactive,
+        },
+        correlationId
+      );
 
       runInAction(() => {
         this.assignments = assignments;
@@ -82,7 +88,7 @@ export class AssignmentListViewModel {
         this.error = message;
         this.isLoading = false;
       });
-      log.error('Failed to load assignments', { error });
+      log.error('Failed to load assignments', { error, correlationId });
     }
   }
 

@@ -184,15 +184,25 @@ export interface IClientFieldService {
     correlationId?: string
   ): Promise<DeleteCategoryResult>;
 
-  /** Count clients with data for a custom field (for deactivation/delete confirmation) */
-  getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }>;
+  /**
+   * Count clients with data for a custom field (for deactivation/delete confirmation).
+   *
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the read.
+   */
+  getFieldUsageCount(
+    fieldKey: string,
+    correlationId?: string
+  ): Promise<{ success: boolean; count: number }>;
 
   /**
    * Count fields in a category plus their names.
    * Pass includeInactive=true to count active + inactive fields (used by delete-category gate).
+   *
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the read.
    */
   getCategoryFieldCount(
     categoryId: string,
-    includeInactive?: boolean
+    includeInactive?: boolean,
+    correlationId?: string
   ): Promise<{ success: boolean; count: number; fields: string[] }>;
 }

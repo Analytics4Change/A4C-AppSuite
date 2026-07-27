@@ -154,8 +154,16 @@ class SupabaseService {
    * Success-path shape is `{success: true} & T` — flat intersection — preserving the
    * existing return-shape convention used by services in this repo.
    *
+   * End-to-end tracing (read-path envelopes): pass `opts.correlationId` to pin the
+   * caller's id as the `X-Correlation-ID` header so the server logs the SAME id the
+   * caller logs. `tracingFetch` (supabase-ssr.ts) only auto-generates when the header
+   * is absent, so this overrides it. Envelope WRITES do not use this — they carry
+   * correlation via the RPC body's `p_correlation_id` param, a separate channel.
+   * See documentation/infrastructure/guides/event-observability.md.
+   *
    * @param functionName - Name of the envelope-shaped RPC (e.g., 'update_user', 'create_role')
    * @param params - Parameters to pass to the function
+   * @param opts - Optional `{ correlationId }` to pin as the `X-Correlation-ID` header
    * @returns Promise with discriminated `ApiEnvelope<T>`
    *
    * @example
@@ -170,10 +178,17 @@ class SupabaseService {
    */
   async apiRpcEnvelope<T extends Record<string, unknown> = Record<string, never>>(
     functionName: EnvelopeRpcs,
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
+    opts?: { correlationId?: string }
   ): Promise<ApiEnvelope<T>> {
     const apiClient = this.client as AnySchemaSupabaseClient;
-    const result = await apiClient.schema('api').rpc(functionName, params);
+    const builder = apiClient.schema('api').rpc(functionName, params);
+    // Pin the caller's correlation id as X-Correlation-ID for read-path envelopes
+    // (see apiRpc above). Absent opts ⇒ no header ⇒ tracingFetch auto-gen applies.
+    if (opts?.correlationId) {
+      builder.setHeader('X-Correlation-ID', opts.correlationId);
+    }
+    const result = await builder;
     return unwrapApiEnvelope<T>(result);
   }
 }

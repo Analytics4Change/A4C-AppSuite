@@ -156,11 +156,14 @@ export class MockScheduleService implements IScheduleService {
     this.mockUsers = seed.users;
   }
 
-  async listTemplates(params: {
-    orgId?: string;
-    status?: 'all' | 'active' | 'inactive';
-    search?: string;
-  }): Promise<ScheduleTemplate[]> {
+  async listTemplates(
+    params: {
+      orgId?: string;
+      status?: 'all' | 'active' | 'inactive';
+      search?: string;
+    },
+    _correlationId?: string
+  ): Promise<ScheduleTemplate[]> {
     log.debug('[Mock] Listing schedule templates', params);
     await this.simulateDelay();
 
@@ -175,7 +178,10 @@ export class MockScheduleService implements IScheduleService {
     });
   }
 
-  async getTemplate(templateId: string): Promise<ScheduleTemplateDetail | null> {
+  async getTemplate(
+    templateId: string,
+    _correlationId?: string
+  ): Promise<ScheduleTemplateDetail | null> {
     log.debug('[Mock] Getting schedule template', { templateId });
     await this.simulateDelay();
 

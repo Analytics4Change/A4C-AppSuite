@@ -41,13 +41,18 @@ export interface ScheduleDeleteResult {
 
 export interface IScheduleService {
   // Template CRUD
-  listTemplates(params: {
-    orgId?: string;
-    status?: 'all' | 'active' | 'inactive';
-    search?: string;
-  }): Promise<ScheduleTemplate[]>;
+  // `correlationId` (optional, trailing) pins X-Correlation-ID on the read so the
+  // caller's failure-log line joins the server-side request trace.
+  listTemplates(
+    params: {
+      orgId?: string;
+      status?: 'all' | 'active' | 'inactive';
+      search?: string;
+    },
+    correlationId?: string
+  ): Promise<ScheduleTemplate[]>;
 
-  getTemplate(templateId: string): Promise<ScheduleTemplateDetail | null>;
+  getTemplate(templateId: string, correlationId?: string): Promise<ScheduleTemplateDetail | null>;
 
   createTemplate(params: {
     name: string;

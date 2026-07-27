@@ -27,9 +27,7 @@ const SAMPLE_ASSIGNMENTS: UserClientAssignment[] = [
   },
 ];
 
-function createMockAssignmentService(
-  overrides?: Partial<IAssignmentService>
-): IAssignmentService {
+function createMockAssignmentService(overrides?: Partial<IAssignmentService>): IAssignmentService {
   return {
     listAssignments: vi.fn().mockResolvedValue(SAMPLE_ASSIGNMENTS),
     assignClient: vi.fn().mockResolvedValue({ assignmentId: 'new-assign-1' }),
@@ -127,11 +125,14 @@ describe('AssignmentListViewModel', () => {
     it('loads assignments successfully', async () => {
       await vm.loadAssignments();
 
-      expect(mockAssignService.listAssignments).toHaveBeenCalledWith({
-        userId: undefined,
-        clientId: undefined,
-        activeOnly: true,
-      });
+      expect(mockAssignService.listAssignments).toHaveBeenCalledWith(
+        {
+          userId: undefined,
+          clientId: undefined,
+          activeOnly: true,
+        },
+        expect.any(String) // per-load correlation id pinned on the read
+      );
       expect(vm.assignments).toEqual(SAMPLE_ASSIGNMENTS);
       expect(vm.isLoading).toBe(false);
       expect(vm.error).toBeNull();
@@ -144,11 +145,14 @@ describe('AssignmentListViewModel', () => {
 
       await vm.loadAssignments();
 
-      expect(mockAssignService.listAssignments).toHaveBeenCalledWith({
-        userId: 'user-1',
-        clientId: 'client-1',
-        activeOnly: false,
-      });
+      expect(mockAssignService.listAssignments).toHaveBeenCalledWith(
+        {
+          userId: 'user-1',
+          clientId: 'client-1',
+          activeOnly: false,
+        },
+        expect.any(String) // per-load correlation id pinned on the read
+      );
     });
 
     it('handles load error', async () => {

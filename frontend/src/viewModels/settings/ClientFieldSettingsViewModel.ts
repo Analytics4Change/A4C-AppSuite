@@ -928,10 +928,14 @@ export class ClientFieldSettingsViewModel {
   }
 
   async getFieldUsageCount(fieldKey: string): Promise<number> {
+    // Pre-flight count for the delete/deactivate confirm flow → reuse the session
+    // id so the read shares the eventual write's audit trail (see loadData).
+    const correlationId = this.getSessionCorrelationId();
     try {
-      const result = await this.service.getFieldUsageCount(fieldKey);
+      const result = await this.service.getFieldUsageCount(fieldKey, correlationId);
       return result.success ? result.count : 0;
-    } catch {
+    } catch (error) {
+      log.error('Failed to get field usage count', { error, correlationId });
       return 0;
     }
   }
@@ -940,12 +944,19 @@ export class ClientFieldSettingsViewModel {
     categoryId: string,
     includeInactive = false
   ): Promise<{ count: number; fields: string[] }> {
+    // Pre-flight count for the delete/deactivate confirm flow → reuse the session id.
+    const correlationId = this.getSessionCorrelationId();
     try {
-      const result = await this.service.getCategoryFieldCount(categoryId, includeInactive);
+      const result = await this.service.getCategoryFieldCount(
+        categoryId,
+        includeInactive,
+        correlationId
+      );
       return result.success
         ? { count: result.count, fields: result.fields }
         : { count: 0, fields: [] };
-    } catch {
+    } catch (error) {
+      log.error('Failed to get category field count', { error, correlationId });
       return { count: 0, fields: [] };
     }
   }

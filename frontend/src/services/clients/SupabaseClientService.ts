@@ -52,25 +52,37 @@ export class SupabaseClientService implements IClientService {
   // Queries (throw on failure — pre-migration listClients/getClient contract)
   // ---------------------------------------------------------------------------
 
-  async listClients(status?: string, searchTerm?: string): Promise<ClientListItem[]> {
+  async listClients(
+    status?: string,
+    searchTerm?: string,
+    correlationId?: string
+  ): Promise<ClientListItem[]> {
     log.debug('Listing clients', { status, searchTerm });
 
-    const env = await supabaseService.apiRpcEnvelope<{ data?: ClientListItem[] }>('list_clients', {
-      p_status: status ?? null,
-      p_search_term: searchTerm ?? null,
-    });
+    const env = await supabaseService.apiRpcEnvelope<{ data?: ClientListItem[] }>(
+      'list_clients',
+      {
+        p_status: status ?? null,
+        p_search_term: searchTerm ?? null,
+      },
+      { correlationId }
+    );
 
     throwIfPostgrestError(env, 'list clients');
     if (!env.success) throw new Error(env.error ?? 'Failed to list clients');
     return env.data ?? [];
   }
 
-  async getClient(clientId: string): Promise<Client> {
+  async getClient(clientId: string, correlationId?: string): Promise<Client> {
     log.debug('Getting client', { clientId });
 
-    const env = await supabaseService.apiRpcEnvelope<{ data?: Client }>('get_client', {
-      p_client_id: clientId,
-    });
+    const env = await supabaseService.apiRpcEnvelope<{ data?: Client }>(
+      'get_client',
+      {
+        p_client_id: clientId,
+      },
+      { correlationId }
+    );
 
     throwIfPostgrestError(env, 'get client');
     if (!env.success) throw new Error(env.error ?? 'Failed to get client');

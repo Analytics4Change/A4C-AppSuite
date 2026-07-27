@@ -13,12 +13,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockApiRpc } = vi.hoisted(() => ({
+const { mockApiRpc, mockApiRpcEnvelope } = vi.hoisted(() => ({
   mockApiRpc: vi.fn(),
+  mockApiRpcEnvelope: vi.fn(),
 }));
 
 vi.mock('@/services/auth/supabase.service', () => ({
-  supabaseService: { apiRpc: mockApiRpc },
+  supabaseService: { apiRpc: mockApiRpc, apiRpcEnvelope: mockApiRpcEnvelope },
 }));
 
 import { SupabaseClientFieldService } from '../SupabaseClientFieldService';
@@ -29,6 +30,7 @@ describe('SupabaseClientFieldService — correlation-id threading', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockApiRpc.mockResolvedValue({ data: [], error: null });
+    mockApiRpcEnvelope.mockResolvedValue({ success: true, count: 0, fields: [] });
     service = new SupabaseClientFieldService();
   });
 
@@ -55,6 +57,36 @@ describe('SupabaseClientFieldService — correlation-id threading', () => {
     expect(mockApiRpc).toHaveBeenCalledWith(
       'list_field_definitions',
       { p_include_inactive: false },
+      { correlationId: undefined }
+    );
+  });
+
+  // The usage-count reads route through the ENVELOPE helper (apiRpcEnvelope),
+  // which now also forwards { correlationId }. The VM reuses its SESSION id here.
+  it('getFieldUsageCount pins the correlation id on the envelope RPC call', async () => {
+    mockApiRpcEnvelope.mockResolvedValueOnce({ success: true, count: 0 });
+    await service.getFieldUsageCount('weekend_hours', 'corr-usage');
+    expect(mockApiRpcEnvelope).toHaveBeenCalledWith(
+      'get_field_usage_count',
+      { p_field_key: 'weekend_hours' },
+      { correlationId: 'corr-usage' }
+    );
+  });
+
+  it('getCategoryFieldCount pins the correlation id on the envelope RPC call', async () => {
+    await service.getCategoryFieldCount('cat-1', true, 'corr-catcount');
+    expect(mockApiRpcEnvelope).toHaveBeenCalledWith(
+      'get_category_field_count',
+      { p_category_id: 'cat-1', p_include_inactive: true },
+      { correlationId: 'corr-catcount' }
+    );
+  });
+
+  it('getCategoryFieldCount omits the id cleanly when none is supplied', async () => {
+    await service.getCategoryFieldCount('cat-2');
+    expect(mockApiRpcEnvelope).toHaveBeenCalledWith(
+      'get_category_field_count',
+      { p_category_id: 'cat-2', p_include_inactive: false },
       { correlationId: undefined }
     );
   });

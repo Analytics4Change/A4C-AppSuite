@@ -40,11 +40,14 @@ export class SupabaseScheduleService implements IScheduleService {
   // (HAS_USERS / STILL_ACTIVE).
   // -------------------------------------------------------------------------
 
-  async listTemplates(params: {
-    orgId?: string;
-    status?: 'all' | 'active' | 'inactive';
-    search?: string;
-  }): Promise<ScheduleTemplate[]> {
+  async listTemplates(
+    params: {
+      orgId?: string;
+      status?: 'all' | 'active' | 'inactive';
+      search?: string;
+    },
+    correlationId?: string
+  ): Promise<ScheduleTemplate[]> {
     log.debug('Listing schedule templates', params);
 
     const env = await supabaseService.apiRpcEnvelope<{ data?: ScheduleTemplate[] }>(
@@ -53,7 +56,8 @@ export class SupabaseScheduleService implements IScheduleService {
         p_org_id: params.orgId ?? null,
         p_status: params.status ?? 'all',
         p_search: params.search ?? null,
-      }
+      },
+      { correlationId }
     );
 
     if (!env.success) {
@@ -64,13 +68,16 @@ export class SupabaseScheduleService implements IScheduleService {
     return env.data ?? [];
   }
 
-  async getTemplate(templateId: string): Promise<ScheduleTemplateDetail | null> {
+  async getTemplate(
+    templateId: string,
+    correlationId?: string
+  ): Promise<ScheduleTemplateDetail | null> {
     log.debug('Getting schedule template', { templateId });
 
     const env = await supabaseService.apiRpcEnvelope<{
       template?: Omit<ScheduleTemplateDetail, 'assigned_users' | 'assigned_user_count'>;
       assigned_users?: ScheduleTemplateDetail['assigned_users'];
-    }>('get_schedule_template', { p_template_id: templateId });
+    }>('get_schedule_template', { p_template_id: templateId }, { correlationId });
 
     if (!env.success) {
       log.error('Failed to get schedule template', { error: env.error });

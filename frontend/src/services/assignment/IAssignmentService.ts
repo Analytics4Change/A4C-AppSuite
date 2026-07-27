@@ -15,12 +15,17 @@
 import type { UserClientAssignment } from '@/types/client-assignment.types';
 
 export interface IAssignmentService {
-  listAssignments(params: {
-    orgId?: string;
-    userId?: string;
-    clientId?: string;
-    activeOnly?: boolean;
-  }): Promise<UserClientAssignment[]>;
+  // `correlationId` (optional, trailing) pins X-Correlation-ID on the read so the
+  // caller's failure-log line joins the server-side request trace.
+  listAssignments(
+    params: {
+      orgId?: string;
+      userId?: string;
+      clientId?: string;
+      activeOnly?: boolean;
+    },
+    correlationId?: string
+  ): Promise<UserClientAssignment[]>;
 
   assignClient(params: {
     userId: string;
@@ -30,9 +35,5 @@ export interface IAssignmentService {
     reason?: string;
   }): Promise<{ assignmentId: string }>;
 
-  unassignClient(params: {
-    userId: string;
-    clientId: string;
-    reason?: string;
-  }): Promise<void>;
+  unassignClient(params: { userId: string; clientId: string; reason?: string }): Promise<void>;
 }

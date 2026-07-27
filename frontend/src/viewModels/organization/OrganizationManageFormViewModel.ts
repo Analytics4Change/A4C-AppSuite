@@ -23,6 +23,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IOrganizationQueryService } from '@/services/organization/IOrganizationQueryService';
 import type { IOrganizationCommandService } from '@/services/organization/IOrganizationCommandService';
 import type { IOrganizationEntityService } from '@/services/organization/IOrganizationEntityService';
@@ -193,13 +194,15 @@ export class OrganizationManageFormViewModel {
   async loadDetails(): Promise<void> {
     log.debug('Loading organization details', { orgId: this.orgId });
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.submissionError = null;
     });
 
     try {
-      const details = await this.queryService.getOrganizationDetails(this.orgId);
+      const details = await this.queryService.getOrganizationDetails(this.orgId, correlationId);
 
       if (!details) {
         runInAction(() => {
@@ -229,7 +232,7 @@ export class OrganizationManageFormViewModel {
         this.submissionError = errorMessage;
       });
 
-      log.error('Failed to load organization details', error);
+      log.error('Failed to load organization details', { error, correlationId });
     }
   }
 

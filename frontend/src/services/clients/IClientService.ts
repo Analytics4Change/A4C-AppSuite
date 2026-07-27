@@ -36,8 +36,14 @@ import type {
 
 export interface IClientService {
   // Queries
-  listClients(status?: string, searchTerm?: string): Promise<ClientListItem[]>;
-  getClient(clientId: string): Promise<Client>;
+  // `correlationId` (optional, trailing) pins X-Correlation-ID on the read so the
+  // caller's failure-log line joins the server-side request trace.
+  listClients(
+    status?: string,
+    searchTerm?: string,
+    correlationId?: string
+  ): Promise<ClientListItem[]>;
+  getClient(clientId: string, correlationId?: string): Promise<Client>;
 
   // Lifecycle
   registerClient(params: RegisterClientParams): Promise<ClientUpdateResult>;

@@ -365,7 +365,10 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
     };
   }
 
-  async getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null> {
+  async getOrganizationDetails(
+    orgId: string,
+    _correlationId?: string
+  ): Promise<OrganizationDetails | null> {
     await this.simulateDelay();
 
     const org = MOCK_ORGANIZATIONS.find((o) => o.id === orgId);
