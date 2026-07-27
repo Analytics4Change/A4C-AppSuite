@@ -354,9 +354,18 @@ service/function **owns its own read-failure logging and has no logging caller**
 only sets error state), it mints the id *inside* the read via a **defaulted** param —
 `correlationId: string = generateCorrelationId()` — pins it, and logs it. Same header/log
 guarantee, zero caller plumbing. Instances: `EventMonitoringService`, `OrphanedDeletionService`,
-`getOrganizationSubdomainInfo`. (The completeness gate for "every read is threaded" is a
-committed `grep -rE 'supabaseService\.apiRpc<' src` sweep — every hit carries a 3rd
-`{ correlationId }` arg or is a documented write.)
+`getOrganizationSubdomainInfo`. **Defaulted, not optional (`?`), on purpose:** a leaf that logs
+the id must never log `undefined` — with an optional param a no-arg call would log a blank id
+while the server auto-gen'd a *different* one, breaking the join. The default guarantees the
+logged id is the pinned id.
+
+**Completeness gate** for "every read is threaded": a committed `grep -rE
+'supabaseService\.apiRpc<' src` sweep — every hit either carries a 3rd `{ correlationId }` arg
+or is a **write** routed through `apiRpc<>` (e.g. `update_user_access_dates`,
+`sync_schedule_assignments`, `bulk_assign_role`, `sync_role_assignments`) that correctly carries
+correlation in the RPC body's `p_correlation_id`, not the transport header. (Scope: this covers
+`api.*` reads via the SDK helpers — direct `.from(...)`/`client.rpc(...)` reads sit outside the
+helper boundary and this rule.)
 
 ## Related Documentation
 
