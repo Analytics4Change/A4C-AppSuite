@@ -1,7 +1,9 @@
 ---
-status: seed
-last_updated: 2026-07-21
+status: archived
+last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27.** The invite/edit form-submit failure path on `UsersManagePage` is fully routed through the standard: shared `<CommandFeedbackBanner kind="error">` (`invite-submission-error` / `edit-submission-error` testids) fed via `sanitizeCommandError`, echo via `reportFailure(formViewModel.submissionError, …)`, page-level banners guarded by `!formViewModel?.submissionError` (INV-1), focus via `useCommandFeedbackFocus`. F4 spec exercises the invite-failure path. → [[command-feedback-standard]]
 
 # Seed: Route UsersManagePage form-submit failure through the command-feedback standard (N4)
 

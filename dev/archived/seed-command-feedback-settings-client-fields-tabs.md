@@ -1,7 +1,9 @@
 ---
-status: seed
-last_updated: 2026-07-22
+status: archived
+last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27.** Both tabs now render the requested success surface: `<CommandFeedbackBanner kind="success" message={viewModel.successMessage} />` (`CategoriesTab.tsx:278-280`, `CustomFieldsTab.tsx:331-333`), driven by `ClientFieldSettingsViewModel.successMessage` per-mutation messages with sanitized errors (+3 VM tests; 68 passing). Contextual `role="alert"` blocks preserved as intended. → [[command-feedback-standard]]
 
 # Seed: Command-feedback for settings client-fields tabs (Categories + CustomFields)
 

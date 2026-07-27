@@ -1,5 +1,9 @@
 # Codify Frontend Feedback + Testing Standards — Seed Findings
 
+> **⚠️ PARTIAL (updated 2026-07-27) — S1 SHIPPED, S2 still OPEN (kept active for S2 only).**
+> **S1 (toast + persistent-banner double-surface convention) is codified** — `documentation/frontend/patterns/command-feedback.md` fully documents the banner-authoritative + `aria-hidden` toast-echo convention (INV-1/2/3, sanitization), and `frontend/CLAUDE.md` forward-links it.
+> **S2 (testing standards) NOT codified** — the "test the ViewModel as the unit of MobX logic / don't extract a one-caller hook just to reach a test seam" guidance is absent from `frontend/CLAUDE.md` §Testing Patterns and the `frontend-dev-guidelines` skill. This card remains open scoped to S2 only.
+
 ## Source
 
 `software-architect-dbc` review of PR #37 (notification-prefs save toast fix), 2026-04-24.

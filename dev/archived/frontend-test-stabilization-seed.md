@@ -1,3 +1,5 @@
+> **✅ SHIPPED — archived 2026-07-27 (PR #97, `464d298b`).** The failing-tests condition no longer holds — all 6 root causes were addressed by #97's commits (Invitation VM, OrganizationFormViewModel, focus/keyboard-nav hook suites, logger, +CI vitest gate; RC#1 resolved by scoping `test` to `src` so `e2e/**` Playwright specs aren't collected). Live suite: `vitest run src` → 620 pass; scripts config → 42 pass. Every cited file green. (The `useKeyboardNavigation` document-target `.closest()` guard is tracked separately by [[fix-usekeyboardnavigation-document-target-crash]], not this card.) → [[pr-97-close-out]]
+
 # Frontend Test Stabilization — Seed Findings
 
 ## Source

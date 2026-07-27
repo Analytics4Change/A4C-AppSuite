@@ -1,7 +1,9 @@
 ---
-status: seed
-last_updated: 2026-07-21
+status: archived
+last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27.** Resolved by removal: `grep -rn successMessage src/viewModels/users/` returns **zero hits** — the write-only observable and all ~18 setters were deleted during the command-feedback migration (success is now surfaced via the banner/echo, not a VM string). No render site exists. → [[command-feedback-standard]]
 
 # Seed: `UsersViewModel.successMessage` is a write-only observable (N2)
 

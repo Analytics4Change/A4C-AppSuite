@@ -1,7 +1,9 @@
 ---
-status: seed
-last_updated: 2026-07-22
+status: archived
+last_updated: 2026-07-27
 ---
+
+> **✅ SHIPPED — archived 2026-07-27.** The last remaining surface (`UsersManagePage` load error → `UsersErrorBanner`) now sanitizes: `error={ viewModel.error ? sanitizeCommandError(viewModel.error, 'Something went wrong. Please try again.').display : … }` (`UsersManagePage.tsx:757-761`). The raw `UsersViewModel` load error can no longer reach the banner unsanitized (siblings were done in PR #91). → [[command-feedback-standard]]
 
 # Seed: Sanitize load-path errors before the command-feedback banner
 
