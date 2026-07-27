@@ -10,6 +10,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IScheduleService, ScheduleDeleteResult } from '@/services/schedule/IScheduleService';
 import { getScheduleService } from '@/services/schedule/ScheduleServiceFactory';
 import type { ScheduleTemplate } from '@/types/schedule.types';
@@ -92,13 +93,15 @@ export class ScheduleListViewModel {
   async loadTemplates(): Promise<void> {
     log.debug('Loading schedule templates');
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
     });
 
     try {
-      const templates = await this.service.listTemplates({ status: 'all' });
+      const templates = await this.service.listTemplates({ status: 'all' }, correlationId);
 
       runInAction(() => {
         this.rawTemplates = templates;
@@ -111,7 +114,7 @@ export class ScheduleListViewModel {
         this.isLoading = false;
         this.error = message;
       });
-      log.error('Failed to load schedule templates', error);
+      log.error('Failed to load schedule templates', { error, correlationId });
     }
   }
 

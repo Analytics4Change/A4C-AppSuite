@@ -117,7 +117,12 @@ export interface IOrganizationQueryService {
    * Used by the Organization Manage page for the edit form.
    *
    * @param orgId - Organization UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Full organization details or null if not found
    */
-  getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null>;
+  getOrganizationDetails(
+    orgId: string,
+    correlationId?: string
+  ): Promise<OrganizationDetails | null>;
 }

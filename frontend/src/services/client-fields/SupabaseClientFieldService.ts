@@ -300,12 +300,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return env as DeleteCategoryResult;
   }
 
-  async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
+  async getFieldUsageCount(
+    fieldKey: string,
+    correlationId?: string
+  ): Promise<{ success: boolean; count: number }> {
     log.debug('Getting field usage count', { fieldKey });
 
-    const env = await supabaseService.apiRpcEnvelope<{ count?: number }>('get_field_usage_count', {
-      p_field_key: fieldKey,
-    });
+    const env = await supabaseService.apiRpcEnvelope<{ count?: number }>(
+      'get_field_usage_count',
+      { p_field_key: fieldKey },
+      { correlationId }
+    );
 
     if (!env.success) {
       log.error('Failed to get field usage count', { error: env.error });
@@ -317,7 +322,8 @@ export class SupabaseClientFieldService implements IClientFieldService {
 
   async getCategoryFieldCount(
     categoryId: string,
-    includeInactive = false
+    includeInactive = false,
+    correlationId?: string
   ): Promise<{ success: boolean; count: number; fields: string[] }> {
     log.debug('Getting category field count', { categoryId, includeInactive });
 
@@ -326,7 +332,8 @@ export class SupabaseClientFieldService implements IClientFieldService {
       {
         p_category_id: categoryId,
         p_include_inactive: includeInactive,
-      }
+      },
+      { correlationId }
     );
 
     if (!env.success) {

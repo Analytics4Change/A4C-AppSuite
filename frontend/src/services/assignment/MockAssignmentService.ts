@@ -13,12 +13,15 @@ const log = Logger.getLogger('api');
 export class MockAssignmentService implements IAssignmentService {
   private assignments: UserClientAssignment[] = [];
 
-  async listAssignments(params: {
-    orgId?: string;
-    userId?: string;
-    clientId?: string;
-    activeOnly?: boolean;
-  }): Promise<UserClientAssignment[]> {
+  async listAssignments(
+    params: {
+      orgId?: string;
+      userId?: string;
+      clientId?: string;
+      activeOnly?: boolean;
+    },
+    _correlationId?: string
+  ): Promise<UserClientAssignment[]> {
     log.debug('[Mock] Listing assignments', params);
     await this.simulateDelay();
 

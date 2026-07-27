@@ -1336,7 +1336,10 @@ export class MockClientFieldService implements IClientFieldService {
     return { success: true, category_id: categoryId };
   }
 
-  async getFieldUsageCount(fieldKey: string): Promise<{ success: boolean; count: number }> {
+  async getFieldUsageCount(
+    fieldKey: string,
+    _correlationId?: string
+  ): Promise<{ success: boolean; count: number }> {
     log.debug('[Mock] Getting field usage count', { fieldKey });
     await this.simulateDelay();
     // Mock: return 0 for most fields, simulate some usage for testing
@@ -1346,7 +1349,8 @@ export class MockClientFieldService implements IClientFieldService {
 
   async getCategoryFieldCount(
     categoryId: string,
-    includeInactive = false
+    includeInactive = false,
+    _correlationId?: string
   ): Promise<{ success: boolean; count: number; fields: string[] }> {
     log.debug('[Mock] Getting category field count', { categoryId, includeInactive });
     await this.simulateDelay();

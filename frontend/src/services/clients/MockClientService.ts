@@ -288,7 +288,11 @@ export class MockClientService implements IClientService {
   // Queries
   // -------------------------------------------------------------------------
 
-  async listClients(status?: string, searchTerm?: string): Promise<ClientListItem[]> {
+  async listClients(
+    status?: string,
+    searchTerm?: string,
+    _correlationId?: string
+  ): Promise<ClientListItem[]> {
     await delay();
     let result = this.clients.map((c) => ({ ...c }));
 
@@ -325,7 +329,7 @@ export class MockClientService implements IClientService {
     }));
   }
 
-  async getClient(clientId: string): Promise<Client> {
+  async getClient(clientId: string, _correlationId?: string): Promise<Client> {
     await delay();
     const client = this.clients.find((c) => c.id === clientId);
     if (!client) throw new Error('Client not found');

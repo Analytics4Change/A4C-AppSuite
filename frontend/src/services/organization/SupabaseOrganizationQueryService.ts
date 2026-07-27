@@ -240,7 +240,10 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
    * `{success: false, error}` on handler-driven failure. PR-A inventory had this
    * misclassified as read-shape; corrected during PR-C implementation 2026-05-11.
    */
-  async getOrganizationDetails(orgId: string): Promise<OrganizationDetails | null> {
+  async getOrganizationDetails(
+    orgId: string,
+    correlationId?: string
+  ): Promise<OrganizationDetails | null> {
     try {
       log.debug('Fetching organization details', { orgId });
 
@@ -249,7 +252,7 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
         contacts?: OrganizationDetails['contacts'];
         addresses?: OrganizationDetails['addresses'];
         phones?: OrganizationDetails['phones'];
-      }>('get_organization_details', { p_org_id: orgId });
+      }>('get_organization_details', { p_org_id: orgId }, { correlationId });
 
       if (!env.success) {
         log.debug('Organization details not found', { orgId, error: env.error });

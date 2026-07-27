@@ -46,6 +46,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { cn } from '@/components/ui/utils';
 import { usePermissionGate } from '@/hooks/usePermissionGate';
 
@@ -138,9 +139,10 @@ export const SchedulesManagePage: React.FC = observer(() => {
   const selectAndLoadTemplate = useCallback(
     async (templateId: string) => {
       setOperationError(null);
+      const correlationId = generateCorrelationId();
       try {
         const service = getScheduleService();
-        const detail = await service.getTemplate(templateId);
+        const detail = await service.getTemplate(templateId, correlationId);
         if (detail) {
           setCurrentTemplate(detail);
           setFormViewModel(new ScheduleFormViewModel(service, 'edit', detail));
@@ -151,11 +153,11 @@ export const SchedulesManagePage: React.FC = observer(() => {
             name: detail.schedule_name,
           });
         } else {
-          log.warn('Template not found', { templateId });
+          log.warn('Template not found', { templateId, correlationId });
           setOperationError('Template could not be loaded. Please refresh the page.');
         }
       } catch (error) {
-        log.error('Failed to load template', error);
+        log.error('Failed to load template', { error, correlationId });
         setOperationError('Failed to load template details');
       }
     },

@@ -14,6 +14,10 @@ import {
   DISCHARGE_REASON_LABELS,
   DISCHARGE_PLACEMENT_LABELS,
 } from '@/types/client.types';
+import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
+
+const log = Logger.getLogger('component');
 
 export const ClientDetailLayout: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -34,15 +38,17 @@ export const ClientDetailLayout: React.FC = () => {
   const loadClient = useCallback(() => {
     if (!clientId) return;
     let cancelled = false;
+    const correlationId = generateCorrelationId();
 
     setIsLoading(true);
     setError(null);
     getClientService()
-      .getClient(clientId)
+      .getClient(clientId, correlationId)
       .then((c) => {
         if (!cancelled) setClient(c);
       })
-      .catch(() => {
+      .catch((error) => {
+        log.error('Failed to load client', { error, correlationId });
         if (!cancelled) setError('Client not found');
       })
       .finally(() => {

@@ -17,12 +17,15 @@ import type { IAssignmentService } from './IAssignmentService';
 const log = Logger.getLogger('api');
 
 export class SupabaseAssignmentService implements IAssignmentService {
-  async listAssignments(params: {
-    orgId?: string;
-    userId?: string;
-    clientId?: string;
-    activeOnly?: boolean;
-  }): Promise<UserClientAssignment[]> {
+  async listAssignments(
+    params: {
+      orgId?: string;
+      userId?: string;
+      clientId?: string;
+      activeOnly?: boolean;
+    },
+    correlationId?: string
+  ): Promise<UserClientAssignment[]> {
     log.debug('Listing assignments', params);
 
     // Registry-classified envelope (Pattern A v2 read envelope variant):
@@ -34,7 +37,8 @@ export class SupabaseAssignmentService implements IAssignmentService {
         p_user_id: params.userId ?? null,
         p_client_id: params.clientId ?? null,
         p_active_only: params.activeOnly ?? true,
-      }
+      },
+      { correlationId }
     );
 
     if (!env.success) {

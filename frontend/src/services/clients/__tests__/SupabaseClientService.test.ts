@@ -67,10 +67,11 @@ describe('SupabaseClientService', () => {
 
       const result = await service.listClients();
 
-      expect(mockApiRpcEnvelope).toHaveBeenCalledWith('list_clients', {
-        p_status: null,
-        p_search_term: null,
-      });
+      expect(mockApiRpcEnvelope).toHaveBeenCalledWith(
+        'list_clients',
+        { p_status: null, p_search_term: null },
+        { correlationId: undefined }
+      );
       expect(result).toEqual(clients);
     });
 

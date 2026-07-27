@@ -339,11 +339,14 @@ async loadRoles(): Promise<void> {
   `loadData` reuses `getSessionCorrelationId()` (the same id its writes carry) rather than
   minting a fresh one. Note this binds the session id at *load* time.
 
-**`apiRpcEnvelope` exception:** only `apiRpc` (read-shape RPCs) currently accepts the
-`{ correlationId }` option. Envelope-shape reads (`get_organization_details`, schedules'
-`list_schedule_templates`/`get_schedule_template`) go through `apiRpcEnvelope`, which does
-NOT yet forward the header — extending it is a separate, deliberate follow-up (it's also the
-write-path helper; touch carefully). Do not bolt that change onto a read-path PR.
+**Both helpers accept `{ correlationId }`:** `apiRpc(fn, params, { correlationId })` AND
+`apiRpcEnvelope(fn, params, { correlationId })` pin the id as the `X-Correlation-ID` header.
+Envelope-shape reads (`get_organization_details`, schedules' `list_schedule_templates`/
+`get_schedule_template`, `list_clients`/`get_client`, `list_user_client_assignments`, the
+client-field usage-counts) thread it the same way — same fresh-per-read vs reuse-session-id
+selection rule as above. **Envelope WRITES do NOT pass it**: they carry correlation via the
+RPC body's `p_correlation_id` param (a separate channel), so leave the transport header off
+write calls — only reads pin it.
 
 ## Related Documentation
 

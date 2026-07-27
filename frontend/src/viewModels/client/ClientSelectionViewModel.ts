@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import type { IClientService } from '@/services/clients';
 import type { ClientListItem } from '@/types/client.types';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -18,18 +19,19 @@ export class ClientSelectionViewModel {
   }
 
   async loadClients() {
+    const correlationId = generateCorrelationId();
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
     });
 
     try {
-      const clients = await this.clientService.listClients();
+      const clients = await this.clientService.listClients(undefined, undefined, correlationId);
       runInAction(() => {
         this.clients = clients;
       });
     } catch (error) {
-      this.handleError('Failed to load clients', error);
+      this.handleError('Failed to load clients', error, correlationId);
     } finally {
       runInAction(() => {
         this.isLoading = false;
@@ -43,22 +45,24 @@ export class ClientSelectionViewModel {
     });
 
     if (!query) {
+      // Empty query = fresh full-list load; loadClients() mints its own id.
       await this.loadClients();
       return;
     }
 
+    const correlationId = generateCorrelationId();
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
     });
 
     try {
-      const clients = await this.clientService.listClients(undefined, query);
+      const clients = await this.clientService.listClients(undefined, query, correlationId);
       runInAction(() => {
         this.clients = clients;
       });
     } catch (error) {
-      this.handleError('Failed to search clients', error);
+      this.handleError('Failed to search clients', error, correlationId);
     } finally {
       runInAction(() => {
         this.isLoading = false;
@@ -98,8 +102,8 @@ export class ClientSelectionViewModel {
     return age;
   }
 
-  private handleError(message: string, error: unknown) {
-    log.error(message, { error });
+  private handleError(message: string, error: unknown, correlationId?: string) {
+    log.error(message, { error, correlationId });
     runInAction(() => {
       this.error = message;
     });

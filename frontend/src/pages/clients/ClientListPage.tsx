@@ -10,6 +10,7 @@ import { getClientService } from '@/services/clients';
 import type { IClientService } from '@/services/clients';
 import type { ClientListItem, ClientStatus } from '@/types/client.types';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('component');
 
@@ -27,15 +28,16 @@ class ClientListViewModel {
   }
 
   async loadClients(status?: string, searchTerm?: string) {
+    const correlationId = generateCorrelationId();
     this.isLoading = true;
     this.error = null;
     try {
-      const result = await this.service.listClients(status, searchTerm);
+      const result = await this.service.listClients(status, searchTerm, correlationId);
       runInAction(() => {
         this.clients = result;
       });
     } catch (e) {
-      log.error('Failed to load clients', { error: e });
+      log.error('Failed to load clients', { error: e, correlationId });
       runInAction(() => {
         this.error = 'Failed to load clients';
       });
