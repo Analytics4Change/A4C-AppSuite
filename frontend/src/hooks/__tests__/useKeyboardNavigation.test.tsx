@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import React from 'react';
 import { useKeyboardNavigation } from '../useKeyboardNavigation';
 import * as focusUtils from '@/utils/focus-management';
 
-// Mock the focus-management utilities
+// The hook enumerates focusable elements via getAllFocusableElements and computes
+// prev/next by index (it does NOT call findPreviousFocusableElement). Mock only the
+// util the hook actually uses.
 vi.mock('@/utils/focus-management', () => ({
   getAllFocusableElements: vi.fn(),
-  findPreviousFocusableElement: vi.fn()
 }));
 
 describe('useKeyboardNavigation', () => {
@@ -17,22 +18,48 @@ describe('useKeyboardNavigation', () => {
   let input1: HTMLInputElement;
   let input2: HTMLInputElement;
 
+  // The hook attaches its keydown listener to the container (capture phase) and
+  // ignores events whose target is outside it — so dispatch on the container.
+  const dispatchKey = async (
+    target: EventTarget,
+    key: string,
+    opts: { shiftKey?: boolean } = {}
+  ) => {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      shiftKey: opts.shiftKey ?? false,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
+    await act(async () => {
+      target.dispatchEvent(event);
+    });
+    return { event, preventDefaultSpy };
+  };
+
+  // Initial focus is scheduled via requestAnimationFrame; flush a frame to settle it.
+  const flushRAF = async () => {
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    });
+  };
+
   beforeEach(() => {
-    // Create a mock container with focusable elements
     container = document.createElement('div');
-    
+
     button1 = document.createElement('button');
     button1.tabIndex = 1;
     button1.textContent = 'Button 1';
-    
+
     input1 = document.createElement('input');
     input1.tabIndex = 2;
     input1.type = 'text';
-    
+
     input2 = document.createElement('input');
     input2.tabIndex = 3;
     input2.type = 'text';
-    
+
     button2 = document.createElement('button');
     button2.tabIndex = 4;
     button2.textContent = 'Button 2';
@@ -41,142 +68,86 @@ describe('useKeyboardNavigation', () => {
     container.appendChild(input1);
     container.appendChild(input2);
     container.appendChild(button2);
-    
+
     document.body.appendChild(container);
 
-    // Setup default mock return values
     vi.mocked(focusUtils.getAllFocusableElements).mockReturnValue([
-      button1, input1, input2, button2
+      button1,
+      input1,
+      input2,
+      button2,
     ]);
   });
 
   afterEach(() => {
-    document.body.removeChild(container);
+    document.body.innerHTML = '';
     vi.clearAllMocks();
   });
 
   describe('Tab key navigation', () => {
-    it('should move focus to next element on Tab', () => {
+    it('should not intercept plain Tab without a focus trap (browser handles natural order)', async () => {
       const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          trapFocus: false
-        })
-      );
 
-      // Focus first element
-      button1.focus();
-      expect(document.activeElement).toBe(button1);
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, trapFocus: false }));
+      await flushRAF();
 
-      // Simulate Tab key
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        shiftKey: false,
-        bubbles: true 
+      await act(async () => {
+        button1.focus();
       });
-      
-      const focusSpy = vi.spyOn(input1, 'focus');
-      document.dispatchEvent(event);
 
-      expect(focusSpy).toHaveBeenCalled();
+      const { preventDefaultSpy } = await dispatchKey(container, 'Tab');
+
+      // trapFocus:false and wrapAround:false → the hook lets the browser move focus.
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
     });
 
-    it('should move focus to previous element on Shift+Tab', () => {
+    it('should move focus to the previous element on Shift+Tab when trapping', async () => {
       const containerRef = { current: container };
-      
-      vi.mocked(focusUtils.findPreviousFocusableElement).mockReturnValue(input1);
 
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          trapFocus: false
-        })
-      );
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, trapFocus: true }));
+      await flushRAF();
 
-      // Focus second input
-      input2.focus();
-      expect(document.activeElement).toBe(input2);
-
-      // Simulate Shift+Tab key
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        shiftKey: true,
-        bubbles: true 
+      // Move to input2 (index 2); Shift+Tab should focus input1 (index 1).
+      await act(async () => {
+        input2.focus();
       });
-      
       const focusSpy = vi.spyOn(input1, 'focus');
-      document.dispatchEvent(event);
 
-      expect(focusUtils.findPreviousFocusableElement).toHaveBeenCalledWith(
-        [button1, input1, input2, button2],
-        input2
-      );
-      expect(focusSpy).toHaveBeenCalled();
-    });
-
-    it('should trap focus when trapFocus is true', () => {
-      const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          trapFocus: true
-        })
-      );
-
-      // Focus last element
-      button2.focus();
-      expect(document.activeElement).toBe(button2);
-
-      // Simulate Tab key (should wrap to first)
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        shiftKey: false,
-        bubbles: true 
-      });
-      
-      const focusSpy = vi.spyOn(button1, 'focus');
-      const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-      
-      document.dispatchEvent(event);
+      const { preventDefaultSpy } = await dispatchKey(container, 'Tab', { shiftKey: true });
 
       expect(preventDefaultSpy).toHaveBeenCalled();
       expect(focusSpy).toHaveBeenCalled();
     });
 
-    it('should wrap backwards when Shift+Tab on first element with trapFocus', () => {
+    it('should trap focus (wrap to first) on Tab from the last element', async () => {
       const containerRef = { current: container };
-      
-      vi.mocked(focusUtils.findPreviousFocusableElement).mockReturnValue(null);
 
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          trapFocus: true
-        })
-      );
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, trapFocus: true }));
+      await flushRAF();
 
-      // Focus first element
-      button1.focus();
-      expect(document.activeElement).toBe(button1);
-
-      // Simulate Shift+Tab key (should wrap to last)
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        shiftKey: true,
-        bubbles: true 
+      await act(async () => {
+        button2.focus();
       });
-      
+      const focusSpy = vi.spyOn(button1, 'focus');
+
+      const { preventDefaultSpy } = await dispatchKey(container, 'Tab');
+
+      expect(preventDefaultSpy).toHaveBeenCalled();
+      expect(focusSpy).toHaveBeenCalled();
+    });
+
+    it('should wrap backwards on Shift+Tab from the first element when trapping', async () => {
+      const containerRef = { current: container };
+
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, trapFocus: true }));
+      await flushRAF();
+
+      await act(async () => {
+        button1.focus();
+      });
       const focusSpy = vi.spyOn(button2, 'focus');
-      const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-      
-      document.dispatchEvent(event);
+
+      const { preventDefaultSpy } = await dispatchKey(container, 'Tab', { shiftKey: true });
 
       expect(preventDefaultSpy).toHaveBeenCalled();
       expect(focusSpy).toHaveBeenCalled();
@@ -184,46 +155,24 @@ describe('useKeyboardNavigation', () => {
   });
 
   describe('Escape key handling', () => {
-    it('should call onEscape when Escape is pressed', () => {
+    it('should call onEscape when Escape is pressed', async () => {
       const onEscape = vi.fn();
       const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          onEscape
-        })
-      );
 
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Escape',
-        bubbles: true 
-      });
-      
-      document.dispatchEvent(event);
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, onEscape }));
+
+      await dispatchKey(container, 'Escape');
 
       expect(onEscape).toHaveBeenCalled();
     });
 
-    it('should not call onEscape when disabled', () => {
+    it('should not call onEscape when disabled', async () => {
       const onEscape = vi.fn();
       const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: false,
-          onEscape
-        })
-      );
 
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Escape',
-        bubbles: true 
-      });
-      
-      document.dispatchEvent(event);
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: false, onEscape }));
+
+      await dispatchKey(container, 'Escape');
 
       expect(onEscape).not.toHaveBeenCalled();
     });
@@ -233,235 +182,143 @@ describe('useKeyboardNavigation', () => {
     it('should restore focus on unmount when restoreFocus is true', () => {
       const previousElement = document.createElement('button');
       document.body.appendChild(previousElement);
-      previousElement.focus();
-      
+      act(() => {
+        previousElement.focus();
+      });
+
       const containerRef = { current: container };
-      
-      const { unmount } = renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          restoreFocus: true
-        })
+
+      const { unmount } = renderHook(() =>
+        useKeyboardNavigation({ containerRef, enabled: true, restoreFocus: true })
       );
 
-      // Focus an element in the container
-      input1.focus();
+      act(() => {
+        input1.focus();
+      });
       expect(document.activeElement).toBe(input1);
 
       const focusSpy = vi.spyOn(previousElement, 'focus');
-
-      // Unmount the hook
-      unmount();
+      act(() => {
+        unmount();
+      });
 
       expect(focusSpy).toHaveBeenCalled();
-      
-      document.body.removeChild(previousElement);
     });
 
     it('should not restore focus when restoreFocus is false', () => {
       const previousElement = document.createElement('button');
       document.body.appendChild(previousElement);
-      previousElement.focus();
-      
+      act(() => {
+        previousElement.focus();
+      });
+
       const containerRef = { current: container };
-      
-      const { unmount } = renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          restoreFocus: false
-        })
+
+      const { unmount } = renderHook(() =>
+        useKeyboardNavigation({ containerRef, enabled: true, restoreFocus: false })
       );
 
-      // Focus an element in the container
-      input1.focus();
-
+      act(() => {
+        input1.focus();
+      });
       const focusSpy = vi.spyOn(previousElement, 'focus');
-
-      // Unmount the hook
-      unmount();
+      act(() => {
+        unmount();
+      });
 
       expect(focusSpy).not.toHaveBeenCalled();
-      
-      document.body.removeChild(previousElement);
     });
   });
 
   describe('Initial focus', () => {
-    it('should set initial focus when initialFocusRef is provided', () => {
+    it('should set initial focus when initialFocusRef is provided (after a frame)', async () => {
       const containerRef = { current: container };
       const initialFocusRef = { current: input2 };
-      
       const focusSpy = vi.spyOn(input2, 'focus');
 
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          initialFocusRef
-        })
-      );
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, initialFocusRef }));
+
+      // Initial focus is deferred to requestAnimationFrame.
+      await flushRAF();
 
       expect(focusSpy).toHaveBeenCalled();
     });
 
-    it('should not set initial focus when disabled', () => {
+    it('should not set initial focus when disabled', async () => {
       const containerRef = { current: container };
       const initialFocusRef = { current: input2 };
-      
       const focusSpy = vi.spyOn(input2, 'focus');
 
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: false,
-          initialFocusRef
-        })
-      );
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: false, initialFocusRef }));
+      await flushRAF();
 
       expect(focusSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('Edge cases', () => {
-    it('should handle missing container gracefully', () => {
+    it('should handle a missing container gracefully', async () => {
       const containerRef = React.createRef<HTMLElement>();
-      
-      renderHook(() => 
+      const el = document.createElement('button');
+      document.body.appendChild(el);
+
+      renderHook(() =>
         useKeyboardNavigation({
           containerRef: containerRef as React.RefObject<HTMLElement>,
-          enabled: true
-        })
-      );
-
-      // Should not throw error
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        bubbles: true 
-      });
-      
-      expect(() => document.dispatchEvent(event)).not.toThrow();
-    });
-
-    it('should handle empty focusable elements', () => {
-      vi.mocked(focusUtils.getAllFocusableElements).mockReturnValue([]);
-      
-      const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
           enabled: true,
-          trapFocus: true
         })
       );
 
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        bubbles: true 
-      });
-      
-      // Should not throw error
-      expect(() => document.dispatchEvent(event)).not.toThrow();
+      // No container → the listener falls back to document. Real key events target an
+      // element (which has .closest), not the document node itself; dispatch from one
+      // so the hook must not throw.
+      await expect(dispatchKey(el, 'Tab')).resolves.toBeDefined();
     });
 
-    it('should not interfere with non-Tab/Escape keys', () => {
+    it('should handle empty focusable elements', async () => {
+      vi.mocked(focusUtils.getAllFocusableElements).mockReturnValue([]);
       const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true
-        })
-      );
 
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Enter',
-        bubbles: true 
-      });
-      
-      const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-      document.dispatchEvent(event);
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, trapFocus: true }));
+      await flushRAF();
+
+      await expect(dispatchKey(container, 'Tab')).resolves.toBeDefined();
+    });
+
+    it('should not interfere with non-Tab/Escape keys', async () => {
+      const containerRef = { current: container };
+
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true }));
+
+      const { preventDefaultSpy } = await dispatchKey(container, 'Enter');
 
       expect(preventDefaultSpy).not.toHaveBeenCalled();
     });
 
-    it('should cleanup event listeners on unmount', () => {
+    it('should cleanup the keydown listener on the container on unmount', () => {
       const containerRef = { current: container };
-      const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
-      
-      const { unmount } = renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true
-        })
-      );
+      const removeEventListenerSpy = vi.spyOn(container, 'removeEventListener');
 
+      const { unmount } = renderHook(() => useKeyboardNavigation({ containerRef, enabled: true }));
       unmount();
 
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        'keydown',
-        expect.any(Function)
-      );
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
     });
 
-    it('should handle focus outside container', () => {
+    it('should not intercept Tab for a target outside the container', async () => {
       const outsideButton = document.createElement('button');
       document.body.appendChild(outsideButton);
       outsideButton.focus();
 
       const containerRef = { current: container };
-      
-      renderHook(() => 
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true,
-          trapFocus: false
-        })
-      );
 
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        bubbles: true 
-      });
-      
-      const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-      document.dispatchEvent(event);
+      renderHook(() => useKeyboardNavigation({ containerRef, enabled: true, trapFocus: true }));
+      await flushRAF();
 
-      // Should not prevent default for elements outside container
+      // Dispatch on an element outside the container → the container guard drops it.
+      const { preventDefaultSpy } = await dispatchKey(outsideButton, 'Tab');
+
       expect(preventDefaultSpy).not.toHaveBeenCalled();
-
-      document.body.removeChild(outsideButton);
-    });
-  });
-
-  describe('isNavigating state', () => {
-    it('should track navigation state correctly', () => {
-      const containerRef = { current: container };
-
-      renderHook(() =>
-        useKeyboardNavigation({
-          containerRef,
-          enabled: true
-        })
-      );
-
-      // isNavigating removed from public API
-
-      // Focus an element in container
-      input1.focus();
-
-      const event = new KeyboardEvent('keydown', { 
-        key: 'Tab',
-        bubbles: true 
-      });
-      
-      document.dispatchEvent(event);
-
-      // Note: In a real scenario, we'd need to test the state change
-      // during the navigation, but this is simplified for unit testing
-      // isNavigating removed from public API
     });
   });
 });

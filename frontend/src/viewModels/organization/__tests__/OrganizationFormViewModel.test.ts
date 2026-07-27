@@ -27,6 +27,7 @@ describe('OrganizationFormViewModel', () => {
         stages: [],
       }),
       cancelWorkflow: vi.fn().mockResolvedValue(true),
+      startDeletionWorkflow: vi.fn().mockResolvedValue('deletion-workflow-123'),
     };
 
     // Mock organization service - matches OrganizationService methods
@@ -105,7 +106,8 @@ describe('OrganizationFormViewModel', () => {
 
       // Verify saveDraft was called with form data that includes our update
       expect(mockOrganizationService.saveDraft).toHaveBeenCalled();
-      const callArgs = (mockOrganizationService.saveDraft as ReturnType<typeof vi.fn>).mock.calls[0];
+      const callArgs = (mockOrganizationService.saveDraft as ReturnType<typeof vi.fn>).mock
+        .calls[0];
       expect(callArgs[0].name).toBe('Test Org');
     });
 
@@ -169,7 +171,7 @@ describe('OrganizationFormViewModel', () => {
       const isValid = viewModel.validate();
       expect(isValid).toBe(false);
       // Check that validationErrors contains error for name
-      const nameError = viewModel.validationErrors.find(e => e.field === 'name');
+      const nameError = viewModel.validationErrors.find((e) => e.field === 'name');
       expect(nameError).toBeDefined();
     });
 
@@ -201,6 +203,7 @@ describe('OrganizationFormViewModel', () => {
       viewModel.updateNestedField('providerAdminContact.firstName', 'John');
       viewModel.updateNestedField('providerAdminContact.lastName', 'Doe');
       viewModel.updateNestedField('providerAdminContact.email', 'john@example.com');
+      viewModel.updateNestedField('providerAdminContact.emailConfirmation', 'john@example.com');
 
       // Use general info for provider admin address/phone
       viewModel.updateNestedField('useProviderAdminGeneralAddress', true);
@@ -214,21 +217,23 @@ describe('OrganizationFormViewModel', () => {
     it('should validate email format', () => {
       viewModel.updateNestedField('providerAdminContact.email', 'invalid-email');
       viewModel.validate();
-      const emailError = viewModel.validationErrors.find(e => e.field === 'providerAdminContact.email');
+      const emailError = viewModel.validationErrors.find(
+        (e) => e.field === 'providerAdminContact.email'
+      );
       expect(emailError).toBeDefined();
     });
 
     it('should validate phone number format', () => {
       viewModel.updateNestedField('generalPhone.number', 'invalid-phone');
       viewModel.validate();
-      const phoneError = viewModel.validationErrors.find(e => e.field === 'generalPhone.number');
+      const phoneError = viewModel.validationErrors.find((e) => e.field === 'generalPhone.number');
       expect(phoneError).toBeDefined();
     });
 
     it('should validate zip code format', () => {
       viewModel.updateNestedField('generalAddress.zipCode', '123');
       viewModel.validate();
-      const zipError = viewModel.validationErrors.find(e => e.field === 'generalAddress.zipCode');
+      const zipError = viewModel.validationErrors.find((e) => e.field === 'generalAddress.zipCode');
       expect(zipError).toBeDefined();
     });
   });
@@ -262,6 +267,7 @@ describe('OrganizationFormViewModel', () => {
       viewModel.updateNestedField('providerAdminContact.firstName', 'John');
       viewModel.updateNestedField('providerAdminContact.lastName', 'Doe');
       viewModel.updateNestedField('providerAdminContact.email', 'john@example.com');
+      viewModel.updateNestedField('providerAdminContact.emailConfirmation', 'john@example.com');
 
       // Use general info for provider admin
       viewModel.updateNestedField('useProviderAdminGeneralAddress', true);
@@ -273,7 +279,8 @@ describe('OrganizationFormViewModel', () => {
       expect(workflowId).toBe('workflow-123');
       // Verify workflow was called with correct params structure
       expect(mockWorkflowClient.startBootstrapWorkflow).toHaveBeenCalled();
-      const callArgs = (mockWorkflowClient.startBootstrapWorkflow as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const callArgs = (mockWorkflowClient.startBootstrapWorkflow as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
       expect(callArgs.subdomain).toBe('test-org');
       expect(callArgs.orgData.name).toBe('Test Organization');
     });
@@ -294,7 +301,9 @@ describe('OrganizationFormViewModel', () => {
 
     it('should handle submit errors gracefully', async () => {
       // Override the mock to reject
-      (mockWorkflowClient.startBootstrapWorkflow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
+      (mockWorkflowClient.startBootstrapWorkflow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('Network error')
+      );
       const workflowId = await viewModel.submit();
       expect(workflowId).toBeNull();
       expect(viewModel.isSubmitting).toBe(false);
