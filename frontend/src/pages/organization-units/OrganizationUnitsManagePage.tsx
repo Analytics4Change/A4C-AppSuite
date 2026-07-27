@@ -60,6 +60,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { cn } from '@/components/ui/utils';
 import * as Select from '@radix-ui/react-select';
 import type { OrganizationUnit } from '@/types/organization-unit.types';
@@ -305,9 +306,10 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
       }
 
       // Fetch full unit details from service
+      const correlationId = generateCorrelationId();
       try {
         const service = getOrganizationUnitService();
-        const fullUnit = await service.getUnitById(unitId);
+        const fullUnit = await service.getUnitById(unitId, correlationId);
         if (fullUnit) {
           setCurrentUnit(fullUnit);
 
@@ -327,7 +329,7 @@ export const OrganizationUnitsManagePage: React.FC = observer(() => {
           viewModel.selectNode(unitId);
         }
       } catch (error) {
-        log.error('Failed to load unit', error);
+        log.error('Failed to load unit', { error, correlationId });
         setOperationError('Failed to load unit details');
       }
     },

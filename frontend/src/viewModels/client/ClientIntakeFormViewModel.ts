@@ -28,6 +28,7 @@ import type { OrganizationUnit, OrganizationUnitNode } from '@/types/organizatio
 import { buildOrganizationUnitTree } from '@/types/organization-unit.types';
 import { getOUIdByPath, getOUPathById } from '@/utils/organizationUnitPath';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -294,13 +295,15 @@ export class ClientIntakeFormViewModel {
   // -------------------------------------------------------------------------
 
   async loadFieldDefinitions(): Promise<void> {
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoadingFieldDefinitions = true;
       this.loadError = null;
     });
 
     try {
-      const definitions = await this.fieldService.listFieldDefinitions();
+      const definitions = await this.fieldService.listFieldDefinitions(false, correlationId);
       runInAction(() => {
         this.fieldDefinitions = definitions;
         this.isLoadingFieldDefinitions = false;
@@ -308,7 +311,7 @@ export class ClientIntakeFormViewModel {
       this.loadDraft();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load field definitions';
-      log.error('Failed to load field definitions', { error });
+      log.error('Failed to load field definitions', { error, correlationId });
       runInAction(() => {
         this.loadError = message;
         this.isLoadingFieldDefinitions = false;
@@ -329,13 +332,18 @@ export class ClientIntakeFormViewModel {
     if (this.isLoadingOrganizationUnits) return;
     if (this.organizationUnits.length > 0) return;
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoadingOrganizationUnits = true;
       this.organizationUnitsError = null;
     });
 
     try {
-      const units = await this.organizationUnitService.getUnits({ status: 'active' });
+      const units = await this.organizationUnitService.getUnits(
+        { status: 'active' },
+        correlationId
+      );
       const rootPath =
         units.length > 0
           ? units.reduce<string>(
@@ -352,7 +360,7 @@ export class ClientIntakeFormViewModel {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to load organizational units';
-      log.warn('Failed to load organizational units for intake', { error });
+      log.warn('Failed to load organizational units for intake', { error, correlationId });
       runInAction(() => {
         this.organizationUnitsError = message;
         this.isLoadingOrganizationUnits = false;

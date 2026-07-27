@@ -136,7 +136,8 @@ describe('RolesViewModel', () => {
       it('should load roles from service', async () => {
         await viewModel.loadRoles();
 
-        expect(mockService.getRoles).toHaveBeenCalledWith({ status: 'all' });
+        // Second arg is a per-load correlation id pinned onto the read (end-to-end tracing).
+        expect(mockService.getRoles).toHaveBeenCalledWith({ status: 'all' }, expect.any(String));
         expect(viewModel.roles).toHaveLength(3);
         expect(viewModel.isLoading).toBe(false);
       });
@@ -151,10 +152,13 @@ describe('RolesViewModel', () => {
       it('should apply filters when provided', async () => {
         await viewModel.loadRoles({ status: 'active', searchTerm: 'admin' });
 
-        expect(mockService.getRoles).toHaveBeenCalledWith({
-          status: 'active',
-          searchTerm: 'admin',
-        });
+        expect(mockService.getRoles).toHaveBeenCalledWith(
+          {
+            status: 'active',
+            searchTerm: 'admin',
+          },
+          expect.any(String)
+        );
         expect(viewModel.filters).toEqual({ status: 'active', searchTerm: 'admin' });
       });
 
@@ -234,7 +238,7 @@ describe('RolesViewModel', () => {
 
         await viewModel.refresh();
 
-        expect(mockService.getRoles).toHaveBeenCalledWith({ status: 'active' });
+        expect(mockService.getRoles).toHaveBeenCalledWith({ status: 'active' }, expect.any(String));
       });
     });
   });
@@ -272,7 +276,7 @@ describe('RolesViewModel', () => {
     it('should set filters and reload', async () => {
       await viewModel.setFilters({ status: 'active' });
 
-      expect(mockService.getRoles).toHaveBeenCalledWith({ status: 'active' });
+      expect(mockService.getRoles).toHaveBeenCalledWith({ status: 'active' }, expect.any(String));
       expect(viewModel.filters.status).toBe('active');
     });
 
@@ -630,7 +634,7 @@ describe('RolesViewModel', () => {
 
         const result = await viewModel.getRoleWithPermissions('role-1');
 
-        expect(mockService.getRoleById).toHaveBeenCalledWith('role-1');
+        expect(mockService.getRoleById).toHaveBeenCalledWith('role-1', expect.any(String));
         expect(result?.permissions).toHaveLength(2);
       });
 

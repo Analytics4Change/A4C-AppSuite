@@ -21,6 +21,8 @@ export interface IOrganizationQueryService {
    * Retrieves organizations with optional filtering
    *
    * @param filters - Optional filters for type, status, partner type, and search
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of organizations matching filters
    *
    * @example
@@ -37,12 +39,17 @@ export interface IOrganizationQueryService {
    *   searchTerm: 'healthcare'
    * });
    */
-  getOrganizations(filters?: OrganizationFilterOptions): Promise<Organization[]>;
+  getOrganizations(
+    filters?: OrganizationFilterOptions,
+    correlationId?: string
+  ): Promise<Organization[]>;
 
   /**
    * Retrieves a single organization by ID
    *
    * @param orgId - Organization UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to organization or null if not found/no access
    *
    * @example
@@ -51,7 +58,7 @@ export interface IOrganizationQueryService {
    *   console.log(org.name, org.type);
    * }
    */
-  getOrganizationById(orgId: string): Promise<Organization | null>;
+  getOrganizationById(orgId: string, correlationId?: string): Promise<Organization | null>;
 
   /**
    * Retrieves child organizations for a given parent organization
@@ -59,13 +66,15 @@ export interface IOrganizationQueryService {
    * Used for hierarchical navigation (e.g., provider viewing their partner organizations)
    *
    * @param parentOrgId - Parent organization UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of child organizations
    *
    * @example
    * // Get all partners for a provider
    * const partners = await service.getChildOrganizations(providerOrgId);
    */
-  getChildOrganizations(parentOrgId: string): Promise<Organization[]>;
+  getChildOrganizations(parentOrgId: string, correlationId?: string): Promise<Organization[]>;
 
   /**
    * Retrieves organizations with pagination, filtering, and sorting
@@ -74,6 +83,8 @@ export interface IOrganizationQueryService {
    * with search, type/status filters, and sortable columns.
    *
    * @param options - Query options including filters, pagination, and sorting
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to paginated result with organizations and total count
    *
    * @example
@@ -97,7 +108,8 @@ export interface IOrganizationQueryService {
    * });
    */
   getOrganizationsPaginated(
-    options?: OrganizationQueryOptions
+    options?: OrganizationQueryOptions,
+    correlationId?: string
   ): Promise<PaginatedResult<Organization>>;
 
   /**

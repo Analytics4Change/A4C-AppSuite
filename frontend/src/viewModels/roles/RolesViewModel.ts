@@ -28,6 +28,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { isCanonicalRole } from '@/config/roles.config';
 import type { IRoleService } from '@/services/roles/IRoleService';
 import { getRoleService } from '@/services/roles/RoleServiceFactory';
@@ -195,6 +196,8 @@ export class RolesViewModel {
   async loadRoles(filters?: RoleFilterOptions): Promise<void> {
     log.debug('Loading roles', { filters });
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -204,7 +207,7 @@ export class RolesViewModel {
     });
 
     try {
-      const roles = await this.service.getRoles(this.filters);
+      const roles = await this.service.getRoles(this.filters, correlationId);
 
       runInAction(() => {
         // Filter out canonical/system roles - they should not be visible in Role Management UI
@@ -225,7 +228,7 @@ export class RolesViewModel {
         this.error = errorMessage;
       });
 
-      log.error('Failed to load roles', error);
+      log.error('Failed to load roles', { error, correlationId });
     }
   }
 
@@ -235,15 +238,17 @@ export class RolesViewModel {
   async loadPermissions(): Promise<void> {
     log.debug('Loading permissions');
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const permissions = await this.service.getPermissions();
+      const permissions = await this.service.getPermissions(correlationId);
 
       runInAction(() => {
         this.allPermissions = permissions;
         log.info('Loaded permissions', { count: permissions.length });
       });
     } catch (error) {
-      log.error('Failed to load permissions', error);
+      log.error('Failed to load permissions', { error, correlationId });
       // Don't set error state - permissions are secondary data
     }
   }
@@ -254,15 +259,17 @@ export class RolesViewModel {
   async loadUserPermissions(): Promise<void> {
     log.debug('Loading user permissions');
 
+    const correlationId = generateCorrelationId();
+
     try {
-      const permissionIds = await this.service.getUserPermissions();
+      const permissionIds = await this.service.getUserPermissions(correlationId);
 
       runInAction(() => {
         this.userPermissionIds = permissionIds;
         log.info('Loaded user permissions', { count: permissionIds.length });
       });
     } catch (error) {
-      log.error('Failed to load user permissions', error);
+      log.error('Failed to load user permissions', { error, correlationId });
       // Don't set error state - user permissions are secondary data
     }
   }
@@ -662,10 +669,12 @@ export class RolesViewModel {
    * @returns Role with permissions or null
    */
   async getRoleWithPermissions(roleId: string): Promise<RoleWithPermissions | null> {
+    const correlationId = generateCorrelationId();
+
     try {
-      return await this.service.getRoleById(roleId);
+      return await this.service.getRoleById(roleId, correlationId);
     } catch (error) {
-      log.error('Failed to get role with permissions', error);
+      log.error('Failed to get role with permissions', { error, correlationId });
       return null;
     }
   }

@@ -55,6 +55,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { cn } from '@/components/ui/utils';
 import { isCanonicalRole } from '@/config/roles.config';
 import { usePermissionGate } from '@/hooks/usePermissionGate';
@@ -178,9 +179,10 @@ export const RolesManagePage: React.FC = observer(() => {
   // Load OU tree data on mount
   useEffect(() => {
     const loadOUData = async () => {
+      const correlationId = generateCorrelationId();
       try {
         const service = getOrganizationUnitService();
-        const units = await service.getUnits({ status: 'active' });
+        const units = await service.getUnits({ status: 'active' }, correlationId);
         // Find root path (shortest path in the set)
         const rootPath =
           units.length > 0
@@ -194,7 +196,7 @@ export const RolesManagePage: React.FC = observer(() => {
         setOuNodes(tree);
         log.debug('OU tree loaded for role scope selection', { nodeCount: units.length });
       } catch (error) {
-        log.error('Failed to load OU tree for scope selection', error);
+        log.error('Failed to load OU tree for scope selection', { error, correlationId });
         // Don't set error state - scope selection is optional
       }
     };
@@ -205,9 +207,10 @@ export const RolesManagePage: React.FC = observer(() => {
   const selectAndLoadRole = useCallback(
     async (roleId: string) => {
       setOperationError(null);
+      const correlationId = generateCorrelationId();
       try {
         const service = getRoleService();
-        const fullRole = await service.getRoleById(roleId);
+        const fullRole = await service.getRoleById(roleId, correlationId);
         if (fullRole) {
           // Guard: Reject selection of canonical roles
           if (isCanonicalRole(fullRole.name)) {
@@ -230,11 +233,11 @@ export const RolesManagePage: React.FC = observer(() => {
           viewModel.selectRole(roleId);
           log.debug('Role loaded for editing', { roleId, name: fullRole.name });
         } else {
-          log.warn('Role not found', { roleId });
+          log.warn('Role not found', { roleId, correlationId });
           setOperationError('Role could not be loaded. Please refresh the page.');
         }
       } catch (error) {
-        log.error('Failed to load role', error);
+        log.error('Failed to load role', { error, correlationId });
         setOperationError('Failed to load role details');
       }
     },

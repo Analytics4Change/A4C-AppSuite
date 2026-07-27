@@ -202,7 +202,10 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
-  async getOrganizations(filters?: OrganizationFilterOptions): Promise<Organization[]> {
+  async getOrganizations(
+    filters?: OrganizationFilterOptions,
+    _correlationId?: string
+  ): Promise<Organization[]> {
     await this.simulateDelay();
 
     log.debug('Mock: Fetching organizations with filters', { filters });
@@ -244,7 +247,7 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
     return results;
   }
 
-  async getOrganizationById(orgId: string): Promise<Organization | null> {
+  async getOrganizationById(orgId: string, _correlationId?: string): Promise<Organization | null> {
     await this.simulateDelay();
 
     log.debug('Mock: Fetching organization by ID', { orgId });
@@ -260,7 +263,10 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
     return org ?? null;
   }
 
-  async getChildOrganizations(parentOrgId: string): Promise<Organization[]> {
+  async getChildOrganizations(
+    parentOrgId: string,
+    _correlationId?: string
+  ): Promise<Organization[]> {
     await this.simulateDelay();
 
     log.debug('Mock: Fetching child organizations', { parentOrgId });
@@ -275,7 +281,8 @@ export class MockOrganizationQueryService implements IOrganizationQueryService {
   }
 
   async getOrganizationsPaginated(
-    options?: OrganizationQueryOptions
+    options?: OrganizationQueryOptions,
+    _correlationId?: string
   ): Promise<PaginatedResult<Organization>> {
     await this.simulateDelay();
 

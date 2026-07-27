@@ -28,8 +28,17 @@ import type {
 } from '@/types/client-field-settings.types';
 
 export interface IClientFieldService {
-  /** List all field definitions for the current org */
-  listFieldDefinitions(includeInactive?: boolean): Promise<FieldDefinition[]>;
+  /**
+   * List all field definitions for the current org.
+   *
+   * @param includeInactive - Include soft-deleted definitions when true
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
+   */
+  listFieldDefinitions(
+    includeInactive?: boolean,
+    correlationId?: string
+  ): Promise<FieldDefinition[]>;
 
   /** Batch update multiple field definitions in a single network call */
   batchUpdateFieldDefinitions(
@@ -99,8 +108,14 @@ export interface IClientFieldService {
     correlationId?: string
   ): Promise<DeleteFieldResult>;
 
-  /** List all field categories (system + org-defined) */
-  listFieldCategories(includeInactive?: boolean): Promise<FieldCategory[]>;
+  /**
+   * List all field categories (system + org-defined).
+   *
+   * @param includeInactive - Include soft-deleted categories when true
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
+   */
+  listFieldCategories(includeInactive?: boolean, correlationId?: string): Promise<FieldCategory[]>;
 
   /**
    * Create a new org-defined category.

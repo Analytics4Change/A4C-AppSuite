@@ -64,6 +64,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { cn } from '@/components/ui/utils';
 
 const log = Logger.getLogger('component');
@@ -187,14 +188,15 @@ export const UsersManagePage: React.FC = observer(() => {
 
     // Load available roles
     const loadRoles = async () => {
+      const correlationId = generateCorrelationId();
       try {
         const roleService = getRoleService();
-        const roles = await roleService.getRoles();
+        const roles = await roleService.getRoles(undefined, correlationId);
         // Filter to active roles only
         setAvailableRoles(roles.filter((r) => r.isActive));
         log.debug('Available roles loaded', { roleCount: roles.length });
       } catch (error) {
-        log.error('Failed to load roles', error);
+        log.error('Failed to load roles', { error, correlationId });
       }
     };
     loadRoles();

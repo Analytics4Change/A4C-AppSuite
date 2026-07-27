@@ -174,7 +174,10 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   /**
    * Retrieves all organizational units within the user's scope
    */
-  async getUnits(filters?: OrganizationUnitFilterOptions): Promise<OrganizationUnit[]> {
+  async getUnits(
+    filters?: OrganizationUnitFilterOptions,
+    correlationId?: string
+  ): Promise<OrganizationUnit[]> {
     log.debug('getUnits called', { filters });
 
     try {
@@ -183,7 +186,8 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
         {
           p_status: filters?.status || 'all',
           p_search_term: filters?.searchTerm || null,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
@@ -204,13 +208,14 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   /**
    * Retrieves a single organizational unit by ID
    */
-  async getUnitById(unitId: string): Promise<OrganizationUnit | null> {
+  async getUnitById(unitId: string, correlationId?: string): Promise<OrganizationUnit | null> {
     log.debug('getUnitById called', { unitId });
 
     try {
       const { data, error } = await supabaseService.apiRpc<OrganizationUnitRow[]>(
         'get_organization_unit_by_id',
-        { p_unit_id: unitId }
+        { p_unit_id: unitId },
+        { correlationId }
       );
 
       if (error) {
@@ -235,13 +240,14 @@ export class SupabaseOrganizationUnitService implements IOrganizationUnitService
   /**
    * Retrieves all descendants of a given unit
    */
-  async getDescendants(unitId: string): Promise<OrganizationUnit[]> {
+  async getDescendants(unitId: string, correlationId?: string): Promise<OrganizationUnit[]> {
     log.debug('getDescendants called', { unitId });
 
     try {
       const { data, error } = await supabaseService.apiRpc<OrganizationUnitRow[]>(
         'get_organization_unit_descendants',
-        { p_unit_id: unitId }
+        { p_unit_id: unitId },
+        { correlationId }
       );
 
       if (error) {

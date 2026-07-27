@@ -25,6 +25,7 @@ import type { IOrganizationQueryService } from '@/services/organization/IOrganiz
 import { createOrganizationQueryService } from '@/services/organization/OrganizationQueryServiceFactory';
 import type { Organization, OrganizationQueryOptions } from '@/types/organization.types';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -81,9 +82,7 @@ export class OrganizationListViewModel {
   /**
    * Constructor with dependency injection
    */
-  constructor(
-    private queryService: IOrganizationQueryService = createOrganizationQueryService()
-  ) {
+  constructor(private queryService: IOrganizationQueryService = createOrganizationQueryService()) {
     makeAutoObservable(this);
     log.debug('OrganizationListViewModel initialized');
   }
@@ -107,6 +106,8 @@ export class OrganizationListViewModel {
    * Load organizations with current filters and pagination
    */
   async loadOrganizations(): Promise<void> {
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -115,7 +116,10 @@ export class OrganizationListViewModel {
     try {
       log.debug('Loading organizations', { options: this.queryOptions });
 
-      const result = await this.queryService.getOrganizationsPaginated(this.queryOptions);
+      const result = await this.queryService.getOrganizationsPaginated(
+        this.queryOptions,
+        correlationId
+      );
 
       runInAction(() => {
         this.organizations = result.data;
@@ -124,14 +128,16 @@ export class OrganizationListViewModel {
         this.isLoading = false;
       });
 
-      log.info(`Loaded ${result.data.length} organizations (page ${this.currentPage}/${result.totalPages})`);
+      log.info(
+        `Loaded ${result.data.length} organizations (page ${this.currentPage}/${result.totalPages})`
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load organizations';
       runInAction(() => {
         this.error = message;
         this.isLoading = false;
       });
-      log.error('Failed to load organizations', { error });
+      log.error('Failed to load organizations', { error, correlationId });
     }
   }
 
@@ -260,11 +266,7 @@ export class OrganizationListViewModel {
    * Check if any filters are active
    */
   get hasActiveFilters(): boolean {
-    return (
-      this.searchTerm !== '' ||
-      this.typeFilter !== 'all' ||
-      this.statusFilter !== 'all'
-    );
+    return this.searchTerm !== '' || this.typeFilter !== 'all' || this.statusFilter !== 'all';
   }
 
   /**

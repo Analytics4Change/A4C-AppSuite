@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-04-22
+last_updated: 2026-07-27
 ---
 
 <!-- TL;DR-START -->
@@ -296,6 +296,54 @@ SELECT event_type, created_at FROM domain_events
 WHERE correlation_id = 'abc-123'::uuid ORDER BY created_at;
 -- user.invited → invitation.resent → invitation.accepted (same ID)
 ```
+
+### Read-path correlation IDs (pinning the transport id)
+
+Every Supabase request already carries an `X-Correlation-ID` — `tracingFetch`
+(`src/lib/supabase-ssr.ts`) auto-generates one when the header is absent. The
+problem: that auto-generated id is never returned, so a ViewModel's read-failure
+`log.error`/`log.warn` line can't print the id the server saw. To make a read
+failure end-to-end traceable, **pin the id the VM already holds** so the server
+logs the SAME id:
+
+```typescript
+// Service read method — accept an optional trailing id, forward it as the 3rd arg
+async getRoles(filters?: RoleFilterOptions, correlationId?: string): Promise<Role[]> {
+  const { data, error } = await supabaseService.apiRpc<RoleRow[]>(
+    'get_roles',
+    { p_status: filters?.status ?? 'all', p_search_term: filters?.searchTerm ?? null },
+    { correlationId },            // ← pins X-Correlation-ID, overriding tracingFetch's auto-gen
+  );
+  ...
+}
+
+// ViewModel load method — generate the id, thread it, log it on failure
+async loadRoles(): Promise<void> {
+  const correlationId = generateCorrelationId();   // from '@/utils/trace-ids'
+  try {
+    this.rawRoles = await this.service.getRoles(this.filters, correlationId);
+  } catch (error) {
+    log.error('Failed to load roles', { error, correlationId });   // joins the server trace
+  }
+}
+```
+
+**Which id to use — the selection rule:**
+
+- **Default: a fresh id per read** (`generateCorrelationId()`). A standalone list/detail
+  read is its own "transaction"; one id per load op is correct. This is the Users /
+  Roles / Organizations / Org-units pattern.
+- **Reuse an existing session/transaction id** when the read is the *opening step* of a
+  multi-step business transaction whose later writes must share one audit trail. Example:
+  `ClientFieldSettingsViewModel` — load → edit → batch-save is a single transaction, so its
+  `loadData` reuses `getSessionCorrelationId()` (the same id its writes carry) rather than
+  minting a fresh one. Note this binds the session id at *load* time.
+
+**`apiRpcEnvelope` exception:** only `apiRpc` (read-shape RPCs) currently accepts the
+`{ correlationId }` option. Envelope-shape reads (`get_organization_details`, schedules'
+`list_schedule_templates`/`get_schedule_template`) go through `apiRpcEnvelope`, which does
+NOT yet forward the header — extending it is a separate, deliberate follow-up (it's also the
+write-path helper; touch carefully). Do not bolt that change onto a read-path PR.
 
 ## Related Documentation
 

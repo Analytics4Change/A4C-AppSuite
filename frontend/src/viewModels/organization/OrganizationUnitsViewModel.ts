@@ -28,6 +28,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IOrganizationUnitService } from '@/services/organization/IOrganizationUnitService';
 import { getOrganizationUnitService } from '@/services/organization/OrganizationUnitServiceFactory';
 import type {
@@ -100,7 +101,9 @@ export class OrganizationUnitsViewModel {
     this.rootPath = rootPath;
     makeAutoObservable(this);
 
-    log.debug('OrganizationUnitsViewModel initialized', { rootPath: rootPath || '(will auto-detect)' });
+    log.debug('OrganizationUnitsViewModel initialized', {
+      rootPath: rootPath || '(will auto-detect)',
+    });
   }
 
   // ============================================
@@ -242,6 +245,8 @@ export class OrganizationUnitsViewModel {
   async loadUnits(filters?: OrganizationUnitFilterOptions): Promise<void> {
     log.debug('Loading organizational units', { filters });
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -251,7 +256,7 @@ export class OrganizationUnitsViewModel {
     });
 
     try {
-      const units = await this.service.getUnits(this.filters);
+      const units = await this.service.getUnits(this.filters, correlationId);
 
       runInAction(() => {
         this.rawUnits = units;
@@ -279,7 +284,7 @@ export class OrganizationUnitsViewModel {
         this.error = errorMessage;
       });
 
-      log.error('Failed to load organizational units', error);
+      log.error('Failed to load organizational units', { error, correlationId });
     }
   }
 
@@ -601,7 +606,10 @@ export class OrganizationUnitsViewModel {
           this.error = result.error ?? 'Failed to deactivate unit';
           this.isLoading = false;
         });
-        log.warn('Failed to deactivate unit', { error: result.error, errorDetails: result.errorDetails });
+        log.warn('Failed to deactivate unit', {
+          error: result.error,
+          errorDetails: result.errorDetails,
+        });
       }
 
       return result;
@@ -659,7 +667,10 @@ export class OrganizationUnitsViewModel {
           this.error = result.error ?? 'Failed to reactivate unit';
           this.isLoading = false;
         });
-        log.warn('Failed to reactivate unit', { error: result.error, errorDetails: result.errorDetails });
+        log.warn('Failed to reactivate unit', {
+          error: result.error,
+          errorDetails: result.errorDetails,
+        });
       }
 
       return result;
@@ -737,7 +748,10 @@ export class OrganizationUnitsViewModel {
           this.error = result.error ?? 'Failed to delete unit';
           this.isLoading = false;
         });
-        log.warn('Failed to delete unit', { error: result.error, errorDetails: result.errorDetails });
+        log.warn('Failed to delete unit', {
+          error: result.error,
+          errorDetails: result.errorDetails,
+        });
       }
 
       return result;
@@ -870,9 +884,7 @@ export class OrganizationUnitsViewModel {
   private updateChildCounts(): void {
     runInAction(() => {
       for (const unit of this.rawUnits) {
-        unit.childCount = this.rawUnits.filter(
-          (u) => u.parentId === unit.id && u.isActive
-        ).length;
+        unit.childCount = this.rawUnits.filter((u) => u.parentId === unit.id && u.isActive).length;
       }
       // Trigger reactivity
       this.rawUnits = [...this.rawUnits];

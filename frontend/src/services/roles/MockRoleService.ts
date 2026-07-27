@@ -500,7 +500,7 @@ export class MockRoleService implements IRoleService {
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
-  async getRoles(filters?: RoleFilterOptions): Promise<Role[]> {
+  async getRoles(filters?: RoleFilterOptions, _correlationId?: string): Promise<Role[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching roles', { filters });
 
@@ -530,7 +530,7 @@ export class MockRoleService implements IRoleService {
     return results;
   }
 
-  async getRoleById(roleId: string): Promise<RoleWithPermissions | null> {
+  async getRoleById(roleId: string, _correlationId?: string): Promise<RoleWithPermissions | null> {
     await this.simulateDelay();
     log.debug('Mock: Fetching role by ID', { roleId });
 
@@ -550,14 +550,14 @@ export class MockRoleService implements IRoleService {
     };
   }
 
-  async getPermissions(): Promise<Permission[]> {
+  async getPermissions(_correlationId?: string): Promise<Permission[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching all permissions');
     log.info(`Mock: Returning ${MOCK_PERMISSIONS.length} permissions`);
     return [...MOCK_PERMISSIONS];
   }
 
-  async getUserPermissions(): Promise<string[]> {
+  async getUserPermissions(_correlationId?: string): Promise<string[]> {
     await this.simulateDelay();
     log.debug('Mock: Fetching current user permissions');
     log.info(`Mock: User has ${this.currentUserPermissions.length} permissions`);

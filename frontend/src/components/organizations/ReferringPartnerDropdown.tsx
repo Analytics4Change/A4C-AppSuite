@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { getOrganizationQueryService } from '@/services/organization/OrganizationQueryServiceFactory';
 import type { Organization } from '@/types/organization.types';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('organization');
 
@@ -46,20 +47,24 @@ export const ReferringPartnerDropdown = observer(
       // Fetch VAR partners on mount
       useEffect(() => {
         const fetchVarPartners = async () => {
+          const correlationId = generateCorrelationId();
           try {
             setLoading(true);
             setError(null);
 
             const orgService = getOrganizationQueryService();
-            const partners = await orgService.getOrganizations({
-              type: 'provider_partner',
-              partnerType: 'var',
-              status: 'active',
-            });
+            const partners = await orgService.getOrganizations(
+              {
+                type: 'provider_partner',
+                partnerType: 'var',
+                status: 'active',
+              },
+              correlationId
+            );
 
             setVarPartners(partners);
           } catch (err) {
-            log.error('Failed to fetch VAR partners', { error: err });
+            log.error('Failed to fetch VAR partners', { error: err, correlationId });
             setError('Failed to load partners');
           } finally {
             setLoading(false);

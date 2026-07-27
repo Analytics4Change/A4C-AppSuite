@@ -84,11 +84,11 @@ function getInitialMockData(): OrganizationUnit[] {
       name: 'Acme Healthcare',
       displayName: 'Acme Healthcare Services',
       path: MOCK_ROOT_PATH,
-      parentPath: null,  // Root has no parent
+      parentPath: null, // Root has no parent
       parentId: null,
       timeZone: 'America/New_York',
       isActive: true,
-      childCount: 3,  // Main Campus, East Campus, Admin Building
+      childCount: 3, // Main Campus, East Campus, Admin Building
       isRootOrganization: true,
       createdAt: lastMonth,
       updatedAt: lastWeek,
@@ -101,7 +101,7 @@ function getInitialMockData(): OrganizationUnit[] {
       displayName: 'Main Campus Medical Center',
       path: `${MOCK_ROOT_PATH}.main_campus`,
       parentPath: MOCK_ROOT_PATH,
-      parentId: ROOT_ORG_ID,  // Child of root org
+      parentId: ROOT_ORG_ID, // Child of root org
       timeZone: 'America/New_York',
       isActive: true,
       childCount: 2,
@@ -114,7 +114,7 @@ function getInitialMockData(): OrganizationUnit[] {
       displayName: 'East Campus Facility',
       path: `${MOCK_ROOT_PATH}.east_campus`,
       parentPath: MOCK_ROOT_PATH,
-      parentId: ROOT_ORG_ID,  // Child of root org
+      parentId: ROOT_ORG_ID, // Child of root org
       timeZone: 'America/New_York',
       isActive: true,
       childCount: 1,
@@ -127,7 +127,7 @@ function getInitialMockData(): OrganizationUnit[] {
       displayName: 'Administrative Headquarters',
       path: `${MOCK_ROOT_PATH}.admin_building`,
       parentPath: MOCK_ROOT_PATH,
-      parentId: ROOT_ORG_ID,  // Child of root org
+      parentId: ROOT_ORG_ID, // Child of root org
       timeZone: 'America/New_York',
       isActive: true,
       childCount: 0,
@@ -256,13 +256,14 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
    */
   private updateChildCounts(): void {
     for (const unit of this.units) {
-      unit.childCount = this.units.filter(
-        (u) => u.parentId === unit.id && u.isActive
-      ).length;
+      unit.childCount = this.units.filter((u) => u.parentId === unit.id && u.isActive).length;
     }
   }
 
-  async getUnits(filters?: OrganizationUnitFilterOptions): Promise<OrganizationUnit[]> {
+  async getUnits(
+    filters?: OrganizationUnitFilterOptions,
+    _correlationId?: string
+  ): Promise<OrganizationUnit[]> {
     await this.simulateDelay();
 
     log.debug('Mock: Fetching organizational units', { filters });
@@ -272,9 +273,7 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
     if (filters) {
       // Filter by status
       if (filters.status && filters.status !== 'all') {
-        results = results.filter((unit) =>
-          unit.isActive === (filters.status === 'active')
-        );
+        results = results.filter((unit) => unit.isActive === (filters.status === 'active'));
       }
 
       // Filter by parent ID
@@ -284,9 +283,7 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
 
       // Filter by ancestor path
       if (filters.ancestorPath) {
-        results = results.filter((unit) =>
-          unit.path.startsWith(filters.ancestorPath + '.')
-        );
+        results = results.filter((unit) => unit.path.startsWith(filters.ancestorPath + '.'));
       }
 
       // Search by name (case-insensitive)
@@ -307,7 +304,7 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
     return results;
   }
 
-  async getUnitById(unitId: string): Promise<OrganizationUnit | null> {
+  async getUnitById(unitId: string, _correlationId?: string): Promise<OrganizationUnit | null> {
     await this.simulateDelay();
 
     log.debug('Mock: Fetching unit by ID', { unitId });
@@ -323,7 +320,7 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
     return unit ?? null;
   }
 
-  async getDescendants(unitId: string): Promise<OrganizationUnit[]> {
+  async getDescendants(unitId: string, _correlationId?: string): Promise<OrganizationUnit[]> {
     await this.simulateDelay();
 
     log.debug('Mock: Fetching descendants', { unitId });
@@ -444,9 +441,7 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
     // Check if name change would create duplicate path
     if (request.name && request.name !== unit.name) {
       const slug = slugify(request.name);
-      const newPath = unit.parentPath
-        ? `${unit.parentPath}.${slug}`
-        : `${MOCK_ROOT_PATH}.${slug}`;
+      const newPath = unit.parentPath ? `${unit.parentPath}.${slug}` : `${MOCK_ROOT_PATH}.${slug}`;
 
       if (this.units.some((u) => u.path === newPath && u.id !== unit.id && u.isActive)) {
         return {
@@ -516,7 +511,8 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
         error: 'Cannot deactivate: this is the root organization',
         errorDetails: {
           code: 'IS_ROOT_ORGANIZATION',
-          message: 'The root organization cannot be deactivated. Contact platform administrators if you need to close this organization.',
+          message:
+            'The root organization cannot be deactivated. Contact platform administrators if you need to close this organization.',
         },
       };
     }
@@ -627,7 +623,8 @@ export class MockOrganizationUnitService implements IOrganizationUnitService {
         error: 'Cannot delete: this is the root organization',
         errorDetails: {
           code: 'IS_ROOT_ORGANIZATION',
-          message: 'The root organization cannot be deleted. Contact platform administrators if you need to close this organization.',
+          message:
+            'The root organization cannot be deleted. Contact platform administrators if you need to close this organization.',
         },
       };
     }

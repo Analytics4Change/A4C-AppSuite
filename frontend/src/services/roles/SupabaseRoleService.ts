@@ -220,14 +220,18 @@ export class SupabaseRoleService implements IRoleService {
   /**
    * Retrieves all roles within the user's organization scope
    */
-  async getRoles(filters?: RoleFilterOptions): Promise<Role[]> {
+  async getRoles(filters?: RoleFilterOptions, correlationId?: string): Promise<Role[]> {
     log.debug('getRoles called', { filters });
 
     try {
-      const { data, error } = await supabaseService.apiRpc<RoleRow[]>('get_roles', {
-        p_status: filters?.status || 'all',
-        p_search_term: filters?.searchTerm || null,
-      });
+      const { data, error } = await supabaseService.apiRpc<RoleRow[]>(
+        'get_roles',
+        {
+          p_status: filters?.status || 'all',
+          p_search_term: filters?.searchTerm || null,
+        },
+        { correlationId }
+      );
 
       if (error) {
         log.error('Error fetching roles', error);
@@ -247,13 +251,14 @@ export class SupabaseRoleService implements IRoleService {
   /**
    * Retrieves a single role by ID with its permissions
    */
-  async getRoleById(roleId: string): Promise<RoleWithPermissions | null> {
+  async getRoleById(roleId: string, correlationId?: string): Promise<RoleWithPermissions | null> {
     log.debug('getRoleById called', { roleId });
 
     try {
       const { data, error } = await supabaseService.apiRpc<RoleWithPermissionsRow[]>(
         'get_role_by_id',
-        { p_role_id: roleId }
+        { p_role_id: roleId },
+        { correlationId }
       );
 
       if (error) {
@@ -278,11 +283,15 @@ export class SupabaseRoleService implements IRoleService {
   /**
    * Retrieves all available permissions
    */
-  async getPermissions(): Promise<Permission[]> {
+  async getPermissions(correlationId?: string): Promise<Permission[]> {
     log.debug('getPermissions called');
 
     try {
-      const { data, error } = await supabaseService.apiRpc<PermissionRow[]>('get_permissions', {});
+      const { data, error } = await supabaseService.apiRpc<PermissionRow[]>(
+        'get_permissions',
+        {},
+        { correlationId }
+      );
 
       if (error) {
         log.error('Error fetching permissions', error);
@@ -302,13 +311,14 @@ export class SupabaseRoleService implements IRoleService {
   /**
    * Retrieves the current user's permission IDs
    */
-  async getUserPermissions(): Promise<string[]> {
+  async getUserPermissions(correlationId?: string): Promise<string[]> {
     log.debug('getUserPermissions called');
 
     try {
       const { data, error } = await supabaseService.apiRpc<UserPermissionRow[]>(
         'get_user_permissions',
-        {}
+        {},
+        { correlationId }
       );
 
       if (error) {
