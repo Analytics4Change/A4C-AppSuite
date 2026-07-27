@@ -106,9 +106,11 @@ describe('SupabaseClientFieldService', () => {
 
       const result = await service.listFieldDefinitions();
 
-      expect(mockApiRpc).toHaveBeenCalledWith('list_field_definitions', {
-        p_include_inactive: false,
-      });
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'list_field_definitions',
+        { p_include_inactive: false },
+        { correlationId: undefined }
+      );
       expect(result).toEqual([FIELD_DEFINITION]);
     });
 
@@ -117,9 +119,11 @@ describe('SupabaseClientFieldService', () => {
 
       await service.listFieldDefinitions(true);
 
-      expect(mockApiRpc).toHaveBeenCalledWith('list_field_definitions', {
-        p_include_inactive: true,
-      });
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'list_field_definitions',
+        { p_include_inactive: true },
+        { correlationId: undefined }
+      );
     });
 
     it('returns empty array when data is null', async () => {
@@ -327,9 +331,11 @@ describe('SupabaseClientFieldService', () => {
 
       const result = await service.listFieldCategories();
 
-      expect(mockApiRpc).toHaveBeenCalledWith('list_field_categories', {
-        p_include_inactive: false,
-      });
+      expect(mockApiRpc).toHaveBeenCalledWith(
+        'list_field_categories',
+        { p_include_inactive: false },
+        { correlationId: undefined }
+      );
       expect(result).toEqual([FIELD_CATEGORY]);
     });
 

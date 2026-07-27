@@ -26,12 +26,16 @@ import type { IClientFieldService } from './IClientFieldService';
 const log = Logger.getLogger('api');
 
 export class SupabaseClientFieldService implements IClientFieldService {
-  async listFieldDefinitions(includeInactive = false): Promise<FieldDefinition[]> {
+  async listFieldDefinitions(
+    includeInactive = false,
+    correlationId?: string
+  ): Promise<FieldDefinition[]> {
     log.debug('Fetching field definitions', { includeInactive });
 
     const { data, error } = await supabaseService.apiRpc<FieldDefinition[]>(
       'list_field_definitions',
-      { p_include_inactive: includeInactive }
+      { p_include_inactive: includeInactive },
+      { correlationId }
     );
 
     if (error) {
@@ -172,12 +176,17 @@ export class SupabaseClientFieldService implements IClientFieldService {
     return env as DeleteFieldResult;
   }
 
-  async listFieldCategories(includeInactive = false): Promise<FieldCategory[]> {
+  async listFieldCategories(
+    includeInactive = false,
+    correlationId?: string
+  ): Promise<FieldCategory[]> {
     log.debug('Fetching field categories', { includeInactive });
 
-    const { data, error } = await supabaseService.apiRpc<FieldCategory[]>('list_field_categories', {
-      p_include_inactive: includeInactive,
-    });
+    const { data, error } = await supabaseService.apiRpc<FieldCategory[]>(
+      'list_field_categories',
+      { p_include_inactive: includeInactive },
+      { correlationId }
+    );
 
     if (error) {
       log.error('Failed to fetch field categories', { error });

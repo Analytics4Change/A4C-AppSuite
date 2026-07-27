@@ -1,11 +1,13 @@
 ---
 status: in-progress
-last_updated: 2026-07-22
+last_updated: 2026-07-27
 ---
 
 # Seed: Surface the transport correlation-id into read-path failure logs (app-wide)
 
-> **PR #94 landed the mechanism + the Users read paths.** `supabaseService.apiRpc(fn, params, { correlationId })` now pins the caller's id as `X-Correlation-ID` (via the confirmed `PostgrestBuilder.setHeader`, postgrest-js 2.88), overriding `tracingFetch`'s auto-gen. `UsersViewModel` generates one id per load op (`loadUsers`/`loadUserDetails`/`loadAssignableRoles`/`loadInvitationDetails`), threads it through `IUserQueryService`, and logs it on failure. Test: `SupabaseUserQueryService.correlation.test.ts`. **Remaining (this card): the OTHER read VMs** — roles, organizations, org-units, schedules, client-fields — same pattern (add optional `correlationId?` to their query methods → `apiRpc` opts → VM generates+logs). Also fold the `apiRpc(..., { correlationId })` idiom into `frontend/src/services/CLAUDE.md` §4 during the rollout.
+> **PR #94 landed the mechanism + the Users read paths. A follow-up PR (`feat/read-path-correlation-id-rollout`, 2026-07-27) extended it to roles, organizations, org-units, and client-fields.** `supabaseService.apiRpc(fn, params, { correlationId })` pins the caller's id as `X-Correlation-ID` (via the confirmed `PostgrestBuilder.setHeader`, postgrest-js 2.88), overriding `tracingFetch`'s auto-gen. Each read VM generates one id per load op (client-fields REUSES its session id — load→edit→save is one audit trail), threads it through the query interface/impl/mock, and logs it on failure. Tests: `Supabase{User,Role,OrganizationQuery,OrganizationUnit,ClientField}Service.correlation.test.ts`. The `apiRpc(..., { correlationId })` idiom + selection rule (fresh-per-read vs reuse-session-id) + the envelope exception are documented in `frontend/src/services/CLAUDE.md` §4.
+>
+> **REMAINING (envelope reads — separate follow-up):** `apiRpcEnvelope` does NOT yet forward the header, so these envelope-shape reads are still un-pinned: **schedules** (`list_schedule_templates`/`get_schedule_template`), **`get_organization_details`**, and the client-field usage-count reads (`get_field_usage_count`/`get_category_field_count`). Extending `apiRpcEnvelope` with the same `setHeader` treatment is its own spike — it's ALSO the write-path helper, so touch carefully. Do NOT bolt the envelope change onto a read-path PR.
 
 **Origin**: PR #94 review (`@software-architect-dbc`) — elevating the "correlation-id is a nit" finding. User goal: **end-to-end server traceability** from a frontend read failure. Applies to **all read-path sites**, not just Users (correlation-id is an epic-wide documented standard).
 

@@ -47,6 +47,8 @@ export interface IRoleService {
    * Results include permission and user assignment counts.
    *
    * @param filters - Optional filters for status and search
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of roles
    *
    * @example
@@ -57,12 +59,14 @@ export interface IRoleService {
    * // Search by name
    * const results = await service.getRoles({ searchTerm: 'admin' });
    */
-  getRoles(filters?: RoleFilterOptions): Promise<Role[]>;
+  getRoles(filters?: RoleFilterOptions, correlationId?: string): Promise<Role[]>;
 
   /**
    * Retrieves a single role by ID with its associated permissions
    *
    * @param roleId - Role UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to role with permissions or null if not found
    *
    * @example
@@ -71,20 +75,22 @@ export interface IRoleService {
    *   console.log(role.name, role.permissions.length);
    * }
    */
-  getRoleById(roleId: string): Promise<RoleWithPermissions | null>;
+  getRoleById(roleId: string, correlationId?: string): Promise<RoleWithPermissions | null>;
 
   /**
    * Retrieves all available permissions for the permission selector UI
    *
    * Returns all permissions defined in the system, grouped by applet.
    *
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of all permissions
    *
    * @example
    * const permissions = await service.getPermissions();
    * const groups = groupPermissionsByApplet(permissions);
    */
-  getPermissions(): Promise<Permission[]>;
+  getPermissions(correlationId?: string): Promise<Permission[]>;
 
   /**
    * Retrieves the current user's permission IDs for subset-only enforcement
@@ -92,13 +98,15 @@ export interface IRoleService {
    * Used by the UI to disable checkboxes for permissions the user
    * cannot grant (they don't possess them themselves).
    *
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of permission IDs the user has
    *
    * @example
    * const userPermIds = await service.getUserPermissions();
    * const canGrant = userPermIds.includes(permissionId);
    */
-  getUserPermissions(): Promise<string[]>;
+  getUserPermissions(correlationId?: string): Promise<string[]>;
 
   /**
    * Creates a new role with optional permissions

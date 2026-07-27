@@ -32,6 +32,8 @@ export interface IOrganizationUnitService {
    * convert to a hierarchical structure for tree display.
    *
    * @param filters - Optional filters for status, search, or parent
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of organizational units
    *
    * @example
@@ -42,12 +44,17 @@ export interface IOrganizationUnitService {
    * // Search by name
    * const results = await service.getUnits({ searchTerm: 'campus' });
    */
-  getUnits(filters?: OrganizationUnitFilterOptions): Promise<OrganizationUnit[]>;
+  getUnits(
+    filters?: OrganizationUnitFilterOptions,
+    correlationId?: string
+  ): Promise<OrganizationUnit[]>;
 
   /**
    * Retrieves a single organizational unit by ID
    *
    * @param unitId - Organizational unit UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to unit or null if not found/no access
    *
    * @example
@@ -56,7 +63,7 @@ export interface IOrganizationUnitService {
    *   console.log(unit.name, unit.path);
    * }
    */
-  getUnitById(unitId: string): Promise<OrganizationUnit | null>;
+  getUnitById(unitId: string, correlationId?: string): Promise<OrganizationUnit | null>;
 
   /**
    * Retrieves all descendants of a given unit (children, grandchildren, etc.)
@@ -65,6 +72,8 @@ export interface IOrganizationUnitService {
    * a subtree of the organization hierarchy.
    *
    * @param unitId - Parent unit UUID
+   * @param correlationId - Optional tracing id pinned as `X-Correlation-ID` on the
+   *   underlying RPC so the caller's log lines join the server-side event trace.
    * @returns Promise resolving to array of descendant units
    *
    * @example
@@ -72,7 +81,7 @@ export interface IOrganizationUnitService {
    * const descendants = await service.getDescendants(mainCampusId);
    * console.log(`Main Campus has ${descendants.length} sub-units`);
    */
-  getDescendants(unitId: string): Promise<OrganizationUnit[]>;
+  getDescendants(unitId: string, correlationId?: string): Promise<OrganizationUnit[]>;
 
   /**
    * Creates a new organizational unit

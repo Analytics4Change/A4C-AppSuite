@@ -1008,7 +1008,10 @@ export class MockClientFieldService implements IClientFieldService {
   private nextFieldNum = 100;
   private nextCatNum = 100;
 
-  async listFieldDefinitions(includeInactive = false): Promise<FieldDefinition[]> {
+  async listFieldDefinitions(
+    includeInactive = false,
+    _correlationId?: string
+  ): Promise<FieldDefinition[]> {
     log.debug('[Mock] Fetching field definitions', { includeInactive });
     await this.simulateDelay();
 
@@ -1186,7 +1189,10 @@ export class MockClientFieldService implements IClientFieldService {
     return { success: true, field_id: fieldId };
   }
 
-  async listFieldCategories(includeInactive = false): Promise<FieldCategory[]> {
+  async listFieldCategories(
+    includeInactive = false,
+    _correlationId?: string
+  ): Promise<FieldCategory[]> {
     log.debug('[Mock] Fetching field categories', { includeInactive });
     await this.simulateDelay();
 

@@ -28,6 +28,7 @@ import { createOrganizationQueryService } from '@/services/organization/Organiza
 import { getOrganizationCommandService } from '@/services/organization/OrganizationCommandServiceFactory';
 import type { Organization, OrganizationUpdateData } from '@/types/organization.types';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -87,6 +88,8 @@ export class OrganizationDashboardViewModel {
    * Load organization by ID
    */
   async loadOrganization(orgId: string): Promise<void> {
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.organizationId = orgId;
       this.isLoading = true;
@@ -96,7 +99,7 @@ export class OrganizationDashboardViewModel {
     try {
       log.debug('Loading organization', { orgId });
 
-      const organization = await this.queryService.getOrganizationById(orgId);
+      const organization = await this.queryService.getOrganizationById(orgId, correlationId);
 
       runInAction(() => {
         if (organization) {
@@ -110,7 +113,7 @@ export class OrganizationDashboardViewModel {
           log.info('Organization loaded', { orgId, name: organization.name });
         } else {
           this.loadError = 'Organization not found';
-          log.warn('Organization not found', { orgId });
+          log.warn('Organization not found', { orgId, correlationId });
         }
         this.isLoading = false;
       });
@@ -120,7 +123,7 @@ export class OrganizationDashboardViewModel {
         this.loadError = message;
         this.isLoading = false;
       });
-      log.error('Failed to load organization', { error, orgId });
+      log.error('Failed to load organization', { error, orgId, correlationId });
     }
   }
 

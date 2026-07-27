@@ -20,6 +20,7 @@
 
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import type { IOrganizationQueryService } from '@/services/organization/IOrganizationQueryService';
 import type { IOrganizationCommandService } from '@/services/organization/IOrganizationCommandService';
 import { getOrganizationQueryService } from '@/services/organization/OrganizationQueryServiceFactory';
@@ -124,6 +125,8 @@ export class OrganizationManageListViewModel {
   async loadOrganizations(filters?: OrganizationFilterOptions): Promise<void> {
     log.debug('Loading organizations', { filters });
 
+    const correlationId = generateCorrelationId();
+
     runInAction(() => {
       this.isLoading = true;
       this.error = null;
@@ -133,7 +136,7 @@ export class OrganizationManageListViewModel {
     });
 
     try {
-      const organizations = await this.queryService.getOrganizations(this.filters);
+      const organizations = await this.queryService.getOrganizations(this.filters, correlationId);
 
       runInAction(() => {
         // Exclude platform_owner from manage list — it's not manageable
@@ -149,7 +152,7 @@ export class OrganizationManageListViewModel {
         this.error = errorMessage;
       });
 
-      log.error('Failed to load organizations', error);
+      log.error('Failed to load organizations', { error, correlationId });
     }
   }
 

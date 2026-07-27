@@ -124,13 +124,18 @@ export class ClientFieldSettingsViewModel {
       this.saveSuccess = false;
     });
 
+    // Reuse the session correlation id (NOT a fresh per-read id): the load is the
+    // opening step of the load→edit→batch-save business transaction, so all its
+    // events share one audit trail. This binds the id at load time.
+    const correlationId = this.getSessionCorrelationId();
+
     try {
       log.debug('Loading field definitions and categories', { orgId, preserveChanges });
       // Always fetch inactive rows too; the UI filters client-side via status filters
       // so deactivated custom fields and categories can surface under the Inactive tab.
       const [fields, categories] = await Promise.all([
-        this.service.listFieldDefinitions(true),
-        this.service.listFieldCategories(true),
+        this.service.listFieldDefinitions(true, correlationId),
+        this.service.listFieldCategories(true, correlationId),
       ]);
 
       runInAction(() => {
@@ -170,7 +175,7 @@ export class ClientFieldSettingsViewModel {
         this.loadError = message;
         this.isLoading = false;
       });
-      log.error('Failed to load field settings', { error });
+      log.error('Failed to load field settings', { error, correlationId });
     }
   }
 

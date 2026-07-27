@@ -78,16 +78,23 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     };
   }
 
-  async getOrganizations(filters?: OrganizationFilterOptions): Promise<Organization[]> {
+  async getOrganizations(
+    filters?: OrganizationFilterOptions,
+    correlationId?: string
+  ): Promise<Organization[]> {
     try {
       log.debug('Fetching organizations with filters', { filters });
 
-      const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>('get_organizations', {
-        p_type: filters?.type && filters.type !== 'all' ? filters.type : null,
-        p_is_active:
-          filters?.status && filters.status !== 'all' ? filters.status === 'active' : null,
-        p_search_term: filters?.searchTerm || null,
-      });
+      const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>(
+        'get_organizations',
+        {
+          p_type: filters?.type && filters.type !== 'all' ? filters.type : null,
+          p_is_active:
+            filters?.status && filters.status !== 'all' ? filters.status === 'active' : null,
+          p_search_term: filters?.searchTerm || null,
+        },
+        { correlationId }
+      );
 
       if (error) {
         log.error('Failed to fetch organizations', { error, filters });
@@ -107,13 +114,14 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     }
   }
 
-  async getOrganizationById(orgId: string): Promise<Organization | null> {
+  async getOrganizationById(orgId: string, correlationId?: string): Promise<Organization | null> {
     try {
       log.debug('Fetching organization by ID', { orgId });
 
       const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>(
         'get_organization_by_id',
-        { p_org_id: orgId }
+        { p_org_id: orgId },
+        { correlationId }
       );
 
       if (error) {
@@ -135,13 +143,17 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
     }
   }
 
-  async getChildOrganizations(parentOrgId: string): Promise<Organization[]> {
+  async getChildOrganizations(
+    parentOrgId: string,
+    correlationId?: string
+  ): Promise<Organization[]> {
     try {
       log.debug('Fetching child organizations', { parentOrgId });
 
       const { data, error } = await supabaseService.apiRpc<OrganizationRow[]>(
         'get_child_organizations',
-        { p_parent_org_id: parentOrgId }
+        { p_parent_org_id: parentOrgId },
+        { correlationId }
       );
 
       if (error) {
@@ -163,7 +175,8 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
   }
 
   async getOrganizationsPaginated(
-    options?: OrganizationQueryOptions
+    options?: OrganizationQueryOptions,
+    correlationId?: string
   ): Promise<PaginatedResult<Organization>> {
     try {
       const page = options?.page ?? 1;
@@ -182,7 +195,8 @@ export class SupabaseOrganizationQueryService implements IOrganizationQueryServi
           p_page_size: pageSize,
           p_sort_by: options?.sortBy || 'name',
           p_sort_order: options?.sortOrder || 'asc',
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
