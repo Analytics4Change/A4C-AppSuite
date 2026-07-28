@@ -165,6 +165,59 @@ describe('CustomFieldsTab — count-read failure confirm state', () => {
     const confirmBtn = screen.getByTestId('confirm-dialog-confirm-btn') as HTMLButtonElement;
     expect(confirmBtn.disabled).toBe(false);
   });
+
+  // Positive controls — lock the rest of the truth table (in-use blocks, empty allows).
+
+  it('DELETE with a definitive in-use count (>0) is BLOCKED with the usage message', async () => {
+    const service = createMockService({
+      getFieldUsageCount: vi.fn().mockResolvedValue({ success: true, count: 3 }),
+    });
+    const vm = await buildVm(service);
+    render(
+      <CustomFieldsTab
+        viewModel={vm}
+        fields={vm.fieldDefinitions}
+        categories={vm.categories}
+        orgId="org-1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('cf-delete-custom_weekend_hours'));
+
+    const message = await screen.findByTestId('confirm-dialog-message');
+    expect(message.textContent).toMatch(/3 client\(s\) have data/i);
+    expect((screen.getByTestId('confirm-dialog-confirm-btn') as HTMLButtonElement).disabled).toBe(
+      true
+    );
+  });
+
+  it('DELETE with a definitive zero count (0) ALLOWS the type-to-confirm delete', async () => {
+    const service = createMockService({
+      getFieldUsageCount: vi.fn().mockResolvedValue({ success: true, count: 0 }),
+    });
+    const vm = await buildVm(service);
+    render(
+      <CustomFieldsTab
+        viewModel={vm}
+        fields={vm.fieldDefinitions}
+        categories={vm.categories}
+        orgId="org-1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('cf-delete-custom_weekend_hours'));
+
+    const message = await screen.findByTestId('confirm-dialog-message');
+    expect(message.textContent).toMatch(/permanently removes the field/i);
+
+    // Type-to-confirm gates the delete: disabled until the name is typed, then enabled.
+    const confirmBtn = screen.getByTestId('confirm-dialog-confirm-btn') as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId('confirm-dialog-confirm-text-input'), {
+      target: { value: 'Weekend Hours' },
+    });
+    await waitFor(() => expect(confirmBtn.disabled).toBe(false));
+  });
 });
 
 // ── CategoriesTab ──
@@ -201,5 +254,23 @@ describe('CategoriesTab — count-read failure confirm state', () => {
 
     const confirmBtn = screen.getByTestId('confirm-dialog-confirm-btn') as HTMLButtonElement;
     expect(confirmBtn.disabled).toBe(false);
+  });
+
+  it('DELETE with a definitive child count (>0) is BLOCKED with the child-count message', async () => {
+    const service = createMockService({
+      getCategoryFieldCount: vi
+        .fn()
+        .mockResolvedValue({ success: true, count: 2, fields: ['Age', 'Height'] }),
+    });
+    const vm = await buildVm(service);
+    render(<CategoriesTab viewModel={vm} categories={vm.categories} orgId="org-1" />);
+
+    fireEvent.click(screen.getByTestId('cat-delete-legacy'));
+
+    const message = await screen.findByTestId('confirm-dialog-message');
+    expect(message.textContent).toMatch(/still has 2 field\(s\)/i);
+    expect((screen.getByTestId('confirm-dialog-confirm-btn') as HTMLButtonElement).disabled).toBe(
+      true
+    );
   });
 });

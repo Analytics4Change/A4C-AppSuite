@@ -281,10 +281,10 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     // (unknown) — block the delete and show honest copy, never fall through to a
     // reassuring "0". Deriving the discriminant once keeps every dialog ternary
     // null-safe and consistent.
-    const usageState = (count: number | null): 'unknown' | 'in-use' | 'empty' =>
+    const countState = (count: number | null): 'unknown' | 'in-use' | 'empty' =>
       count === null ? 'unknown' : count > 0 ? 'in-use' : 'empty';
-    const deleteState = deleteTarget ? usageState(deleteTarget.usageCount) : undefined;
-    const deactivateState = deactivateTarget ? usageState(deactivateTarget.usageCount) : undefined;
+    const deleteState = deleteTarget ? countState(deleteTarget.usageCount) : undefined;
+    const deactivateState = deactivateTarget ? countState(deactivateTarget.usageCount) : undefined;
 
     return (
       <div
