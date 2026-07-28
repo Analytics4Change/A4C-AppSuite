@@ -276,11 +276,13 @@ export const UsersManagePage: React.FC = observer(() => {
           // Load notification preferences and phones for active users
           if (!item.isInvitation && item.displayStatus === 'active') {
             setIsLoadingPrefs(true);
+            // One id shared across the two batched reads → single failure log below.
+            const correlationId = generateCorrelationId();
             try {
               const queryService = getUserQueryService();
               const [prefs, phones] = await Promise.all([
-                queryService.getUserNotificationPreferences(item.id),
-                queryService.getUserPhones(item.id),
+                queryService.getUserNotificationPreferences(item.id, correlationId),
+                queryService.getUserPhones(item.id, correlationId),
               ]);
               setNotificationPrefs(prefs);
               setUserPhones(phones);
@@ -290,7 +292,10 @@ export const UsersManagePage: React.FC = observer(() => {
                 phoneCount: phones.length,
               });
             } catch (prefsError) {
-              log.error('Failed to load notification preferences', prefsError);
+              log.error('Failed to load notification preferences', {
+                error: prefsError,
+                correlationId,
+              });
               // Don't block - use defaults
               setNotificationPrefs(DEFAULT_NOTIFICATION_PREFERENCES);
               setUserPhones([]);

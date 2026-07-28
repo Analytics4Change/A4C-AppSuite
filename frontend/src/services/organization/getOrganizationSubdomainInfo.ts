@@ -7,6 +7,7 @@
  */
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('organization');
 
@@ -53,16 +54,18 @@ interface OrganizationRpcResponse {
  * occur for a PK lookup. See plan v2 §"Read-shape with `.single<T>()`".
  */
 export async function getOrganizationSubdomainInfo(
-  orgId: string
+  orgId: string,
+  correlationId: string = generateCorrelationId()
 ): Promise<OrganizationSubdomainInfo | null> {
   try {
     const { data, error } = await supabaseService.apiRpc<OrganizationRpcResponse[]>(
       'get_organization_by_id',
-      { p_org_id: orgId }
+      { p_org_id: orgId },
+      { correlationId }
     );
 
     if (error) {
-      log.error('RPC error', { orgId, error });
+      log.error('RPC error', { orgId, error, correlationId });
       return null;
     }
 
@@ -77,7 +80,7 @@ export async function getOrganizationSubdomainInfo(
       subdomain_status: row.subdomain_status as OrganizationSubdomainInfo['subdomain_status'],
     };
   } catch (err) {
-    log.error('Unexpected error', { orgId, error: err });
+    log.error('Unexpected error', { orgId, error: err, correlationId });
     return null;
   }
 }

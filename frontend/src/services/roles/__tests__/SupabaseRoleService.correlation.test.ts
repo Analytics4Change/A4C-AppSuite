@@ -72,4 +72,22 @@ describe('SupabaseRoleService — correlation-id threading', () => {
       { correlationId: undefined }
     );
   });
+
+  it('listUsersForBulkAssignment pins the correlation id on the RPC call', async () => {
+    await service.listUsersForBulkAssignment({ roleId: 'r1', scopePath: 'acme' }, 'corr-bulk');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'list_users_for_bulk_assignment',
+      { p_role_id: 'r1', p_scope_path: 'acme', p_search_term: null, p_limit: 100, p_offset: 0 },
+      { correlationId: 'corr-bulk' }
+    );
+  });
+
+  it('listUsersForRoleManagement pins the correlation id on the RPC call', async () => {
+    await service.listUsersForRoleManagement({ roleId: 'r1', scopePath: 'acme' }, 'corr-mgmt');
+    expect(mockApiRpc).toHaveBeenCalledWith(
+      'list_users_for_role_management',
+      { p_role_id: 'r1', p_scope_path: 'acme', p_search_term: null, p_limit: 100, p_offset: 0 },
+      { correlationId: 'corr-mgmt' }
+    );
+  });
 });

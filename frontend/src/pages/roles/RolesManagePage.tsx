@@ -484,17 +484,22 @@ export const RolesManagePage: React.FC = observer(() => {
       setDialogState({ type: 'activeWarning' });
     } else if (currentRole.userCount > 0) {
       // Enumerate assigned users for the dialog
+      const correlationId = generateCorrelationId();
       try {
         const service = getRoleService();
-        const users = await service.listUsersForRoleManagement({
-          roleId: currentRole.id,
-          scopePath: currentRole.orgHierarchyScope ?? '',
-        });
+        const users = await service.listUsersForRoleManagement(
+          {
+            roleId: currentRole.id,
+            scopePath: currentRole.orgHierarchyScope ?? '',
+          },
+          correlationId
+        );
         const assignedNames = users
           .filter((u) => u.isAssigned)
           .map((u) => u.displayName || u.email);
         setDialogState({ type: 'hasUsers', users: assignedNames });
-      } catch {
+      } catch (error) {
+        log.error('Failed to load assigned users for delete dialog', { error, correlationId });
         setOperationError('Failed to load assigned users. Please try again.');
       }
     } else {

@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { UserPhone } from '@/types/user.types';
 import { Phone, Plus, AlertCircle, Loader2 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('component');
 
@@ -83,13 +84,14 @@ export const UserPhonesSection: React.FC<UserPhonesSectionProps> = observer(
     const loadPhones = useCallback(async () => {
       setIsLoading(true);
       setError(null);
+      const correlationId = generateCorrelationId();
       try {
-        const result = await queryService.getUserPhones(userId);
+        const result = await queryService.getUserPhones(userId, correlationId);
         setPhones(result);
         // Notify parent of phone changes (for SMS notification preferences sync)
         onPhonesChange?.(result);
       } catch (err) {
-        log.error('Failed to load phones', err);
+        log.error('Failed to load phones', { error: err, correlationId });
         setError('Failed to load phone numbers');
       } finally {
         setIsLoading(false);

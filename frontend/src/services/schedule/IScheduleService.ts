@@ -86,7 +86,8 @@ export interface IScheduleService {
 
   // Assignment management (batch operations)
   listUsersForScheduleManagement(
-    params: ListUsersForScheduleManagementParams
+    params: ListUsersForScheduleManagementParams,
+    correlationId?: string
   ): Promise<ScheduleManageableUser[]>;
   syncScheduleAssignments(
     params: SyncScheduleAssignmentsParams

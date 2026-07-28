@@ -103,7 +103,7 @@ export interface IUserQueryService {
    *   inv => computeInvitationDisplayStatus(inv) === 'pending'
    * );
    */
-  getInvitations(): Promise<Invitation[]>;
+  getInvitations(correlationId?: string): Promise<Invitation[]>;
 
   /**
    * Retrieves a single invitation by ID
@@ -183,7 +183,7 @@ export interface IUserQueryService {
    *   showOrgSelector(orgs);
    * }
    */
-  getUserOrganizations(): Promise<
+  getUserOrganizations(correlationId?: string): Promise<
     Array<{
       id: string;
       name: string;
@@ -209,7 +209,7 @@ export interface IUserQueryService {
    * const primary = addresses.find(a => a.isPrimary);
    * const orgOverrides = addresses.filter(a => a.orgId);
    */
-  getUserAddresses(userId: string): Promise<UserAddress[]>;
+  getUserAddresses(userId: string, correlationId?: string): Promise<UserAddress[]>;
 
   /**
    * Retrieves all phone numbers for a user
@@ -225,7 +225,7 @@ export interface IUserQueryService {
    * const smsCapable = phones.filter(p => p.smsCapable);
    * const primary = phones.find(p => p.isPrimary);
    */
-  getUserPhones(userId: string): Promise<UserPhone[]>;
+  getUserPhones(userId: string, correlationId?: string): Promise<UserPhone[]>;
 
   /**
    * Retrieves user's access and notification preferences for a specific organization
@@ -247,7 +247,11 @@ export interface IUserQueryService {
    *   }
    * }
    */
-  getUserOrgAccess(userId: string, orgId: string): Promise<UserOrgAccess | null>;
+  getUserOrgAccess(
+    userId: string,
+    orgId: string,
+    correlationId?: string
+  ): Promise<UserOrgAccess | null>;
 
   /**
    * Retrieves user's notification preferences for the current organization
@@ -264,5 +268,8 @@ export interface IUserQueryService {
    *   await sendSmsNotification(prefs.sms.phoneId, message);
    * }
    */
-  getUserNotificationPreferences(userId: string): Promise<NotificationPreferences>;
+  getUserNotificationPreferences(
+    userId: string,
+    correlationId?: string
+  ): Promise<NotificationPreferences>;
 }

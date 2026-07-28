@@ -268,7 +268,8 @@ export class SupabaseScheduleService implements IScheduleService {
   }
 
   async listUsersForScheduleManagement(
-    params: ListUsersForScheduleManagementParams
+    params: ListUsersForScheduleManagementParams,
+    correlationId?: string
   ): Promise<ScheduleManageableUser[]> {
     log.debug('Listing users for schedule management', params);
 
@@ -279,11 +280,12 @@ export class SupabaseScheduleService implements IScheduleService {
         p_search_term: params.searchTerm ?? null,
         p_limit: params.limit ?? 100,
         p_offset: params.offset ?? 0,
-      }
+      },
+      { correlationId }
     );
 
     if (error) {
-      log.error('Failed to list users for schedule management', { error });
+      log.error('Failed to list users for schedule management', { error, correlationId });
       throw new Error(`Failed to list users for schedule management: ${error.message}`);
     }
 

@@ -14,7 +14,7 @@ const log = Logger.getLogger('api');
 export class MockDirectCareSettingsService implements IDirectCareSettingsService {
   private settingsStore = new Map<string, DirectCareSettings>();
 
-  async getSettings(orgId: string): Promise<DirectCareSettings> {
+  async getSettings(orgId: string, _correlationId?: string): Promise<DirectCareSettings> {
     log.debug('[Mock] Fetching direct care settings', { orgId });
     await this.simulateDelay();
 
@@ -33,7 +33,7 @@ export class MockDirectCareSettingsService implements IDirectCareSettingsService
     orgId: string,
     enableStaffClientMapping: boolean | null,
     enableScheduleEnforcement: boolean | null,
-    reason: string,
+    reason: string
   ): Promise<DirectCareSettings> {
     log.debug('[Mock] Updating direct care settings', {
       orgId,

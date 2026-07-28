@@ -29,6 +29,7 @@ import type {
 } from '@/types/event-monitoring.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { maskPii } from '@/utils/maskPii';
 
 const log = Logger.getLogger('api');
@@ -131,7 +132,8 @@ export class EventMonitoringService {
    * ```
    */
   async getFailedEvents(
-    options: FailedEventsQueryOptions = {}
+    options: FailedEventsQueryOptions = {},
+    correlationId: string = generateCorrelationId()
   ): Promise<EventMonitoringOperationResult<FailedEventsResult>> {
     try {
       log.info('Fetching failed events', options);
@@ -147,11 +149,12 @@ export class EventMonitoringService {
           p_include_dismissed: options.includeDismissed ?? false,
           p_sort_by: options.sortBy ?? 'created_at',
           p_sort_order: options.sortOrder ?? 'desc',
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch failed events', error);
+        log.error('Failed to fetch failed events', { error, correlationId });
 
         // Handle permission errors
         if (error.code === '42501' || error.message?.includes('permission denied')) {
@@ -203,7 +206,7 @@ export class EventMonitoringService {
         },
       };
     } catch (error) {
-      log.error('Unexpected error fetching failed events', error);
+      log.error('Unexpected error fetching failed events', { error, correlationId });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -452,17 +455,20 @@ export class EventMonitoringService {
    * }
    * ```
    */
-  async getProcessingStats(): Promise<EventMonitoringOperationResult<EventProcessingStats>> {
+  async getProcessingStats(
+    correlationId: string = generateCorrelationId()
+  ): Promise<EventMonitoringOperationResult<EventProcessingStats>> {
     try {
       log.info('Fetching event processing stats');
 
       const { data, error } = await supabaseService.apiRpc<GetStatsRpcResponse>(
         'get_event_processing_stats',
-        {}
+        {},
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch processing stats', error);
+        log.error('Failed to fetch processing stats', { error, correlationId });
 
         // Handle permission errors
         if (error.code === '42501' || error.message?.includes('permission denied')) {
@@ -526,7 +532,7 @@ export class EventMonitoringService {
         },
       };
     } catch (error) {
-      log.error('Unexpected error fetching processing stats', error);
+      log.error('Unexpected error fetching processing stats', { error, correlationId });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -601,7 +607,8 @@ export class EventMonitoringService {
    */
   async getEventsBySession(
     sessionId: string,
-    limit: number = 100
+    limit: number = 100,
+    correlationId: string = generateCorrelationId()
   ): Promise<EventMonitoringOperationResult<TracedEventsResult>> {
     try {
       log.info('Fetching events by session ID', { sessionId, limit });
@@ -611,11 +618,12 @@ export class EventMonitoringService {
         {
           p_session_id: sessionId,
           p_limit: limit,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch events by session', { sessionId, error });
+        log.error('Failed to fetch events by session', { sessionId, error, correlationId });
 
         if (error.code === '42501' || error.message?.includes('permission denied')) {
           return {
@@ -657,7 +665,7 @@ export class EventMonitoringService {
         },
       };
     } catch (error) {
-      log.error('Unexpected error fetching events by session', { sessionId, error });
+      log.error('Unexpected error fetching events by session', { sessionId, error, correlationId });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -686,7 +694,10 @@ export class EventMonitoringService {
    */
   async getEventsByCorrelation(
     correlationId: string,
-    limit: number = 100
+    limit: number = 100,
+    // `correlationId` above is the SEARCH KEY (body p_correlation_id). This is this
+    // request's OWN transport trace id — distinct from what the admin searched for.
+    requestCorrelationId: string = generateCorrelationId()
   ): Promise<EventMonitoringOperationResult<TracedEventsResult>> {
     try {
       log.info('Fetching events by correlation ID', { correlationId, limit });
@@ -696,11 +707,16 @@ export class EventMonitoringService {
         {
           p_correlation_id: correlationId,
           p_limit: limit,
-        }
+        },
+        { correlationId: requestCorrelationId }
       );
 
       if (error) {
-        log.error('Failed to fetch events by correlation', { correlationId, error });
+        log.error('Failed to fetch events by correlation', {
+          correlationId,
+          requestCorrelationId,
+          error,
+        });
 
         if (error.code === '42501' || error.message?.includes('permission denied')) {
           return {
@@ -742,7 +758,11 @@ export class EventMonitoringService {
         },
       };
     } catch (error) {
-      log.error('Unexpected error fetching events by correlation', { correlationId, error });
+      log.error('Unexpected error fetching events by correlation', {
+        correlationId,
+        requestCorrelationId,
+        error,
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -773,7 +793,8 @@ export class EventMonitoringService {
    * ```
    */
   async getTraceTimeline(
-    traceId: string
+    traceId: string,
+    correlationId: string = generateCorrelationId()
   ): Promise<EventMonitoringOperationResult<TraceTimelineResult>> {
     try {
       log.info('Fetching trace timeline', { traceId });
@@ -782,11 +803,12 @@ export class EventMonitoringService {
         'get_trace_timeline',
         {
           p_trace_id: traceId,
-        }
+        },
+        { correlationId }
       );
 
       if (error) {
-        log.error('Failed to fetch trace timeline', { traceId, error });
+        log.error('Failed to fetch trace timeline', { traceId, error, correlationId });
 
         if (error.code === '42501' || error.message?.includes('permission denied')) {
           return {
@@ -829,7 +851,7 @@ export class EventMonitoringService {
         },
       };
     } catch (error) {
-      log.error('Unexpected error fetching trace timeline', { traceId, error });
+      log.error('Unexpected error fetching trace timeline', { traceId, error, correlationId });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

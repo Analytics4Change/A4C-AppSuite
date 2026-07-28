@@ -19,6 +19,7 @@ import type { DirectCareSettings } from '@/types/direct-care-settings.types';
 import type { IDirectCareSettingsService } from '@/services/direct-care/IDirectCareSettingsService';
 import { getDirectCareSettingsService } from '@/services/direct-care/DirectCareSettingsServiceFactory';
 import { Logger } from '@/utils/logger';
+import { generateCorrelationId } from '@/utils/trace-ids';
 
 const log = Logger.getLogger('viewmodel');
 
@@ -48,9 +49,11 @@ export class DirectCareSettingsViewModel {
       this.saveSuccess = false;
     });
 
+    const correlationId = generateCorrelationId();
+
     try {
       log.debug('Loading direct care settings', { orgId });
-      const settings = await this.service.getSettings(orgId);
+      const settings = await this.service.getSettings(orgId, correlationId);
 
       runInAction(() => {
         this.settings = { ...settings };
@@ -66,7 +69,7 @@ export class DirectCareSettingsViewModel {
         this.loadError = message;
         this.isLoading = false;
       });
-      log.error('Failed to load direct care settings', { error, orgId });
+      log.error('Failed to load direct care settings', { error, orgId, correlationId });
     }
   }
 

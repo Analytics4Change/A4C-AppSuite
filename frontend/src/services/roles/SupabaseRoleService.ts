@@ -651,7 +651,8 @@ export class SupabaseRoleService implements IRoleService {
    * Lists users eligible for bulk role assignment
    */
   async listUsersForBulkAssignment(
-    params: ListUsersForBulkAssignmentParams
+    params: ListUsersForBulkAssignmentParams,
+    correlationId?: string
   ): Promise<SelectableUser[]> {
     log.debug('listUsersForBulkAssignment called', { params });
 
@@ -665,16 +666,20 @@ export class SupabaseRoleService implements IRoleService {
           current_roles: string[];
           is_already_assigned: boolean;
         }>
-      >('list_users_for_bulk_assignment', {
-        p_role_id: params.roleId,
-        p_scope_path: params.scopePath,
-        p_search_term: params.searchTerm || null,
-        p_limit: params.limit || 100,
-        p_offset: params.offset || 0,
-      });
+      >(
+        'list_users_for_bulk_assignment',
+        {
+          p_role_id: params.roleId,
+          p_scope_path: params.scopePath,
+          p_search_term: params.searchTerm || null,
+          p_limit: params.limit || 100,
+          p_offset: params.offset || 0,
+        },
+        { correlationId }
+      );
 
       if (error) {
-        log.error('Error listing users for bulk assignment', error);
+        log.error('Error listing users for bulk assignment', { error, correlationId });
         throw new Error(`Failed to list users: ${error.message}`);
       }
 
@@ -691,7 +696,7 @@ export class SupabaseRoleService implements IRoleService {
         isAlreadyAssigned: row.is_already_assigned,
       }));
     } catch (err) {
-      log.error('Exception in listUsersForBulkAssignment', err);
+      log.error('Exception in listUsersForBulkAssignment', { error: err, correlationId });
       throw err;
     }
   }
@@ -768,7 +773,8 @@ export class SupabaseRoleService implements IRoleService {
    * Lists ALL users for role management with their current assignment status
    */
   async listUsersForRoleManagement(
-    params: ListUsersForRoleManagementParams
+    params: ListUsersForRoleManagementParams,
+    correlationId?: string
   ): Promise<ManageableUser[]> {
     log.debug('listUsersForRoleManagement called', { params });
 
@@ -782,16 +788,20 @@ export class SupabaseRoleService implements IRoleService {
           current_roles: string[];
           is_assigned: boolean;
         }>
-      >('list_users_for_role_management', {
-        p_role_id: params.roleId,
-        p_scope_path: params.scopePath,
-        p_search_term: params.searchTerm || null,
-        p_limit: params.limit || 100,
-        p_offset: params.offset || 0,
-      });
+      >(
+        'list_users_for_role_management',
+        {
+          p_role_id: params.roleId,
+          p_scope_path: params.scopePath,
+          p_search_term: params.searchTerm || null,
+          p_limit: params.limit || 100,
+          p_offset: params.offset || 0,
+        },
+        { correlationId }
+      );
 
       if (error) {
-        log.error('Error listing users for role management', error);
+        log.error('Error listing users for role management', { error, correlationId });
         throw new Error(`Failed to list users: ${error.message}`);
       }
 
@@ -808,7 +818,7 @@ export class SupabaseRoleService implements IRoleService {
         isAssigned: row.is_assigned,
       }));
     } catch (err) {
-      log.error('Exception in listUsersForRoleManagement', err);
+      log.error('Exception in listUsersForRoleManagement', { error: err, correlationId });
       throw err;
     }
   }
