@@ -1016,4 +1016,69 @@ describe('ClientFieldSettingsViewModel', () => {
       expect(vm.successMessage).toBeNull();
     });
   });
+
+  // ── Pre-flight count reads: failure channel (O1) ──
+  // A read failure must surface as `{ success: false }`, NEVER a `0`-sentinel that
+  // could render a misleading "0 clients — safe to delete" in the confirm dialog.
+
+  describe('getFieldUsageCount — failure channel', () => {
+    it('returns { success: true, count } on a successful read', async () => {
+      mockService = createMockService({
+        getFieldUsageCount: vi.fn().mockResolvedValue({ success: true, count: 3 }),
+      });
+      vm = new ClientFieldSettingsViewModel(mockService);
+      expect(await vm.getFieldUsageCount('custom_weekend_hours')).toEqual({
+        success: true,
+        count: 3,
+      });
+    });
+
+    it('returns { success: false } (NOT count 0) when the service envelope fails', async () => {
+      mockService = createMockService({
+        getFieldUsageCount: vi.fn().mockResolvedValue({ success: false, count: 0 }),
+      });
+      vm = new ClientFieldSettingsViewModel(mockService);
+      expect(await vm.getFieldUsageCount('custom_weekend_hours')).toEqual({ success: false });
+    });
+
+    it('returns { success: false } when the read throws', async () => {
+      mockService = createMockService({
+        getFieldUsageCount: vi.fn().mockRejectedValue(new Error('network down')),
+      });
+      vm = new ClientFieldSettingsViewModel(mockService);
+      expect(await vm.getFieldUsageCount('custom_weekend_hours')).toEqual({ success: false });
+    });
+  });
+
+  describe('getCategoryFieldCount — failure channel', () => {
+    it('returns { success: true, count, fields } on a successful read', async () => {
+      mockService = createMockService({
+        getCategoryFieldCount: vi
+          .fn()
+          .mockResolvedValue({ success: true, count: 2, fields: ['a', 'b'] }),
+      });
+      vm = new ClientFieldSettingsViewModel(mockService);
+      expect(await vm.getCategoryFieldCount('cat-07', true)).toEqual({
+        success: true,
+        count: 2,
+        fields: ['a', 'b'],
+      });
+    });
+
+    it('returns { success: false } (NOT count 0) when the service envelope fails', async () => {
+      mockService = createMockService({
+        getCategoryFieldCount: vi.fn().mockResolvedValue({ success: false, count: 0, fields: [] }),
+      });
+      vm = new ClientFieldSettingsViewModel(mockService);
+      expect(await vm.getCategoryFieldCount('cat-07')).toEqual({ success: false });
+    });
+
+    it('returns { success: false } when the read throws', async () => {
+      mockService = createMockService({
+        getCategoryFieldCount: vi.fn().mockRejectedValue(new Error('network down')),
+      });
+      vm = new ClientFieldSettingsViewModel(mockService);
+      expect(await vm.getCategoryFieldCount('cat-07')).toEqual({ success: false });
+    });
+  });
 });

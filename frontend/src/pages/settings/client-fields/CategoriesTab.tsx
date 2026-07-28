@@ -76,10 +76,11 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
       inactiveChildCount: number;
       inactiveChildNames: string[];
     } | null>(null);
+    // childCount: number = definitive count; null = pre-flight read failed (unknown).
     const [deleteTarget, setDeleteTarget] = useState<{
       id: string;
       name: string;
-      childCount: number;
+      childCount: number | null;
       childNames: string[];
     } | null>(null);
     const [isCheckingDeleteChildren, setIsCheckingDeleteChildren] = useState(false);
@@ -124,11 +125,12 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
       }
     };
 
-    // Deactivation confirmation state
+    // Deactivation confirmation state.
+    // fieldCount: number = definitive count; null = pre-flight read failed (unknown).
     const [deactivateTarget, setDeactivateTarget] = useState<{
       id: string;
       name: string;
-      fieldCount: number;
+      fieldCount: number | null;
       fieldNames: string[];
     } | null>(null);
     const [isCheckingFields, setIsCheckingFields] = useState(false);
@@ -141,8 +143,9 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
       setDeactivateTarget({
         id: cat.id,
         name: cat.name,
-        fieldCount: result.count,
-        fieldNames: result.fields,
+        // null = read failed (unknown) → dialog shows honest copy; never coerce to 0.
+        fieldCount: result.success ? result.count : null,
+        fieldNames: result.success ? result.fields : [],
       });
     };
 
@@ -191,13 +194,15 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
       setDeleteTarget({
         id: cat.id,
         name: cat.name,
-        childCount: result.count,
-        childNames: result.fields,
+        // null = read failed (unknown) → dialog blocks; never coerce to 0.
+        childCount: result.success ? result.count : null,
+        childNames: result.success ? result.fields : [],
       });
     };
 
     const confirmDelete = async () => {
-      if (!deleteTarget || deleteTarget.childCount > 0) return;
+      // Proceed ONLY when child count is definitively 0 (blocks both >0 and unknown/null).
+      if (!deleteTarget || deleteTarget.childCount !== 0) return;
       const result = await viewModel.deleteCategory(
         deleteTarget.id,
         `Deleted category: ${deleteTarget.name}`,
@@ -214,6 +219,15 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
         });
       }
     };
+
+    // Pre-flight child-count → confirm-dialog state. A null count means the read
+    // FAILED (unknown) — block the delete and show honest copy, never fall through
+    // to a reassuring "0". Deriving the discriminant once keeps every dialog
+    // ternary null-safe and consistent.
+    const countState = (count: number | null): 'unknown' | 'in-use' | 'empty' =>
+      count === null ? 'unknown' : count > 0 ? 'in-use' : 'empty';
+    const deleteState = deleteTarget ? countState(deleteTarget.childCount) : undefined;
+    const deactivateState = deactivateTarget ? countState(deactivateTarget.fieldCount) : undefined;
 
     return (
       <div
@@ -542,19 +556,17 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
               isOpen={deactivateTarget !== null}
               title={`Deactivate "${deactivateTarget?.name}"?`}
               message={
-                deactivateTarget && deactivateTarget.fieldCount > 0
-                  ? `This category contains ${deactivateTarget.fieldCount} active custom field(s). Deactivating will also deactivate all fields in this category.`
-                  : 'This will remove the category. No fields are affected.'
+                deactivateState === 'unknown'
+                  ? "Couldn't verify how many fields this category contains. Deactivating will also deactivate any fields it contains (reversible)."
+                  : deactivateState === 'in-use'
+                    ? `This category contains ${deactivateTarget?.fieldCount} active custom field(s). Deactivating will also deactivate all fields in this category.`
+                    : 'This will remove the category. No fields are affected.'
               }
               confirmLabel="Deactivate"
               cancelLabel="Cancel"
               variant="warning"
               isLoading={isDeactivating}
-              details={
-                deactivateTarget && deactivateTarget.fieldCount > 0
-                  ? deactivateTarget.fieldNames
-                  : undefined
-              }
+              details={deactivateState === 'in-use' ? deactivateTarget?.fieldNames : undefined}
               onConfirm={confirmDeactivate}
               onCancel={() => setDeactivateTarget(null)}
             />
@@ -585,26 +597,33 @@ export const CategoriesTab: React.FC<CategoriesTabProps> = observer(
             <ConfirmDialog
               isOpen={deleteTarget !== null}
               title={
-                deleteTarget && deleteTarget.childCount > 0
-                  ? `Cannot delete "${deleteTarget.name}"`
-                  : `Permanently delete "${deleteTarget?.name}"?`
+                deleteState === 'unknown'
+                  ? `Couldn't verify "${deleteTarget?.name}"`
+                  : deleteState === 'in-use'
+                    ? `Cannot delete "${deleteTarget?.name}"`
+                    : `Permanently delete "${deleteTarget?.name}"?`
               }
               message={
-                deleteTarget && deleteTarget.childCount > 0
-                  ? `This category still has ${deleteTarget.childCount} field(s) (active or deactivated). Delete those fields first, then retry.`
-                  : 'This permanently removes the category. This cannot be undone.'
+                deleteState === 'unknown'
+                  ? "Couldn't verify how many fields this category contains. Close and try again."
+                  : deleteState === 'in-use'
+                    ? `This category still has ${deleteTarget?.childCount} field(s) (active or deactivated). Delete those fields first, then retry.`
+                    : 'This permanently removes the category. This cannot be undone.'
               }
-              details={
-                deleteTarget && deleteTarget.childCount > 0 ? deleteTarget.childNames : undefined
-              }
+              details={deleteState === 'in-use' ? deleteTarget?.childNames : undefined}
               confirmLabel="Delete permanently"
-              cancelLabel={deleteTarget && deleteTarget.childCount > 0 ? 'Dismiss' : 'Cancel'}
+              cancelLabel={
+                deleteState === 'unknown'
+                  ? 'Close'
+                  : deleteState === 'in-use'
+                    ? 'Dismiss'
+                    : 'Cancel'
+              }
               variant="danger"
               isLoading={viewModel.isCategoryLifecycleActionInProgress}
-              confirmDisabled={!!(deleteTarget && deleteTarget.childCount > 0)}
-              requireConfirmText={
-                deleteTarget && deleteTarget.childCount === 0 ? deleteTarget.name : undefined
-              }
+              // Blocked on both a positive count AND an unknown/null count.
+              confirmDisabled={!!deleteState && deleteState !== 'empty'}
+              requireConfirmText={deleteState === 'empty' ? deleteTarget?.name : undefined}
               onConfirm={confirmDelete}
               onCancel={() => setDeleteTarget(null)}
             />
