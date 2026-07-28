@@ -23,6 +23,25 @@ const log = Logger.getLogger('viewmodel');
 
 export type FieldStatusFilter = 'all' | 'active' | 'inactive';
 
+/**
+ * Result of a pre-flight field-usage count read. Mirrors the house `{ success }`
+ * envelope so callers can distinguish a definitive `count` from a read failure —
+ * on failure `count` is OMITTED (no `0`-sentinel that could masquerade as
+ * "safe to delete" in a confirm dialog). Callers MUST render an honest
+ * "couldn't verify" state on `{ success: false }`, never treat it as `0`.
+ */
+export type FieldUsage = { success: true; count: number } | { success: false };
+
+/**
+ * Result of a pre-flight category field-count read. Same failure-channel
+ * contract as {@link FieldUsage}: on `{ success: false }` both `count` and
+ * `fields` are omitted and callers must surface an honest "couldn't verify"
+ * state rather than a misleading `0`.
+ */
+export type CategoryFieldUsage =
+  | { success: true; count: number; fields: string[] }
+  | { success: false };
+
 export class ClientFieldSettingsViewModel {
   fieldDefinitions: FieldDefinition[] = [];
   originalFieldDefinitions: FieldDefinition[] = [];
@@ -927,23 +946,41 @@ export class ClientFieldSettingsViewModel {
     }
   }
 
-  async getFieldUsageCount(fieldKey: string): Promise<number> {
+  /**
+   * Pre-flight usage count for the delete/deactivate confirm flow.
+   *
+   * Returns a {@link FieldUsage} discriminated union rather than a bare number:
+   * a read failure (envelope `success:false` OR a thrown exception) yields
+   * `{ success: false }` — NOT `count: 0`. This lets the confirm dialog
+   * distinguish "definitively 0 clients" (safe to delete) from "couldn't
+   * determine" (must block/warn), instead of rendering a misleading
+   * "0 clients — safe to delete" on failure.
+   */
+  async getFieldUsageCount(fieldKey: string): Promise<FieldUsage> {
     // Pre-flight count for the delete/deactivate confirm flow → reuse the session
     // id so the read shares the eventual write's audit trail (see loadData).
     const correlationId = this.getSessionCorrelationId();
     try {
       const result = await this.service.getFieldUsageCount(fieldKey, correlationId);
-      return result.success ? result.count : 0;
+      return result.success ? { success: true, count: result.count } : { success: false };
     } catch (error) {
       log.error('Failed to get field usage count', { error, correlationId });
-      return 0;
+      return { success: false };
     }
   }
 
+  /**
+   * Pre-flight child-field count for the category delete/deactivate confirm flow.
+   *
+   * Returns a {@link CategoryFieldUsage} discriminated union. Same failure-channel
+   * contract as {@link getFieldUsageCount}: both the envelope-failure and thrown
+   * paths return `{ success: false }` (no `count: 0` sentinel), so callers can
+   * surface an honest "couldn't verify" confirm state.
+   */
   async getCategoryFieldCount(
     categoryId: string,
     includeInactive = false
-  ): Promise<{ count: number; fields: string[] }> {
+  ): Promise<CategoryFieldUsage> {
     // Pre-flight count for the delete/deactivate confirm flow → reuse the session id.
     const correlationId = this.getSessionCorrelationId();
     try {
@@ -953,11 +990,11 @@ export class ClientFieldSettingsViewModel {
         correlationId
       );
       return result.success
-        ? { count: result.count, fields: result.fields }
-        : { count: 0, fields: [] };
+        ? { success: true, count: result.count, fields: result.fields }
+        : { success: false };
     } catch (error) {
       log.error('Failed to get category field count', { error, correlationId });
-      return { count: 0, fields: [] };
+      return { success: false };
     }
   }
 }

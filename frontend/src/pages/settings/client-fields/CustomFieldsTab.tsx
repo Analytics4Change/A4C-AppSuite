@@ -62,12 +62,13 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     const [editIsRequired, setEditIsRequired] = useState(false);
     const [editEnumValues, setEditEnumValues] = useState<string[]>([]);
 
-    // Deactivation confirmation state
+    // Deactivation confirmation state.
+    // usageCount: number = definitive count; null = pre-flight read failed (unknown).
     const [deactivateTarget, setDeactivateTarget] = useState<{
       id: string;
       name: string;
       fieldKey: string;
-      usageCount: number;
+      usageCount: number | null;
     } | null>(null);
     const [isCheckingUsage, setIsCheckingUsage] = useState(false);
     const [isDeactivating, setIsDeactivating] = useState(false);
@@ -85,11 +86,12 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
       parentCategoryInactive: boolean;
       parentCategoryName: string | null;
     } | null>(null);
+    // usageCount: number = definitive count; null = pre-flight read failed (unknown).
     const [deleteTarget, setDeleteTarget] = useState<{
       id: string;
       name: string;
       fieldKey: string;
-      usageCount: number;
+      usageCount: number | null;
     } | null>(null);
 
     const editNameRef = useRef<HTMLInputElement>(null);
@@ -136,18 +138,20 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
     const handleDeleteClick = async (field: FieldDefinition) => {
       viewModel.clearFieldLifecycleError();
       setIsCheckingUsage(true);
-      const count = await viewModel.getFieldUsageCount(field.field_key);
+      const usage = await viewModel.getFieldUsageCount(field.field_key);
       setIsCheckingUsage(false);
       setDeleteTarget({
         id: field.id,
         name: field.display_name,
         fieldKey: field.field_key,
-        usageCount: count,
+        // null = read failed (unknown) → dialog blocks; never coerce to 0.
+        usageCount: usage.success ? usage.count : null,
       });
     };
 
     const confirmDelete = async () => {
-      if (!deleteTarget || deleteTarget.usageCount > 0) return;
+      // Proceed ONLY when usage is definitively 0 (blocks both >0 and unknown/null).
+      if (!deleteTarget || deleteTarget.usageCount !== 0) return;
       const result = await viewModel.deleteCustomField(
         deleteTarget.id,
         `Deleted custom field: ${deleteTarget.name}`,
@@ -207,13 +211,14 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
 
     const handleDeactivateClick = async (field: FieldDefinition) => {
       setIsCheckingUsage(true);
-      const count = await viewModel.getFieldUsageCount(field.field_key);
+      const usage = await viewModel.getFieldUsageCount(field.field_key);
       setIsCheckingUsage(false);
       setDeactivateTarget({
         id: field.id,
         name: field.display_name,
         fieldKey: field.field_key,
-        usageCount: count,
+        // null = read failed (unknown) → dialog shows honest copy; never coerce to 0.
+        usageCount: usage.success ? usage.count : null,
       });
     };
 
@@ -271,6 +276,15 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
         cancelEditing();
       }
     };
+
+    // Pre-flight usage → confirm-dialog state. A null count means the read FAILED
+    // (unknown) — block the delete and show honest copy, never fall through to a
+    // reassuring "0". Deriving the discriminant once keeps every dialog ternary
+    // null-safe and consistent.
+    const usageState = (count: number | null): 'unknown' | 'in-use' | 'empty' =>
+      count === null ? 'unknown' : count > 0 ? 'in-use' : 'empty';
+    const deleteState = deleteTarget ? usageState(deleteTarget.usageCount) : undefined;
+    const deactivateState = deactivateTarget ? usageState(deactivateTarget.usageCount) : undefined;
 
     return (
       <div
@@ -710,9 +724,11 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
               isOpen={deactivateTarget !== null}
               title={`Deactivate "${deactivateTarget?.name}"?`}
               message={
-                deactivateTarget && deactivateTarget.usageCount > 0
-                  ? `This field has data for ${deactivateTarget.usageCount} registered client(s). Deactivating will hide the field from the intake form but preserve existing data.`
-                  : 'This will remove the field from the intake form. No client data is affected.'
+                deactivateState === 'unknown'
+                  ? "Couldn't verify how many clients have data for this field. Deactivating hides it from the intake form and preserves any existing data."
+                  : deactivateState === 'in-use'
+                    ? `This field has data for ${deactivateTarget?.usageCount} registered client(s). Deactivating will hide the field from the intake form but preserve existing data.`
+                    : 'This will remove the field from the intake form. No client data is affected.'
               }
               confirmLabel="Deactivate"
               cancelLabel="Cancel"
@@ -745,23 +761,32 @@ export const CustomFieldsTab: React.FC<CustomFieldsTabProps> = observer(
             <ConfirmDialog
               isOpen={deleteTarget !== null}
               title={
-                deleteTarget && deleteTarget.usageCount > 0
-                  ? `Cannot delete "${deleteTarget.name}"`
-                  : `Permanently delete "${deleteTarget?.name}"?`
+                deleteState === 'unknown'
+                  ? `Couldn't verify "${deleteTarget?.name}"`
+                  : deleteState === 'in-use'
+                    ? `Cannot delete "${deleteTarget?.name}"`
+                    : `Permanently delete "${deleteTarget?.name}"?`
               }
               message={
-                deleteTarget && deleteTarget.usageCount > 0
-                  ? `${deleteTarget.usageCount} client(s) have data for this field. Leave it deactivated to preserve the historical data, or clear the data before deleting.`
-                  : 'This permanently removes the field definition. This cannot be undone.'
+                deleteState === 'unknown'
+                  ? "Couldn't verify how many clients use this field. Close and try again."
+                  : deleteState === 'in-use'
+                    ? `${deleteTarget?.usageCount} client(s) have data for this field. Leave it deactivated to preserve the historical data, or clear the data before deleting.`
+                    : 'This permanently removes the field definition. This cannot be undone.'
               }
               confirmLabel="Delete permanently"
-              cancelLabel={deleteTarget && deleteTarget.usageCount > 0 ? 'Dismiss' : 'Cancel'}
+              cancelLabel={
+                deleteState === 'unknown'
+                  ? 'Close'
+                  : deleteState === 'in-use'
+                    ? 'Dismiss'
+                    : 'Cancel'
+              }
               variant="danger"
               isLoading={viewModel.isFieldLifecycleActionInProgress}
-              confirmDisabled={!!(deleteTarget && deleteTarget.usageCount > 0)}
-              requireConfirmText={
-                deleteTarget && deleteTarget.usageCount === 0 ? deleteTarget.name : undefined
-              }
+              // Blocked on both a positive count AND an unknown/null count.
+              confirmDisabled={!!deleteState && deleteState !== 'empty'}
+              requireConfirmText={deleteState === 'empty' ? deleteTarget?.name : undefined}
               onConfirm={confirmDelete}
               onCancel={() => setDeleteTarget(null)}
             />
