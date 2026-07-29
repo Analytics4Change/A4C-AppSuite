@@ -30,6 +30,7 @@ import type {
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
 import type { Database } from '@/types/database.types';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import { decodeJWT } from '@/utils/jwt';
@@ -806,9 +807,16 @@ export class SupabaseUserQueryService implements IUserQueryService {
    *
    * @param email - Email address to check
    * @param correlationId - Pins X-Correlation-ID across all three probes so a
-   *   failure logged here joins the server-side trace
+   *   failure logged here joins the server-side trace. **Defaulted, not
+   *   optional**, per `services/CLAUDE.md` §"Service-mints variant": this method
+   *   owns its own failure logging and its caller only reads the returned status,
+   *   so an absent id would log `undefined` while the server auto-generated a
+   *   different one — silently breaking the join this parameter exists to make.
    */
-  async checkEmailStatus(email: string, correlationId?: string): Promise<EmailLookupResult> {
+  async checkEmailStatus(
+    email: string,
+    correlationId: string = generateCorrelationId()
+  ): Promise<EmailLookupResult> {
     /**
      * Sole construction site for the failure result. Logs the reason (never the
      * email — it is PII) alongside the correlation id, so the reason stays
@@ -816,9 +824,12 @@ export class SupabaseUserQueryService implements IUserQueryService {
      */
     const failed = (
       reason: 'no_session' | 'no_org_context' | 'rpc_error',
-      rpc?: string
+      rpc?: string,
+      error?: unknown
     ): EmailLookupResult => {
-      log.warn('Email status lookup failed', { reason, rpc, correlationId });
+      // `error` is already PII-masked by apiRpc at the SDK boundary, so it is
+      // safe to log and is the only thing that says *why* the probe failed.
+      log.warn('Email status lookup failed', { reason, rpc, correlationId, error });
       return { status: 'lookup_failed' };
     };
 
@@ -844,7 +855,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         DbEmailMembershipResult[]
       >('check_user_org_membership', { p_email: email, p_org_id: orgId }, { correlationId });
 
-      if (membershipError) return failed('rpc_error', 'check_user_org_membership');
+      if (membershipError) return failed('rpc_error', 'check_user_org_membership', membershipError);
 
       if (membership && membership.length > 0) {
         const member = membership[0];
@@ -867,7 +878,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         DbPendingInvitationResult[]
       >('check_pending_invitation', { p_email: email, p_org_id: orgId }, { correlationId });
 
-      if (pendingError) return failed('rpc_error', 'check_pending_invitation');
+      if (pendingError) return failed('rpc_error', 'check_pending_invitation', pendingError);
 
       if (pending && pending.length > 0) {
         const inv = pending[0];
@@ -890,7 +901,7 @@ export class SupabaseUserQueryService implements IUserQueryService {
         DbUserExistsResult[]
       >('check_user_exists', { p_email: email }, { correlationId });
 
-      if (existsError) return failed('rpc_error', 'check_user_exists');
+      if (existsError) return failed('rpc_error', 'check_user_exists', existsError);
 
       if (exists && exists.length > 0) {
         return {

@@ -162,6 +162,30 @@ export default [
             'supabaseService.apiRpc<T>(...) or apiRpcEnvelope<T>(...). If you genuinely ' +
             'mean a public-schema function, add the file to the allow-list in eslint.config.js.',
         },
+        {
+          // Cast-wrapped bare .rpc(...). THIS is the shape the original defect
+          // actually had — `await (client.rpc as any)('check_user_org_membership', …)`.
+          // The selector above cannot see it: with a cast, the CallExpression's
+          // callee is a TSAsExpression, not a MemberExpression, so the
+          // `[callee.type='MemberExpression']` clause excludes it. The `as any`
+          // was there precisely to silence the type error that would otherwise
+          // have flagged the wrong schema — so the cast and the bug travel
+          // together, and a rule that misses casts misses the bug.
+          //
+          // Two entries because the cast can nest: `as any` puts the member
+          // expression one level down, `as unknown as T` two. Verified against
+          // @typescript-eslint/typescript-estree + esquery that these two match
+          // both forms and neither matches the allow-listed bare call, the
+          // .schema('api').rpc() chain, or a cast appearing in an argument.
+          selector:
+            "CallExpression[callee.type='TSAsExpression'][callee.expression.property.name='rpc']," +
+            "CallExpression[callee.type='TSAsExpression'][callee.expression.expression.property.name='rpc']",
+          message:
+            'Cast-wrapped .rpc(...) — e.g. `(client.rpc as any)(...)`. This is how the ' +
+            'api-schema bug shipped: the cast silences the type error that would have ' +
+            'caught it, and the call still targets the default (public) schema. Use ' +
+            'supabaseService.apiRpc<T>(...) or apiRpcEnvelope<T>(...) instead of casting.',
+        },
       ],
     },
   },

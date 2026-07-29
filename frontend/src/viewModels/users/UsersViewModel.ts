@@ -784,7 +784,9 @@ export class UsersViewModel {
       return null;
     }
 
-    log.debug('Checking email status', { email });
+    // Email is PII (utils/maskPii) — log the outcome, never the address. Matches
+    // the `failed()` convention in SupabaseUserQueryService.checkEmailStatus.
+    log.debug('Checking email status');
 
     runInAction(() => {
       this.isCheckingEmail = true;
@@ -796,7 +798,7 @@ export class UsersViewModel {
       runInAction(() => {
         this.emailLookupResult = result;
         this.isCheckingEmail = false;
-        log.info('Email lookup result', { email, status: result.status });
+        log.info('Email lookup result', { status: result.status });
       });
 
       return result;

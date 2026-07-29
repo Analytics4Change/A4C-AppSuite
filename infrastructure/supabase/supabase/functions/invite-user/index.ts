@@ -270,6 +270,15 @@ export async function checkEmailStatus(
     // cross-provider gate then assign). api.check_user_has_any_role supplies the
     // missing signal. On error, default to other_org_member — the conservative
     // path that still runs the cross-provider eligibility gate.
+    //
+    // DELIBERATE ASYMMETRY: the three probes above now fail CLOSED (lookup_failed
+    // → 503), this one does not. That is not an oversight. Those probes decide
+    // *whether* the address is already known, so an unknown answer can mint an
+    // invitation for an existing member. This one only refines an already-known
+    // "exists elsewhere" into zombie-vs-other-org, and the fallback picks the
+    // STRICTER branch — the cross-provider gate still runs, and no invitation is
+    // minted for an active member either way. The failure is bounded, so failing
+    // closed here would reject legitimate invites for no safety gain.
     const { data: hasRole, error: roleAnyError } = await supabase
       .rpc('check_user_has_any_role', { p_user_id: existingUserId });
     if (roleAnyError) {

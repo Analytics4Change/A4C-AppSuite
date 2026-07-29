@@ -250,8 +250,13 @@ const EMAIL_STATUS_CONFIG: Record<
     // fail too. Promise only what is guaranteed: that it re-checks.
     message:
       "Couldn't check this email's status. You can still send the invitation; the server re-checks before routing.",
-    actionLabel: 'Try again',
-    actionVariant: 'outline',
+    // No action button — same test applied to `deactivated` and `other_org`
+    // above: a label without a working handler is a dead affordance, and
+    // `onSuggestedAction` is still a no-op stub. A retry IS worth having (it is
+    // the one action here that would genuinely work), so PR B should add this
+    // label and its handler together, in one change. The copy already tells the
+    // admin they may proceed, so nothing is lost by waiting.
+    actionLabel: undefined,
   },
 };
 
@@ -285,11 +290,10 @@ const EmailLookupFeedback: React.FC<EmailLookupFeedbackProps> = ({
       case 'active_member':
         action = 'view';
         break;
-      case 'lookup_failed':
-        action = 'retry';
-        break;
-      // 'deactivated' and 'other_org' carry no actionLabel, so this handler is
-      // unreachable for them — see EMAIL_STATUS_CONFIG for why.
+      // 'deactivated', 'other_org' and 'lookup_failed' carry no actionLabel, so
+      // this handler is unreachable for them — see EMAIL_STATUS_CONFIG for why.
+      // PR B adds `case 'lookup_failed': action = 'retry'` together with the
+      // label and a real handler.
       default:
         action = 'invite';
     }

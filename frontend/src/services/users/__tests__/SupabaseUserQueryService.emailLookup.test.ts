@@ -91,6 +91,32 @@ describe('SupabaseUserQueryService.checkEmailStatus', () => {
       }
     });
 
+    it('mints its own correlation id when the caller supplies none', async () => {
+      // services/CLAUDE.md §"Service-mints variant": this method owns its failure
+      // logging and its caller only reads the returned status, so the param is
+      // DEFAULTED, not optional. With an optional param a no-arg call would log
+      // `undefined` while the server auto-generated a different id — silently
+      // breaking the very join the id exists to make.
+      await service.checkEmailStatus(EMAIL);
+
+      expect(mockApiRpc.mock.calls).toHaveLength(3);
+      const ids = mockApiRpc.mock.calls.map((c) => c[2]?.correlationId);
+      for (const id of ids) {
+        expect(id).toEqual(expect.any(String));
+        expect(id).not.toBe('');
+      }
+      // ...and it is ONE id across all three probes, not three different ones.
+      expect(new Set(ids).size).toBe(1);
+    });
+
+    it('logs the minted id on failure, never undefined', async () => {
+      probes({ check_user_org_membership: RPC_ERROR });
+      await service.checkEmailStatus(EMAIL);
+      const [, payload] = mockLog.warn.mock.calls[0];
+      expect(payload.correlationId).toEqual(expect.any(String));
+      expect(payload.correlationId).not.toBe('');
+    });
+
     it('short-circuits after a membership hit — one probe, not three', async () => {
       probes({
         check_user_org_membership: { data: [{ user_id: 'u1', is_active: true }], error: null },

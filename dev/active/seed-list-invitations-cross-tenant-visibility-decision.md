@@ -32,6 +32,44 @@ Phase 3 made `api.list_users` grant-aware (Model M membership-oracle guard) so c
 2. `CREATE OR REPLACE api.list_invitations` (pitfall #6: fetch deployed body first) — guard becomes `has_platform_privilege() OR (has_effective_permission('invitation.read', <org_path>) AND accessible_organizations @> [p_org_id])`; reject path RAISE→RETURN-empty; re-issue COMMENT (consultant-callable tag) + regenerate reachability matrix.
 3. Verify via the transactional simulate-JWT pattern (Phase 3 close-out has the exact recipe: in-txn grant insert → trigger → simulate consultant JWT → call → ROLLBACK).
 
+## ⚠️ Scope widened by PR #103 (2026-07-29) — decision #1 now applies to a second RPC
+
+`20260729184125_guard_email_lookup_rpcs.sql` tenancy-guarded
+`api.check_pending_invitation` with the **Model M membership guard only** — no
+permission conjunct. Because `accessible_organizations` is the UNION *including
+active grants*, a grant-bearing consultant (down to an `emergency_access`
+clinician holding only `client.view`/`medication.view`) can now ask:
+
+> does `alice@example.com` have a pending invitation to provider-org P, and what
+> is its id and expiry?
+
+That is decision #1's question, answered **YES by default** on this probe, via the
+membership-only shape decision #2 explicitly rules out ("membership conjunct AND
+the permission — together, not either-or").
+
+**Context that keeps this from being a regression:** the prior state was strictly
+worse — the probe was reachable by `anon` (verified live: the publishable key
+returned membership data for an arbitrary pair). PR #103 is a net improvement. But
+it changed the *shape* of this open question rather than settling it, and it did so
+as a side effect of unrelated work.
+
+**What this card must now decide** — one question, two surfaces:
+
+| RPC | current gate | data exposed |
+|---|---|---|
+| `api.list_invitations` | `has_org_admin_permission() AND p_org_id = get_current_org_id()` | full invitation list |
+| `api.check_pending_invitation` | membership only (Model M) | `(id, email, expires_at)` for a **known** address |
+
+The second is a strict data subset behind a strictly weaker gate. Whatever
+decision #1 resolves to should apply to both, and the implementation sketch below
+should gain a step for `check_pending_invitation`.
+
+**Not a one-liner.** Adding `has_org_admin_permission()` to `check_pending_invitation`
+would likely break the invite flow — an inviter may hold `user.create` without
+`user.manage`. Needs the same design pass as decision #2.
+
+Mitigating: the probe requires knowing the exact address, so it enumerates nothing.
+
 ## Relationships
 
 - **Sibling of** (shipped): `list_users` Model M refactor (Phase 3, migration `20260622183824`).

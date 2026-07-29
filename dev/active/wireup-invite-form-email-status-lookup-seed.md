@@ -12,7 +12,7 @@ The invite-user form has a **complete email status-lookup feature that is never 
 
 Root cause — the blur handler is a placeholder stub:
 ```tsx
-// frontend/src/pages/users/UsersManagePage.tsx:820-823
+// frontend/src/pages/users/UsersManagePage.tsx:929 (line refs refreshed 2026-07-29)
 onEmailBlur={() => {
   // Email lookup integration - for now just mark as touched
   formViewModel.touchField('email');
@@ -21,9 +21,13 @@ onEmailBlur={() => {
 It calls `touchField('email')` but **not** `checkEmailStatus(email)`, so `formViewModel.emailLookupResult` stays `null` and the `EmailLookupFeedback` panel never mounts.
 
 ## What already exists (just not wired)
-- **Lookup method**: `UsersViewModel.ts:763` `checkEmailStatus(email)` → `SupabaseUserQueryService.ts:777-910` calls `check_user_org_membership` (derives `is_active ? 'active_member' : 'deactivated'`), `check_pending_invitation`, `check_user_exists`.
-- **Status union**: `types/user.types.ts:458-464` — `not_found | pending | expired | active_member | deactivated | other_org`.
-- **UI config**: `components/users/UserFormFields.tsx:176-234` (`EMAIL_STATUS_CONFIG`) — per-status message, panel color, action button, and `shouldDisableFields` (lines 388-393: only `active_member`/`pending` lock the form). Deactivated → gray panel, *"This user was deactivated."*, "Reactivate User" button, fields NOT disabled.
+
+> **Line refs refreshed 2026-07-29 after PR A.** PR A rewrote the service method and
+> reshaped the types, so the pre-PR-A refs below were stale.
+
+- **Lookup method**: `UsersViewModel.ts:779` `checkEmailStatus(email)` → `SupabaseUserQueryService.ts:816-936` calls `check_user_org_membership` (derives `is_active ? 'active_member' : 'deactivated'`), `check_pending_invitation`, `check_user_exists`. **Both RPCs are now tenancy-guarded** — see the backend-dependency section below.
+- **Status types** (reshaped by PR A): `types/user.types.ts:458` `EmailLookupVerdict` = the six real answers; `:481` `EmailLookupStatus` = those plus `lookup_failed`. `EmailLookupResult` is now a **discriminated union** — the `lookup_failed` variant carries no `userId`/`invitationId`/name fields at all, so leaking identity for a failed lookup is a compile error rather than a review catch.
+- **UI config**: `components/users/UserFormFields.tsx:176` (`EMAIL_STATUS_CONFIG`) — per-status message, panel color, optional action button, and `shouldDisableFields` (`:419`: only `active_member`/`pending` lock the form). Deactivated → gray panel, *"This user was deactivated."*, **no** action button (PR A removed it: a standalone Reactivate would skip the roles the admin just selected). `lookup_failed` → orange panel, no button — PR B should add the "Try again" label **and** its handler together.
 
 ## Proposed
 Replace the stub with a debounced lookup that populates `emailLookupResult` (and toggles `isCheckingEmail`). Reuse the existing `useDebounce`/`useSearchDebounce` hook + `TIMINGS.debounce` per `frontend/CLAUDE.md`. Fail-closed on lookup error (show nothing, never block submit). No new UI needed — the feedback component + config already exist.
