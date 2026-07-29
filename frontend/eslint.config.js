@@ -144,6 +144,24 @@ export default [
             'helpers are allow-listed at src/services/auth/supabase.service.ts and ' +
             'src/services/api/envelope.ts.',
         },
+        {
+          // Bare `client.rpc(...)` — no .schema() at all. The selector above cannot
+          // see this shape, which is exactly how SupabaseUserQueryService.checkEmailStatus
+          // called three api.* functions against the DEFAULT (public) schema for months:
+          // every call 404'd, the errors were swallowed, and the lookup silently
+          // answered "not found" for every address. It also slipped the PR #98-#100
+          // correlation-id sweep, which greps for `supabaseService.apiRpc<`.
+          //
+          // Legitimate public-schema callers must be allow-listed by file below.
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.property.name='rpc']" +
+            ":not([callee.object.callee.property.name='schema'])",
+          message:
+            'Bare .rpc(...) targets the default (public) schema. api.* functions are ' +
+            'NOT reachable this way — the call will fail at runtime. Use ' +
+            'supabaseService.apiRpc<T>(...) or apiRpcEnvelope<T>(...). If you genuinely ' +
+            'mean a public-schema function, add the file to the allow-list in eslint.config.js.',
+        },
       ],
     },
   },

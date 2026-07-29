@@ -131,12 +131,20 @@ export interface IUserQueryService {
    * - active_member: Show "already member" message
    * - deactivated: Offer to reactivate user
    * - other_org: Offer to add user to this organization
+   * - lookup_failed: The check did not complete — show a neutral notice and
+   *   let the admin proceed. This is NOT a verdict: implementations must never
+   *   collapse a failure into `not_found`, and callers must never block
+   *   submission on it (the server re-checks before routing).
+   *
+   * Never rejects — failures surface as `lookup_failed`.
    *
    * @param email - Email address to check
+   * @param correlationId - Optional id pinned onto the underlying reads so a
+   *   client-side failure log joins the server-side trace
    * @returns Promise resolving to lookup result with status and context
    *
    * @example
-   * const result = await service.checkEmailStatus('user@example.com');
+   * const result = await service.checkEmailStatus('user@example.com', correlationId);
    * switch (result.status) {
    *   case 'not_found':
    *     showInvitationForm();
@@ -147,9 +155,12 @@ export interface IUserQueryService {
    *   case 'active_member':
    *     showAlreadyMemberMessage(result.userId);
    *     break;
+   *   case 'lookup_failed':
+   *     showCouldNotCheckNotice();   // submit stays enabled
+   *     break;
    * }
    */
-  checkEmailStatus(email: string): Promise<EmailLookupResult>;
+  checkEmailStatus(email: string, correlationId?: string): Promise<EmailLookupResult>;
 
   /**
    * Retrieves roles that the current user can assign to invitees

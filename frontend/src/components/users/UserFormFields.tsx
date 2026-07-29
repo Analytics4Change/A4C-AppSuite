@@ -220,16 +220,38 @@ const EMAIL_STATUS_CONFIG: Record<
     bgClass: 'bg-gray-50',
     textClass: 'text-gray-700',
     message: 'This user was deactivated.',
-    actionLabel: 'Reactivate User',
-    actionVariant: 'default',
+    // No action button: a standalone "Reactivate" would reactivate WITHOUT the
+    // roles the admin just selected, whereas submitting the form reactivates
+    // and assigns them in one transaction (invite-user/index.ts, deactivated
+    // route). Two paths for one intent, with the button being the lossy one.
+    actionLabel: undefined,
   },
   other_org: {
     icon: <UserPlus size={16} />,
     bgClass: 'bg-purple-50',
     textClass: 'text-purple-700',
     message: 'This user exists but is not in this organization.',
-    actionLabel: 'Add to Organization',
-    actionVariant: 'default',
+    // No action button: SupabaseUserCommandService.addUserToOrganization is a
+    // not-implemented stub. Normal submit already routes this case correctly
+    // server-side.
+    actionLabel: undefined,
+  },
+  lookup_failed: {
+    icon: <AlertCircle size={16} />,
+    // Orange, not amber: `pending` above is already yellow-50/yellow-700 and
+    // amber-50 is visually indistinguishable from it. The icon and copy carry
+    // the meaning either way (WCAG 1.4.1), but the panels should not read as
+    // the same state at a glance.
+    bgClass: 'bg-orange-50',
+    textClass: 'text-orange-800',
+    // Deliberately does NOT promise correct routing. The Edge Function re-runs
+    // these same checks, but shares this read path's failure modes — so if the
+    // lookup failed for an infrastructural reason, the server's re-check may
+    // fail too. Promise only what is guaranteed: that it re-checks.
+    message:
+      "Couldn't check this email's status. You can still send the invitation; the server re-checks before routing.",
+    actionLabel: 'Try again',
+    actionVariant: 'outline',
   },
 };
 
@@ -263,37 +285,42 @@ const EmailLookupFeedback: React.FC<EmailLookupFeedbackProps> = ({
       case 'active_member':
         action = 'view';
         break;
-      case 'deactivated':
-        action = 'reactivate';
+      case 'lookup_failed':
+        action = 'retry';
         break;
-      case 'other_org':
-        action = 'add_to_org';
-        break;
+      // 'deactivated' and 'other_org' carry no actionLabel, so this handler is
+      // unreachable for them — see EMAIL_STATUS_CONFIG for why.
       default:
         action = 'invite';
     }
     onAction?.(action);
   };
 
+  // `lookup_failed` is a separate variant of EmailLookupResult that carries no
+  // identity fields at all, so the narrowing below is what makes "never surface
+  // a name or role for a lookup we could not complete" structural.
+  const identity = lookup.status === 'lookup_failed' ? null : lookup;
+
   return (
     <div
       className={cn('mt-2 p-3 rounded-lg flex items-start gap-3', config.bgClass)}
       role="status"
       aria-live="polite"
+      data-testid={`email-lookup-${lookup.status}`}
     >
       <span className={cn('mt-0.5', config.textClass)} aria-hidden="true">
         {config.icon}
       </span>
       <div className="flex-1">
         <p className={cn('text-sm', config.textClass)}>{config.message}</p>
-        {lookup.firstName && (
+        {identity?.firstName && (
           <p className="text-sm text-gray-600 mt-1">
-            Name: {lookup.firstName} {lookup.lastName}
+            Name: {identity.firstName} {identity.lastName}
           </p>
         )}
-        {lookup.currentRoles && lookup.currentRoles.length > 0 && (
+        {identity?.currentRoles && identity.currentRoles.length > 0 && (
           <p className="text-sm text-gray-600 mt-1">
-            Current roles: {lookup.currentRoles.map((r) => r.roleName).join(', ')}
+            Current roles: {identity.currentRoles.map((r) => r.roleName).join(', ')}
           </p>
         )}
       </div>

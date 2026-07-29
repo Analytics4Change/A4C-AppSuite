@@ -164,3 +164,58 @@ Deno.test('assignRolesToExistingUser → done 400 with errorDetails.message for 
   assertEquals(body.error, 'Cannot modify roles on a deactivated user');
   assertEquals(body.errorDetails.code, 'TARGET_DEACTIVATED');
 });
+
+// ---------------------------------------------------------------------------
+// Fail-closed lookup probes.
+//
+// Each of the three probes used to log its error and fall through, so a
+// transient RPC failure classified an existing member as `not_found` and the
+// caller minted a fresh invitation for them. These lock the fix: an unknown
+// state is never reported as a negative result.
+// ---------------------------------------------------------------------------
+
+Deno.test('checkEmailStatus → lookup_failed when the membership probe errors', async () => {
+  const client = mockClient({
+    check_user_org_membership: { data: null, error: { message: 'boom' } },
+    // Would classify as not_found if the error were swallowed and we fell through.
+    check_pending_invitation: { data: [], error: null },
+    check_user_exists: { data: [], error: null },
+  });
+  const result = await checkEmailStatus(client, 'a@b.com', 'org1');
+  assertEquals(result.status, 'lookup_failed');
+});
+
+Deno.test('checkEmailStatus → lookup_failed when the pending-invitation probe errors', async () => {
+  const client = mockClient({
+    check_user_org_membership: { data: [], error: null },
+    check_pending_invitation: { data: null, error: { message: 'boom' } },
+    check_user_exists: { data: [], error: null },
+  });
+  const result = await checkEmailStatus(client, 'a@b.com', 'org1');
+  assertEquals(result.status, 'lookup_failed');
+});
+
+Deno.test('checkEmailStatus → lookup_failed when the user-exists probe errors', async () => {
+  const client = mockClient({
+    check_user_org_membership: { data: [], error: null },
+    check_pending_invitation: { data: [], error: null },
+    check_user_exists: { data: null, error: { message: 'boom' } },
+  });
+  const result = await checkEmailStatus(client, 'a@b.com', 'org1');
+  assertEquals(result.status, 'lookup_failed');
+});
+
+Deno.test('checkEmailStatus → an errored probe never yields not_found', async () => {
+  // Regression fence for the whole class: whichever probe fails, the answer is
+  // "unknown", never the confident negative that triggers an invitation.
+  for (const failing of ['check_user_org_membership', 'check_pending_invitation', 'check_user_exists']) {
+    const responses: Record<string, RpcResponse> = {
+      check_user_org_membership: { data: [], error: null },
+      check_pending_invitation: { data: [], error: null },
+      check_user_exists: { data: [], error: null },
+    };
+    responses[failing] = { data: null, error: { message: 'boom' } };
+    const result = await checkEmailStatus(mockClient(responses), 'a@b.com', 'org1');
+    assert(result.status !== 'not_found', `${failing} error must not classify as not_found`);
+  }
+});

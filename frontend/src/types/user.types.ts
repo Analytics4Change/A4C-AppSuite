@@ -450,12 +450,12 @@ export interface Invitation {
 // ============================================================================
 
 /**
- * Result of smart email lookup
+ * A *verdict* about an email — an answer the backend actually gave us.
  *
  * Used to determine what action to take when an admin enters an email
  * in the invitation form.
  */
-export type EmailLookupStatus =
+export type EmailLookupVerdict =
   | 'not_found' // No matches anywhere - show full form
   | 'pending' // Has pending invitation - offer resend
   | 'expired' // Invitation expired - offer new invitation
@@ -464,30 +464,56 @@ export type EmailLookupStatus =
   | 'other_org'; // Exists in system but not this org - offer add
 
 /**
- * Full email lookup result with context
+ * Every state the lookup UI can be in: the six verdicts plus `lookup_failed`.
+ *
+ * `lookup_failed` is a **transport/context failure, not a domain verdict** —
+ * "we could not find out", never "we found nothing". It exists so a failed
+ * lookup can never masquerade as `not_found` (which reads to the admin as
+ * "new user, go ahead and invite"). Two invariants ride on it:
+ *
+ * 1. **It must never block submission.** The Edge Function re-checks before
+ *    routing, so a failed pre-flight is a missing courtesy, not a blocker.
+ *    Every gating site enumerates positively (`blockingStatuses`,
+ *    `shouldDisableFields`) so this holds by construction — keep it that way.
+ * 2. **It carries no identity.** Enforced by the `EmailLookupResult` union
+ *    below, not by convention.
  */
-export interface EmailLookupResult {
-  /** Lookup status */
-  status: EmailLookupStatus;
+export type EmailLookupStatus = EmailLookupVerdict | 'lookup_failed';
 
-  /** User ID if user exists */
-  userId: string | null;
+/**
+ * Full email lookup result with context.
+ *
+ * Discriminated on `status`: the failure variant is structurally incapable of
+ * carrying `userId`/`invitationId`/names, so "don't leak identity on a failed
+ * lookup" is a compile-time guarantee rather than a review comment.
+ */
+export type EmailLookupResult =
+  | {
+      /** The lookup did not complete (no session, no org context, or an RPC error) */
+      status: 'lookup_failed';
+    }
+  | {
+      /** Lookup status */
+      status: EmailLookupVerdict;
 
-  /** Invitation ID if pending invitation exists */
-  invitationId: string | null;
+      /** User ID if user exists */
+      userId: string | null;
 
-  /** User's first name if available */
-  firstName: string | null;
+      /** Invitation ID if pending invitation exists */
+      invitationId: string | null;
 
-  /** User's last name if available */
-  lastName: string | null;
+      /** User's first name if available */
+      firstName: string | null;
 
-  /** Invitation expiration if pending */
-  expiresAt: Date | null;
+      /** User's last name if available */
+      lastName: string | null;
 
-  /** Current roles if active member */
-  currentRoles: RoleReference[] | null;
-}
+      /** Invitation expiration if pending */
+      expiresAt: Date | null;
+
+      /** Current roles if active member */
+      currentRoles: RoleReference[] | null;
+    };
 
 // ============================================================================
 // FORM AND REQUEST TYPES

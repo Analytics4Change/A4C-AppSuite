@@ -133,7 +133,8 @@ type EmailStatus =
   | 'active_member'         // Active member of this org
   | 'deactivated'           // Deactivated member of this org
   | 'existing_user_no_roles' // User exists, zero roles anywhere (zombie)
-  | 'other_org_member';     // User exists with ≥1 role in another org
+  | 'other_org_member'      // User exists with ≥1 role in another org
+  | 'lookup_failed';        // A lookup RPC errored — state UNKNOWN, do not route
 
 /**
  * What invite-user actually DID — discriminates the success response so the
@@ -191,8 +192,12 @@ export async function checkEmailStatus(
   const { data: existingRole, error: roleError } = await supabase
     .rpc('check_user_org_membership', { p_email: email, p_org_id: orgId });
 
+  // Fail CLOSED on a failed probe. Previously this logged and fell through, so a
+  // transient RPC error made an active member look like `not_found` and minted a
+  // fresh invitation for them. An unknown state is not a negative result.
   if (roleError) {
     console.error(`[invite-user v${DEPLOY_VERSION}] Role check error:`, roleError);
+    return { status: 'lookup_failed' };
   }
 
   if (existingRole?.[0]) {
@@ -216,6 +221,7 @@ export async function checkEmailStatus(
 
   if (invError) {
     console.error(`[invite-user v${DEPLOY_VERSION}] Invitation check error:`, invError);
+    return { status: 'lookup_failed' };
   }
 
   if (existingInvitation?.[0]) {
@@ -253,6 +259,7 @@ export async function checkEmailStatus(
 
   if (userError) {
     console.error(`[invite-user v${DEPLOY_VERSION}] User check error:`, userError);
+    return { status: 'lookup_failed' };
   }
 
   if (existingUser?.[0]) {
@@ -1001,6 +1008,23 @@ serve(async (req) => {
     // Note: supabaseAdmin already declared above (shared for resend and create)
     const emailStatus = await checkEmailStatus(supabaseAdmin, requestData.email, orgId, tracingContext);
     console.log(`[invite-user v${DEPLOY_VERSION}] Email status: ${emailStatus.status}`);
+
+    // A probe errored, so we do not know whether this address is already an
+    // active member / invitee. Refuse rather than route on an unknown state:
+    // every downstream branch below is a decision that assumes the lookup is
+    // authoritative, and minting an invitation for an existing member is the
+    // specific harm this guard exists to prevent. 503 = transient, safe to retry.
+    if (emailStatus.status === 'lookup_failed') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          emailStatus: emailStatus.status,
+          suggestedAction: 'Try again in a moment',
+          error: 'Could not determine this email\'s status; no invitation was sent',
+        } as InviteUserResponse),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Handle non-invitable statuses
     if (emailStatus.status === 'active_member') {
