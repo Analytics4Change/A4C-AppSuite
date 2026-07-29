@@ -31,8 +31,10 @@
  *
  * @example
  *   const platformNoOrg = usePlatformNoOrgContext();
- *   // ...
- *   <Button disabled={platformNoOrg} aria-disabled={platformNoOrg}
+ *   // Use aria-disabled (NOT native `disabled`) so the button stays focusable
+ *   // and its aria-describedby banner is announced; guard the handler instead.
+ *   <Button onClick={() => { if (platformNoOrg) return; ... }}
+ *           aria-disabled={platformNoOrg || undefined}
  *           aria-describedby={platformNoOrg ? 'platform-no-org-banner' : undefined}>
  *     Invite New User
  *   </Button>
@@ -44,5 +46,8 @@ export function usePlatformNoOrgContext(): boolean {
   const { session } = useAuth();
   const claims = session?.claims;
   if (!claims) return false;
+  // `!org_id` is the "no active org" test: SupabaseAuthProvider mints the
+  // empty-string sentinel `''` for a NULL org_id (see JWTClaims.org_id doc);
+  // the falsy check also covers null/undefined defensively.
   return claims.org_type === 'platform_owner' && !claims.org_id;
 }

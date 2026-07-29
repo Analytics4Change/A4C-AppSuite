@@ -57,8 +57,10 @@ const UsersManagePage = () => {
   return (
     <>
       <Button
-        onClick={handleCreateClick}
-        disabled={platformNoOrg}
+        onClick={handleCreateClick}   // guards: `if (platformNoOrg) return;`
+        // NOTE: aria-disabled, NOT native `disabled`, for the no-org gate — a
+        // natively-disabled button leaves the tab order, so its aria-describedby
+        // banner would never be announced at focus. Keep it focusable.
         aria-disabled={platformNoOrg || undefined}
         aria-describedby={platformNoOrg ? 'platform-no-org-banner' : undefined}
         data-testid="invite-user-btn"
@@ -77,7 +79,7 @@ const UsersManagePage = () => {
 ### WCAG 2.1 Level AA Compliance
 
 - **Informational region**: `role="note"` (persistent state), NOT `role="alert"` — it must not hijack the assertive live region reserved for command results.
-- **Reachable explanation**: a `disabled` button is not focusable, so its `title` tooltip is unreachable. Disabled write buttons instead point `aria-describedby` at this banner's `id`, so keyboard/AT users reach the explanation.
+- **Reachable explanation**: a natively-`disabled` button is removed from the tab order, so a `title` tooltip on it is unreachable and any `aria-describedby` never fires at focus. Gated write buttons therefore use **`aria-disabled="true"` (keeping them focusable) rather than the native `disabled` attribute**, guard their click handler (`if (platformNoOrg) return;`), and point `aria-describedby` at this banner's `id` — so keyboard/AT users land on the button and hear the explanation.
 - **Icon**: the leading icon is decorative (`aria-hidden="true"`); the text carries all meaning (color is not the sole signal).
 
 ## Testing

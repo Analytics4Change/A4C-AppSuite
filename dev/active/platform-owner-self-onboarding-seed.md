@@ -38,6 +38,8 @@ Today the **only** way to create a new `super_admin` / a4c-org member is a migra
 
 Whatever Intent 2 does, it must **NOT reintroduce a silent wrong-org write**. If super_admins gain a default `org_id` (fork 2a-i), org-scoped writes on a *tenant* subdomain must still gate/fail-safe — the honest condition then becomes *"subdomain's org ≠ token's org"*, not merely "has any org." Update `usePlatformNoOrgContext` accordingly if that fork is taken.
 
+**Gate-coverage caveat (row actions).** The honest-gate PR gates only the **Invite** button, because today a no-org super_admin's `list_users` (called with `p_org_id = claims.org_id`, NULL) returns an **empty** list, so the row/edit-panel write affordances (Reactivate, Resend/Revoke, `ManageUserActions`) are unreachable and need no separate gate. Fork 2a-i would give that super_admin a **populated** list — surfacing those actions — so taking 2a-i requires **extending the state gate to every row/edit-panel write on `UsersManagePage`**, not just Invite. (Anchor recorded in the `platformNoOrg` comment block in `frontend/src/pages/users/UsersManagePage.tsx`.)
+
 ## Verification (stub — per chosen fork)
 
 - As the target platform person, complete onboarding via the UI (no migration); confirm the new user appears with the intended role.

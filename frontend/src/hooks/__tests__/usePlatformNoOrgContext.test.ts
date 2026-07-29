@@ -29,8 +29,25 @@ describe('usePlatformNoOrgContext', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('is TRUE for a platform admin with no active org (platform_owner + empty org_id)', () => {
+    // '' is the real-provider value: decodeJWT coerces a NULL org_id to '' (`|| ''`).
     mockUseAuth.mockReturnValue({
       session: sessionWith({ org_type: 'platform_owner', org_id: '' }),
+    });
+    const { result } = renderHook(() => usePlatformNoOrgContext());
+    expect(result.current).toBe(true);
+  });
+
+  it('is TRUE for platform_owner with a null org_id (fences the contract if the sentinel changes)', () => {
+    mockUseAuth.mockReturnValue({
+      session: sessionWith({ org_type: 'platform_owner', org_id: null }),
+    });
+    const { result } = renderHook(() => usePlatformNoOrgContext());
+    expect(result.current).toBe(true);
+  });
+
+  it('is TRUE for platform_owner with an absent org_id (undefined)', () => {
+    mockUseAuth.mockReturnValue({
+      session: sessionWith({ org_type: 'platform_owner' }),
     });
     const { result } = renderHook(() => usePlatformNoOrgContext());
     expect(result.current).toBe(true);
