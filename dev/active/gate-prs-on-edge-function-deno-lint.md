@@ -110,10 +110,12 @@ always-run skip-job pattern that reports success when no relevant paths changed.
   (`supabase-edge-functions-adr-citation.yml`), or fold the ADR check into the
   new lint job. The current name is a trap for the next person looking for lint
   coverage.
-- **Reconcile deployed vs. repo after the first green deploy.** Two months of
-  manual deploys mean deployed bundles are not provably from any commit.
-  Confirm `invite-user` bumps past v106 on the next CI deploy rather than
-  assuming it.
+
+**Deployed-vs-repo reconciliation is deliberately NOT tracked here.** It is a
+post-merge check on PR #103 specifically — does `invite-user` bump past v106? —
+and it lives in that PR's body under "⚠️ POST-MERGE" so whoever merges sees it
+at the moment it matters, plus in session memory so it survives. A second copy
+here is how one of them goes stale.
 
 ## Related
 
