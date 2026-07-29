@@ -5,6 +5,11 @@ last_updated: 2026-07-29
 
 # Seed: Gate PRs on Edge Function `deno lint` (and `deno check`)
 
+**Two things here**: (1) add the missing PR-time lint gate, and (2) close the
+required-check reporting gap on direct pushes to `main` — see the ⚠️ section
+below. They ship together because (1) adds a second required check that would
+otherwise inherit the same gap.
+
 **Origin**: PR #103 (email-lookup PR A), 2026-07-29. Found while investigating why
 `edge-functions-deploy` was red.
 
@@ -90,10 +95,53 @@ If this is made a **required** status check, a path-filtered workflow never runs
 on PRs that do not touch `infrastructure/supabase/supabase/functions/**`, and
 the required check sits `pending` forever — blocking merge on every unrelated PR.
 
-**This repo has already solved this once**: PR #97 added the `frontend-ci`
-required check "path-filter-safe". Copy that arrangement rather than re-deriving
-it. Options are (a) drop the path filter and let the job no-op fast, or (b) the
-always-run skip-job pattern that reports success when no relevant paths changed.
+**Copy `frontend-ci.yml` (PR #97). Do not re-derive this.** Its header states the
+rule and the reason:
+
+> NOTE: this job is intended to be a REQUIRED status check. It therefore triggers
+> on EVERY pull request with NO `paths:` filter — a path-filtered workflow is
+> *skipped* on PRs that don't touch frontend/, and a skipped required check never
+> reports, which wedges the merge box. Instead we always run (so the check always
+> reports) and gate the expensive steps on whether frontend / CI files actually
+> changed.
+
+Concretely: `on: pull_request` with no `paths:`, a `Detect changes` step, and
+`if: steps.changes.outputs.<x> == 'true'` on every expensive step. Cost on an
+unrelated PR is a checkout plus a diff.
+
+### Residual gap: direct pushes to `main` (observed 2026-07-29)
+
+`frontend-ci.yml` triggers on `pull_request` **only**. Branch protection requires
+`Type-check, lint, test, build` on `main`, so a **direct push** to `main` produces
+no run, the required check never reports, and the push needs a bypass:
+
+```
+remote: Bypassed rule violations for refs/heads/main:
+remote: - Required status check "Type-check, lint, test, build" is expected.
+```
+
+Hit twice while seeding this card and its follow-up — both docs-only commits, both
+bypassed. This is **not** a defect in PR #97's design (which is correct for its
+trigger); it is that branch protection expects a check on a path the workflow was
+never wired to cover.
+
+Two resolutions, and it is a **policy** call, not a CI bug:
+
+- **(a) Route everything through PRs**, including doc-only commits. The gap never
+  arises, and bypass stops being routine. Costs a PR for two-line card edits, and
+  cuts against the existing carve-out allowing card-archival/memory-only closeouts
+  directly on `main`.
+- **(b) Add `push: branches: [main]` to `frontend-ci.yml`'s trigger.** The check
+  then reports on direct pushes and the change-detection step no-ops it cheaply.
+  Keeps the carve-out; one line.
+
+**(b) is the smaller change and preserves current working habits.** Whichever is
+chosen, apply it to the new Edge Function lint check at the same time — otherwise
+this card ships a second required check with the identical gap.
+
+**Why this matters beyond tidiness**: routine bypassing trains the reflex that a
+red or unreported required check is normal. That reflex is precisely how a `deno
+lint` failure survived on `main` for two months.
 
 ## Verification
 
@@ -101,6 +149,9 @@ always-run skip-job pattern that reports success when no relevant paths changed.
   check FAILS on the PR, not after merge.
 - Open a PR touching **no** Edge Function → the check does not sit `pending`
   (the trap above).
+- **Push a docs-only commit directly to `main`** → the required check reports
+  (green, no-op) instead of needing a bypass. This is the residual-gap fix; if
+  it still says "Bypassed rule violations", (b) was not applied.
 - Confirm PR lint and deploy-time lint agree: same Deno version, same flags,
   same per-function loop.
 
@@ -122,4 +173,6 @@ here is how one of them goes stale.
 - `.github/workflows/edge-functions-deploy.yml` — where lint lives today
 - `.github/workflows/supabase-edge-functions-test.yml` — the natural host
 - PR #103 commit `f3a25377` — the one-line fix that unblocked deploys
-- PR #97 — the `frontend-ci` path-filter-safe required-check precedent
+- `.github/workflows/frontend-ci.yml` — the always-run + detect-changes exemplar
+  to copy; its header comment is the canonical statement of the rule
+- PR #97 — where that pattern was established
