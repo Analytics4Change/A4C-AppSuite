@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-06-24
+last_updated: 2026-07-29
 ---
 
 <!-- TL;DR-START -->
@@ -390,7 +390,7 @@ Phase 4 deliverable: per-table RLS policy review with grant-aware EXISTS clauses
 
 Several Bucket-D RPCs are `SECURITY DEFINER` with `search_path` set — DEFINER bypasses caller-RLS, so the "RLS-enforcement" framing in the guard column is **informational only** for these entries. Each needs an explicit Phase 4 review to decide whether to add an inline permission check, narrow the surface, or document the open-by-design behavior.
 
-- **`check_user_org_membership`** (`baseline_v4:593-606`) — unauthenticated org-membership probe; any caller can check any user/org pair. Forward-compatible by accident with cross-tenant grants (no restriction = no rejection).
+- ~~**`check_user_org_membership`** (`baseline_v4:593-606`) — unauthenticated org-membership probe; any caller can check any user/org pair.~~ **RESOLVED ahead of Phase 4 — `20260729184125_guard_email_lookup_rpcs.sql` (2026-07-29).** Confirmed live before the fix: the *publishable* (anon) key returned `{"user_id":…,"is_active":true}` for an arbitrary email/org pair — i.e. reachable with no authentication at all, not merely by any authenticated caller. Guarded with the Model M shape from `20260622183824` (`accessible_organizations @>`, NOT the superseded `get_current_org_id()` form, which rejects grant-bearers), RETURN-empty so the guard leaks no existence info. **`api.check_pending_invitation` was guarded in the same migration** for the same reason — it leaked `(id, email, expires_at)` for any pair, which also pre-empted the open decision on `seed-list-invitations-cross-tenant-visibility-decision.md`. Pulled forward because the frontend email-status lookup was about to call both from the browser, turning a latent hole into a live enumeration oracle. Carries a **load-bearing `service_role` exemption** — `invite-user` calls both via the service client, which has no `effective_permissions` and no JWT `sub`; without it the Edge Function would classify every address `not_found` and mint invitations for existing members. Post-apply probes verified service-role still returns data and anon returns `[]`. **`api.check_user_exists` deliberately left open** — Bucket E `[pre-auth]`, the signup/accept-invitation flow needs it, and it takes no org parameter.
 - **`get_organization_details`** (`20260226002002_*.sql:214`) [Stage R-6 F3 fold-in 2026-05-30] — no permission check, no tenancy guard; `p_org_id` taken at face value. Any `authenticated` caller can fetch any org's extended metadata. **Pre-existing gap; orthogonal to cross-tenant grant migration.** Phase 4 decision: add `has_effective_permission('organization.view', <p_org_id>'s path)` gate, OR document as open-by-design (e.g., if details are public-by-design), OR replace with a `has_org_admin_permission()` gate.
 - **`list_schedule_templates`** (`20260218001058_*.sql:164`) [Stage R-6 F3 fold-in 2026-05-30] — `COALESCE(p_org_id, get_current_org_id())` is taken at face value with no permission check. Any `authenticated` caller can list schedule templates of any org by passing `p_org_id`. **Pre-existing gap; orthogonal to cross-tenant grant migration.** Phase 4 decision: add `has_effective_permission(<perm>, <p_org_id>'s path)` gate matching the schedule-template-mutation family's enforcement.
 
