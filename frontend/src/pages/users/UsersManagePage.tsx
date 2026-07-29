@@ -43,6 +43,8 @@ import { getUserQueryService, getUserCommandService } from '@/services/users';
 import { getRoleService } from '@/services/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissionGate } from '@/hooks/usePermissionGate';
+import { usePlatformNoOrgContext } from '@/hooks/usePlatformNoOrgContext';
+import { PlatformNoOrgContextBanner } from '@/components/users/PlatformNoOrgContextBanner';
 import type {
   UserListItem,
   UserDisplayStatus,
@@ -100,6 +102,22 @@ export const UsersManagePage: React.FC = observer(() => {
   // checked explicitly before rendering the corresponding affordance.
   const canUpdateUser = usePermissionGate('user.update');
   const canDeleteUser = usePermissionGate('user.delete');
+
+  // State gate (NOT permission): a platform administrator with no active
+  // organization holds every permission but has no org context, so org-scoped
+  // writes (invite, deactivate, …) are 403'd at the Edge Function
+  // ("No organization context in token"). Disable + explain rather than let the
+  // caller fire a doomed request. See usePlatformNoOrgContext + contexts/CLAUDE.md.
+  //
+  // Only the Invite button is explicitly gated below. The row/edit-panel write
+  // affordances (Reactivate, Resend/Revoke, ManageUserActions) need no separate
+  // gate for THIS population: list_users is called with p_org_id = claims.org_id
+  // (SupabaseUserQueryService), which is NULL here → the list is empty → those
+  // row actions are unreachable. Invite is the sole reachable write entry point.
+  // Forward-note: seed-card fork 2a-i (a no-org super_admin gaining a populated
+  // list via a defaulted org) WOULD surface those actions and require extending
+  // this gate to them. See dev/active/platform-owner-self-onboarding-seed.md.
+  const platformNoOrg = usePlatformNoOrgContext();
 
   // List ViewModel - manages user list state
   const [viewModel] = useState(
@@ -379,13 +397,16 @@ export const UsersManagePage: React.FC = observer(() => {
 
   // Handle create button click with dirty check
   const handleCreateClick = useCallback(() => {
+    // aria-disabled (not native `disabled`) keeps this button focusable so its
+    // aria-describedby explanation is reachable; swallow the activation here.
+    if (platformNoOrg) return;
     if (formViewModel?.isDirty) {
       pendingActionRef.current = { type: 'create' };
       setDialogState({ type: 'discard' });
     } else {
       enterCreateMode();
     }
-  }, [formViewModel, enterCreateMode]);
+  }, [platformNoOrg, formViewModel, enterCreateMode]);
 
   // Handle form submission
   const handleSubmit = useCallback(
@@ -738,8 +759,18 @@ export const UsersManagePage: React.FC = observer(() => {
             </Button>
             <Button
               onClick={handleCreateClick}
+              // Native `disabled` ONLY for the transient loading state. For the
+              // platform-no-org gate we use aria-disabled so the button stays in
+              // the tab order and its aria-describedby banner is announced at
+              // focus (a natively-disabled button is unfocusable — the
+              // explanation would never be reachable). handleCreateClick guards.
               disabled={viewModel.isLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              aria-disabled={platformNoOrg || undefined}
+              aria-describedby={platformNoOrg ? 'platform-no-org-banner' : undefined}
+              data-testid="invite-user-btn"
+              className={`bg-blue-600 hover:bg-blue-700 text-white${
+                platformNoOrg ? ' opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               <Plus className="w-4 h-4 mr-2" />
               Invite New User
@@ -753,6 +784,10 @@ export const UsersManagePage: React.FC = observer(() => {
             </div>
           </div>
         </div>
+
+        {/* Platform-admin-with-no-active-org honest state gate: explains why the
+            org-scoped write affordances above are disabled (see platformNoOrg). */}
+        {platformNoOrg && <PlatformNoOrgContextBanner />}
 
         {/* Error Banner — yields to the form-submit banner so exactly one
             role="alert" region is ever mounted (INV-1). Role violations /

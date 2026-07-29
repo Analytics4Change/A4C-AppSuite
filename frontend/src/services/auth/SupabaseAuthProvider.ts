@@ -416,10 +416,12 @@ export class SupabaseAuthProvider implements IAuthProvider {
       throw new Error('No active session');
     }
 
-    // Call the Supabase function to update active organization
-    // This should update user_roles_projection.is_active
-    const { error } = await this.client.rpc('switch_active_organization', {
-      new_org_id: orgId,
+    // Update the caller's active organization (writes users.current_organization_id).
+    // RPC is public.switch_organization(p_new_org_id) — a global super_admin role
+    // (organization_id IS NULL) passes its access check for any org. It emits no
+    // event; the refreshSession() below re-mints the JWT with the new org_id.
+    const { error } = await this.client.rpc('switch_organization', {
+      p_new_org_id: orgId,
     });
 
     if (error) {

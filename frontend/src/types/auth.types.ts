@@ -26,15 +26,15 @@
  * See documentation/architecture/authorization/permissions-reference.md for complete role definitions
  */
 export type UserRole =
-  | 'super_admin'           // Canonical: Platform-wide access
-  | 'provider_admin'        // Canonical: Organization owner
-  | 'partner_admin'         // Custom: Provider Partner admin
-  | 'facility_admin'        // Custom: Facility-scoped admin (future)
-  | 'program_manager'       // Custom: Program-scoped manager (future)
-  | 'clinician'             // Custom: Clinical user
-  | 'nurse'                 // Custom: Nursing staff
-  | 'caregiver'             // Custom: Caregiver role
-  | 'viewer';               // Custom: Read-only access
+  | 'super_admin' // Canonical: Platform-wide access
+  | 'provider_admin' // Canonical: Organization owner
+  | 'partner_admin' // Custom: Provider Partner admin
+  | 'facility_admin' // Custom: Facility-scoped admin (future)
+  | 'program_manager' // Custom: Program-scoped manager (future)
+  | 'clinician' // Custom: Clinical user
+  | 'nurse' // Custom: Nursing staff
+  | 'caregiver' // Custom: Caregiver role
+  | 'viewer'; // Custom: Read-only access
 
 /**
  * Permission strings following the applet.action pattern
@@ -89,7 +89,15 @@ export interface JWTClaims {
   /** Session ID */
   session_id?: string;
 
-  /** Organization ID - primary tenant identifier for RLS */
+  /**
+   * Organization ID - primary tenant identifier for RLS.
+   *
+   * Empty-string sentinel (`''`), NOT `null`, when there is no active org: the
+   * JWT hook mints a NULL `org_id` for a global super_admin, and
+   * `SupabaseAuthProvider.decodeJWT` coerces that to `''` (`decoded.org_id || ''`).
+   * Consumers testing "no active org" therefore use a falsy check (`!org_id`),
+   * which also covers `null`/`undefined` defensively — see `usePlatformNoOrgContext`.
+   */
   org_id: string;
 
   /** Organization type for UI feature gating */
@@ -226,16 +234,16 @@ export type OAuthProvider =
   | 'github'
   | 'facebook'
   | 'apple'
-  | 'azure'      // EntraID / Azure AD
-  | 'okta'       // Enterprise OIDC
-  | 'keycloak';  // Self-hosted OIDC
+  | 'azure' // EntraID / Azure AD
+  | 'okta' // Enterprise OIDC
+  | 'keycloak'; // Self-hosted OIDC
 
 /**
  * SSO configuration for enterprise SAML-based auth
  */
 export interface SSOConfig {
   type: 'saml';
-  domain: string;  // e.g., 'acme.com' for IdP discovery
+  domain: string; // e.g., 'acme.com' for IdP discovery
 }
 
 /**
