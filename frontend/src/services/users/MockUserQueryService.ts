@@ -786,11 +786,20 @@ export class MockUserQueryService implements IUserQueryService {
     return invitation;
   }
 
-  async checkEmailStatus(email: string): Promise<EmailLookupResult> {
+  async checkEmailStatus(email: string, _correlationId?: string): Promise<EmailLookupResult> {
     await this.simulateDelay();
-    log.debug('Mock: Checking email status', { email });
+    // Email is PII (see utils/maskPii) — log the outcome, never the address.
+    log.debug('Mock: Checking email status');
 
     const emailLower = email.toLowerCase();
+
+    // Simulated lookup failure, so the "couldn't check" panel is reachable in
+    // mock mode without breaking a backend. Same pattern-trigger convention as
+    // the other-org case below.
+    if (emailLower.includes('lookupfail')) {
+      log.info('Mock: Email lookup failed (simulated)');
+      return { status: 'lookup_failed' };
+    }
 
     // Check pending invitations first
     const pendingInvitation = this.invitations.find(
@@ -801,7 +810,7 @@ export class MockUserQueryService implements IUserQueryService {
       const isExpired = new Date(pendingInvitation.expiresAt) < new Date();
       const status: EmailLookupStatus = isExpired ? 'expired' : 'pending';
 
-      log.info('Mock: Email has invitation', { email, status });
+      log.info('Mock: Email has invitation', { status });
       return {
         status,
         userId: null,
@@ -823,7 +832,7 @@ export class MockUserQueryService implements IUserQueryService {
       const roles = this.userRoles.get(userInOrg.id) || [];
       const status: EmailLookupStatus = userInOrg.isActive ? 'active_member' : 'deactivated';
 
-      log.info('Mock: Email is member of org', { email, status, isActive: userInOrg.isActive });
+      log.info('Mock: Email is member of org', { status, isActive: userInOrg.isActive });
       return {
         status,
         userId: userInOrg.id,
@@ -838,7 +847,7 @@ export class MockUserQueryService implements IUserQueryService {
     // Check if user exists in another org (Sally scenario)
     // For mock, we simulate this with specific email patterns
     if (emailLower.includes('otherorg') || emailLower.endsWith('.gov')) {
-      log.info('Mock: Email exists in other org', { email });
+      log.info('Mock: Email exists in other org');
       return {
         status: 'other_org',
         userId: 'user-other-org-001',
@@ -850,7 +859,7 @@ export class MockUserQueryService implements IUserQueryService {
       };
     }
 
-    log.info('Mock: Email not found', { email });
+    log.info('Mock: Email not found');
     return {
       status: 'not_found',
       userId: null,

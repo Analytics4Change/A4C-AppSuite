@@ -420,6 +420,11 @@ export class SupabaseAuthProvider implements IAuthProvider {
     // RPC is public.switch_organization(p_new_org_id) — a global super_admin role
     // (organization_id IS NULL) passes its access check for any org. It emits no
     // event; the refreshSession() below re-mints the JWT with the new org_id.
+    //
+    // The bare .rpc() is correct here: switch_organization is a PUBLIC-schema
+    // function, so routing it through supabaseService.apiRpc would target `api`,
+    // where it does not exist.
+    // eslint-disable-next-line no-restricted-syntax -- public-schema function, see above
     const { error } = await this.client.rpc('switch_organization', {
       p_new_org_id: orgId,
     });

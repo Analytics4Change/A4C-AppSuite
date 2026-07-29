@@ -34,6 +34,7 @@ import type {
   UpdateUserResult,
   ModifyUserRolesResult,
   EmailLookupResult,
+  EmailLookupStatus,
   NotificationPreferences,
   InvitationPhone,
   UserListItem,
@@ -253,9 +254,15 @@ export class UserFormViewModel {
     if (this.isCheckingEmail) return false;
     if (!this.validateAll()) return false;
 
-    // Check if email lookup blocks submission
+    // Check if email lookup blocks submission.
+    //
+    // Enumerated POSITIVELY and typed against the union on purpose: a status
+    // absent from this list — notably `lookup_failed` — must fail OPEN. A
+    // failed pre-flight is a missing courtesy, not a reason to stop an admin
+    // submitting; the server re-checks before routing. The annotation makes a
+    // typo'd or stale entry a compile error instead of a silent no-op.
     if (this.emailLookupResult) {
-      const blockingStatuses = ['active_member'];
+      const blockingStatuses: EmailLookupStatus[] = ['active_member'];
       if (blockingStatuses.includes(this.emailLookupResult.status)) {
         return false;
       }
@@ -696,18 +703,24 @@ export class UserFormViewModel {
   // ============================================
 
   /**
-   * Set email lookup result (typically called from UsersViewModel)
+   * Set email lookup result.
+   *
+   * A `lookup_failed` result carries no identity by construction, so the
+   * name pre-fill below is unreachable for it — we never put a name in the
+   * form on the strength of a lookup we could not complete.
    */
   setEmailLookupResult(result: EmailLookupResult | null): void {
     runInAction(() => {
       this.emailLookupResult = result;
 
+      const identity = result && result.status !== 'lookup_failed' ? result : null;
+
       // Pre-fill name if available from lookup
-      if (result && result.firstName && !this.formData.firstName) {
-        this.formData.firstName = result.firstName;
+      if (identity?.firstName && !this.formData.firstName) {
+        this.formData.firstName = identity.firstName;
       }
-      if (result && result.lastName && !this.formData.lastName) {
-        this.formData.lastName = result.lastName;
+      if (identity?.lastName && !this.formData.lastName) {
+        this.formData.lastName = identity.lastName;
       }
     });
   }
@@ -1167,22 +1180,6 @@ export class UserFormViewModel {
       this.touchedFields.clear();
       this.submissionError = null;
       log.debug('Form initialized for edit', { userId });
-    });
-  }
-
-  /**
-   * Pre-fill form from email lookup result
-   */
-  prefillFromLookup(result: EmailLookupResult): void {
-    runInAction(() => {
-      if (result.firstName) {
-        this.formData.firstName = result.firstName;
-      }
-      if (result.lastName) {
-        this.formData.lastName = result.lastName;
-      }
-      this.emailLookupResult = result;
-      log.debug('Form prefilled from lookup', { status: result.status });
     });
   }
 }

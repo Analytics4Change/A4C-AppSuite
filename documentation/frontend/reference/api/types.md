@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2025-12-30
+last_updated: 2026-07-29
 ---
 
 <!-- TL;DR-START -->
@@ -16,7 +16,7 @@ last_updated: 2025-12-30
 
 **Prerequisites**: None
 
-**Key topics**: `medication-types`, `dosage-form`, `client-types`, `rxnorm-api`, `type-guards`
+**Key topics**: `medication-types`, `dosage-form`, `client-types`, `rxnorm-api`, `type-guards`, `email-lookup`
 
 **Estimated read time**: 20 minutes
 <!-- TL;DR-END -->
@@ -281,6 +281,60 @@ interface MedicationSearchResult {
   searchTime: number;
 }
 ```
+
+## Email Lookup Types
+
+Defined in `frontend/src/types/user.types.ts`. Consumed by the invite-user form
+to tell an admin what will happen *before* they submit.
+
+```typescript
+/** A verdict — an answer the backend actually gave us. */
+type EmailLookupVerdict =
+  | 'not_found'      // No matches anywhere - show full form
+  | 'pending'        // Has pending invitation - offer resend
+  | 'expired'        // Invitation expired - offer new invitation
+  | 'active_member'  // Already active in this org - show view link
+  | 'deactivated'    // Deactivated in this org - offer reactivate
+  | 'other_org';     // Exists in system but not this org - offer add
+
+/** Every state the lookup UI can be in. */
+type EmailLookupStatus = EmailLookupVerdict | 'lookup_failed';
+
+type EmailLookupResult =
+  | { status: 'lookup_failed' }
+  | {
+      status: EmailLookupVerdict;
+      userId: string | null;
+      invitationId: string | null;
+      firstName: string | null;
+      lastName: string | null;
+      expiresAt: Date | null;
+      currentRoles: RoleReference[] | null;
+    };
+```
+
+### `lookup_failed` is not a verdict
+
+It means **"we could not find out"**, never "we found nothing". Two invariants
+ride on that distinction:
+
+1. **It must never block submission.** The `invite-user` Edge Function re-checks
+   before routing, so a failed pre-flight is a missing courtesy, not a blocker.
+   Gating sites (`UserFormViewModel.canSubmit`, `shouldDisableFields`) enumerate
+   blocking statuses *positively* so an unlisted status fails open by
+   construction — preserve that shape rather than adding negative checks.
+2. **It carries no identity.** Enforced by the discriminated union above, not by
+   convention: the failure variant has no `userId`/`invitationId`/name fields, so
+   leaking identity for a lookup that did not complete is a compile error.
+
+Producers must map *every* failure to it — no session, no org context in the
+token, any RPC error, or an exception. Collapsing a failure into `not_found`
+renders a confident "new user, go ahead and invite" panel for what may be an
+existing active member; that was the pre-existing defect this contract closes.
+
+Server side, `invite-user` mirrors the same rule with its own `lookup_failed`
+`EmailStatus` member and refuses to route (HTTP 503) rather than act on an
+unknown state.
 
 ## Utility Types
 

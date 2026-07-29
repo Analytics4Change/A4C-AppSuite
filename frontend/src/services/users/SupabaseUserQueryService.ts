@@ -29,6 +29,8 @@ import type {
 } from '@/types/user.types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types/user.types';
 import type { Role } from '@/types/role.types';
+import type { Database } from '@/types/database.types';
+import { generateCorrelationId } from '@/utils/trace-ids';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import { decodeJWT } from '@/utils/jwt';
@@ -165,29 +167,26 @@ interface DbUserOrgAccessListItem extends DbUserOrgAccessRow {
   is_currently_active: boolean;
 }
 
-/** Email membership check result */
-interface DbEmailMembershipResult {
-  user_id: string;
-  is_active: boolean;
-  first_name: string | null;
-  last_name: string | null;
-  roles: RoleReference[] | null;
-}
+/**
+ * Row shapes for the three email-lookup RPCs.
+ *
+ * Derived from the generated types rather than hand-written: the previous
+ * hand-written versions declared `first_name`/`last_name`/`roles` that none of
+ * these functions has ever returned, so every consumer read `undefined`. Bind
+ * to the generator and that class of drift cannot recur.
+ *
+ * Consequence to know about: because the RPCs return no names or roles, the
+ * "Name:" and "Current roles:" lines in EmailLookupFeedback are inert against
+ * the real backend (they still populate under MockUserQueryService). Widening
+ * the RPCs is backend work — see the follow-ups on the origin card.
+ */
+type DbEmailMembershipResult =
+  Database['api']['Functions']['check_user_org_membership']['Returns'][number];
 
-/** Pending invitation check result */
-interface DbPendingInvitationResult {
-  id: string;
-  expires_at: string;
-  first_name: string | null;
-  last_name: string | null;
-}
+type DbPendingInvitationResult =
+  Database['api']['Functions']['check_pending_invitation']['Returns'][number];
 
-/** User exists check result */
-interface DbUserExistsResult {
-  user_id: string;
-  first_name: string | null;
-  last_name: string | null;
-}
+type DbUserExistsResult = Database['api']['Functions']['check_user_exists']['Returns'][number];
 
 /** Simple role row for assignable roles query */
 interface _DbSimpleRoleRow {
@@ -792,81 +791,96 @@ export class SupabaseUserQueryService implements IUserQueryService {
   }
 
   /**
-   * Smart email lookup using RPC functions
+   * Smart email lookup: what will happen if we invite this address?
+   *
+   * **Never throws, and never reports a failure as a verdict.** Anything that
+   * stops us finding out — no session, no org context, an RPC error, an
+   * exception — returns `lookup_failed`. It must NOT return `not_found`, which
+   * the UI renders as a confident "new user, go ahead and invite" and which
+   * would be actively misleading for an existing member.
+   *
+   * The three probes run **sequentially and short-circuit**, which is a privacy
+   * property as much as a cost one: these are parameterized membership probes,
+   * so the common `active_member` case should cost exactly one of them. Do not
+   * "optimise" this into a Promise.all — that would fire all three on every
+   * lookup regardless of outcome.
+   *
+   * @param email - Email address to check
+   * @param correlationId - Pins X-Correlation-ID across all three probes so a
+   *   failure logged here joins the server-side trace. **Defaulted, not
+   *   optional**, per `services/CLAUDE.md` §"Service-mints variant": this method
+   *   owns its own failure logging and its caller only reads the returned status,
+   *   so an absent id would log `undefined` while the server auto-generated a
+   *   different one — silently breaking the join this parameter exists to make.
    */
-  async checkEmailStatus(email: string): Promise<EmailLookupResult> {
-    const client = supabaseService.getClient();
-
-    // Get session from Supabase client
-    const {
-      data: { session },
-    } = await client.auth.getSession();
-    if (!session) {
-      return {
-        status: 'not_found',
-        userId: null,
-        invitationId: null,
-        firstName: null,
-        lastName: null,
-        expiresAt: null,
-        currentRoles: null,
-      };
-    }
-
-    const claims = decodeJWT(session.access_token);
-    if (!claims.org_id) {
-      return {
-        status: 'not_found',
-        userId: null,
-        invitationId: null,
-        firstName: null,
-        lastName: null,
-        expiresAt: null,
-        currentRoles: null,
-      };
-    }
-
-    const orgId = claims.org_id;
+  async checkEmailStatus(
+    email: string,
+    correlationId: string = generateCorrelationId()
+  ): Promise<EmailLookupResult> {
+    /**
+     * Sole construction site for the failure result. Logs the reason (never the
+     * email — it is PII) alongside the correlation id, so the reason stays
+     * observable without widening the status union to carry it.
+     */
+    const failed = (
+      reason: 'no_session' | 'no_org_context' | 'rpc_error',
+      rpc?: string,
+      error?: unknown
+    ): EmailLookupResult => {
+      // `error` is already PII-masked by apiRpc at the SDK boundary, so it is
+      // safe to log and is the only thing that says *why* the probe failed.
+      log.warn('Email status lookup failed', { reason, rpc, correlationId, error });
+      return { status: 'lookup_failed' };
+    };
 
     try {
-      // Check if user has membership in this org
+      const client = supabaseService.getClient();
 
-      const { data: membershipData, error: membershipError } = await (client.rpc as any)(
-        'check_user_org_membership',
-        {
-          p_email: email,
-          p_org_id: orgId,
-        }
-      );
+      // Get session from Supabase client
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      if (!session) return failed('no_session');
 
-      const membership = membershipData as DbEmailMembershipResult[] | null;
+      const claims = decodeJWT(session.access_token);
+      // Empty-string sentinel for a NULL org_id (see JWTClaims.org_id). With no
+      // tenant to look in we cannot answer the question — say so rather than
+      // asserting the email is unknown.
+      if (!claims.org_id) return failed('no_org_context');
 
-      if (!membershipError && membership && membership.length > 0) {
+      const orgId = claims.org_id;
+
+      // 1. Already a member of this org (active or deactivated)?
+      const { data: membership, error: membershipError } = await supabaseService.apiRpc<
+        DbEmailMembershipResult[]
+      >('check_user_org_membership', { p_email: email, p_org_id: orgId }, { correlationId });
+
+      if (membershipError) return failed('rpc_error', 'check_user_org_membership', membershipError);
+
+      if (membership && membership.length > 0) {
         const member = membership[0];
         return {
+          // NB: is_active is the GLOBAL users.is_active flag, not an org-scoped
+          // one — "deactivated" here means a globally-deactivated user who holds
+          // a role in this org.
           status: member.is_active ? 'active_member' : 'deactivated',
           userId: member.user_id,
           invitationId: null,
-          firstName: member.first_name ?? null,
-          lastName: member.last_name ?? null,
+          firstName: null,
+          lastName: null,
           expiresAt: null,
-          currentRoles: member.roles ?? null,
+          currentRoles: null,
         };
       }
 
-      // Check for pending invitation
+      // 2. Outstanding invitation to this org?
+      const { data: pending, error: pendingError } = await supabaseService.apiRpc<
+        DbPendingInvitationResult[]
+      >('check_pending_invitation', { p_email: email, p_org_id: orgId }, { correlationId });
 
-      const { data: pendingData, error: pendingError } = await (client.rpc as any)(
-        'check_pending_invitation',
-        {
-          p_email: email,
-          p_org_id: orgId,
-        }
-      );
+      if (pendingError) return failed('rpc_error', 'check_pending_invitation', pendingError);
 
-      const pending = pendingData as DbPendingInvitationResult[] | null;
-
-      if (!pendingError && pending && pending.length > 0) {
+      if (pending && pending.length > 0) {
         const inv = pending[0];
         const expiresAt = new Date(inv.expires_at);
         const isExpired = expiresAt < new Date();
@@ -875,37 +889,37 @@ export class SupabaseUserQueryService implements IUserQueryService {
           status: isExpired ? 'expired' : 'pending',
           userId: null,
           invitationId: inv.id,
-          firstName: inv.first_name ?? null,
-          lastName: inv.last_name ?? null,
+          firstName: null,
+          lastName: null,
           expiresAt,
           currentRoles: null,
         };
       }
 
-      // Check if user exists in system (other org)
+      // 3. Known to the platform, but not to this org?
+      const { data: exists, error: existsError } = await supabaseService.apiRpc<
+        DbUserExistsResult[]
+      >('check_user_exists', { p_email: email }, { correlationId });
 
-      const { data: existsData, error: existsError } = await (client.rpc as any)(
-        'check_user_exists',
-        {
-          p_email: email,
-        }
-      );
+      if (existsError) return failed('rpc_error', 'check_user_exists', existsError);
 
-      const exists = existsData as DbUserExistsResult[] | null;
-
-      if (!existsError && exists && exists.length > 0) {
+      if (exists && exists.length > 0) {
         return {
+          // The Edge Function splits this case further (other_org_member vs a
+          // roleless "zombie" account) via check_user_has_any_role; this union
+          // has no equivalent, so the copy is imprecise here while the server's
+          // routing stays correct. See the origin card's follow-ups.
           status: 'other_org',
           userId: exists[0].user_id,
           invitationId: null,
-          firstName: exists[0].first_name ?? null,
-          lastName: exists[0].last_name ?? null,
+          firstName: null,
+          lastName: null,
           expiresAt: null,
           currentRoles: null,
         };
       }
 
-      // User not found
+      // All three probes came back empty — a real negative.
       return {
         status: 'not_found',
         userId: null,
@@ -916,16 +930,8 @@ export class SupabaseUserQueryService implements IUserQueryService {
         currentRoles: null,
       };
     } catch (error) {
-      log.error('Error in checkEmailStatus', error);
-      return {
-        status: 'not_found',
-        userId: null,
-        invitationId: null,
-        firstName: null,
-        lastName: null,
-        expiresAt: null,
-        currentRoles: null,
-      };
+      log.error('Email status lookup threw', { error, correlationId });
+      return { status: 'lookup_failed' };
     }
   }
 

@@ -140,4 +140,19 @@ describe('SupabaseUserQueryService — correlation-id threading', () => {
       { correlationId: 'corr-prefs' }
     );
   });
+
+  it('checkEmailStatus pins ONE id across all three lookup probes', async () => {
+    // This method escaped the original PR #98-#100 sweep: it called its RPCs via
+    // a bare `client.rpc(...)` rather than the helper, so the completeness grep
+    // (`supabaseService.apiRpc<`) could not see it. Keeping it in this suite is
+    // what stops it drifting back out.
+    await service.checkEmailStatus('someone@example.com', 'corr-email');
+    const names = mockApiRpc.mock.calls.map((c) => c[0]);
+    expect(names).toContain('check_user_org_membership');
+    expect(names).toContain('check_pending_invitation');
+    expect(names).toContain('check_user_exists');
+    for (const call of mockApiRpc.mock.calls) {
+      expect(call[2]).toEqual({ correlationId: 'corr-email' });
+    }
+  });
 });

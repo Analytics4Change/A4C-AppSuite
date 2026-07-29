@@ -33,7 +33,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { validateEdgeFunctionEnv, createEnvErrorResponse } from '../_shared/env-schema.ts';
 import { resolveAnonKey, resolveServiceRoleKey } from '../_shared/api-key-resolution.ts';
-import { AnySchemaSupabaseClient, JWTPayload, hasPermission } from '../_shared/types.ts';
+import { JWTPayload, hasPermission } from '../_shared/types.ts';
 import {
   handleRpcError,
   createInternalError,
