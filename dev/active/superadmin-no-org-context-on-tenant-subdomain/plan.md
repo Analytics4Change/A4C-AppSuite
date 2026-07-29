@@ -1,6 +1,16 @@
 # super_admin gets HTTP 403 "No organization context in token" when invoking org-scoped EFs from a tenant subdomain
 
-**Status**: seed (not yet planned)
+> ## RESOLUTION (2026-07-28) — adjudicated; do not re-litigate options A–D
+>
+> Investigation split this into **two intents** sharing one root cause (a global super_admin has `org_id: NULL`, minted from `users.current_organization_id`, never the subdomain):
+> - **Intent 1 — super_admin acting on a *tenant* org's users** (the reported scenario). Enabling it properly = "acting-as another org" = **impersonation**, which needs a cross-boundary accountability chain (who, under what warrant, acting-as whom, why). **Resolved via an honest-UX state gate (Option D-variant):** the EF 403 stays as the fail-safe; the frontend detects `org_type==='platform_owner' && !org_id` (`usePlatformNoOrgContext`) and **disables + explains** the write affordances (`PlatformNoOrgContextBanner`) instead of firing a doomed request. The *capability* is deferred to the already-scaffolded (not-yet-functional) **impersonation** subsystem (`documentation/architecture/authentication/impersonation-architecture.md`). Shipped by the honest-gate PR (this work).
+> - **Intent 2 — onboard platform people into a4c** (surfaced during investigation: today only a migration can create a new super_admin / a4c-org member). **Split to its own card** `dev/active/platform-owner-self-onboarding-seed.md` — because its cleanest fix (defaulting super_admin `org_id` → the a4c platform org) would *delete the very 403 this gate fronts* and risk a silent wrong-org write on tenant subdomains.
+>
+> **Why options A–C were rejected:** **(A)** EF accepts a platform-admin-supplied target org — launders a platform action into a tenant write with **no first-class cross-boundary audit record** (crypto-impersonation without the audit chain). **(B)** frontend auto-sets `current_organization_id` on subdomain landing — mutates DB per visit + JWT-refresh race across tabs. **(C)** explicit "enter org" precondition — worst UX; and "acting-as" belongs to the impersonation epic, not an ad-hoc switch. The dead `switchOrganization` RPC call (`switch_active_organization`, non-existent) was repaired to `public.switch_organization(p_new_org_id)` as part of the honest-gate PR.
+>
+> **Original seed analysis retained below for provenance.**
+
+**Status**: Intent 1 RESOLVED (honest-gate, this PR); Intent 2 split to `platform-owner-self-onboarding-seed.md`
 **Priority**: Medium — annoyance, not a regression; existed pre-nginx-fix but was masked by the earlier nginx 400 (you couldn't even reach the subdomain to discover this). Now exposed by `dev/archived/fix-nginx-large-client-header-buffers/` shipping (PR #65, 2026-05-19).
 **Origin**: 2026-05-19 bonus UAT of PR #64 T1 ran as super_admin (`lars.tice@gmail.com`) on `testorg-20260329.firstovertheline.com/users/manage`. Invite User dialog → HTTP 403 `{"error":"No organization context in token"}`. Same problem was alluded to in PR #64's UAT notes as the "super_admin role-validation quirk" that forced the original T1 actor to switch to `johnltice@yahoo.com`.
 

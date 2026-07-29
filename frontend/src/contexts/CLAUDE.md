@@ -106,6 +106,16 @@ interface EffectivePermission {
 
 > **⚠️ Deprecated v3 fields**: `permissions` (flat array), `user_role`, `app_metadata.org_id` were removed in claims v4. Never read these fields. If you find code that does, it's broken.
 
+### Platform admin with no active org (org-scoped write gate)
+
+> **`org_type === 'platform_owner' && !org_id` ⇒ "platform administrator with no active organization."** Org-scoped writes MUST state-gate on this.
+
+`org_id` is minted from `users.current_organization_id` (**never** from the subdomain). A global `super_admin` has that NULL, so the JWT hook mints `org_id: NULL` **and** `org_type: 'platform_owner'` at the same NULL (current hook `20260601174841_..._jwt_shape.sql:480-481`). Downstream, org-scoped Edge Functions (`invite-user`, `manage-user`) reject with 403 `"No organization context in token"` — correct fail-safe, but a cryptic UX if the caller is allowed to fire the request.
+
+- Detect with the **`usePlatformNoOrgContext()`** hook (fail-closed). The `&& !org_id` conjunct is load-bearing: a *real* member of the a4c platform-owner org also has `org_type === 'platform_owner'` but **with** a non-empty `org_id`, and must NOT be gated.
+- **This is a STATE gate, not a permission gate** — a super_admin *holds* every permission; the missing *context* blocks the action. Per the [Permission Gating Convention](../../CLAUDE.md#permission-gating-convention): **disable + explain** (via `PlatformNoOrgContextBanner`), do not hide.
+- Acting *as* a specific org (cross-tenant) is deferred to the scaffolded **impersonation** subsystem (`../../../documentation/architecture/authentication/impersonation-architecture.md`), not a per-EF org fallback (which would lack the cross-boundary audit chain).
+
 ### Usage in Components
 
 ```typescript

@@ -43,6 +43,8 @@ import { getUserQueryService, getUserCommandService } from '@/services/users';
 import { getRoleService } from '@/services/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissionGate } from '@/hooks/usePermissionGate';
+import { usePlatformNoOrgContext } from '@/hooks/usePlatformNoOrgContext';
+import { PlatformNoOrgContextBanner } from '@/components/users/PlatformNoOrgContextBanner';
 import type {
   UserListItem,
   UserDisplayStatus,
@@ -100,6 +102,13 @@ export const UsersManagePage: React.FC = observer(() => {
   // checked explicitly before rendering the corresponding affordance.
   const canUpdateUser = usePermissionGate('user.update');
   const canDeleteUser = usePermissionGate('user.delete');
+
+  // State gate (NOT permission): a platform administrator with no active
+  // organization holds every permission but has no org context, so org-scoped
+  // writes (invite, deactivate, …) are 403'd at the Edge Function
+  // ("No organization context in token"). Disable + explain rather than let the
+  // caller fire a doomed request. See usePlatformNoOrgContext + contexts/CLAUDE.md.
+  const platformNoOrg = usePlatformNoOrgContext();
 
   // List ViewModel - manages user list state
   const [viewModel] = useState(
@@ -738,7 +747,10 @@ export const UsersManagePage: React.FC = observer(() => {
             </Button>
             <Button
               onClick={handleCreateClick}
-              disabled={viewModel.isLoading}
+              disabled={viewModel.isLoading || platformNoOrg}
+              aria-disabled={platformNoOrg || undefined}
+              aria-describedby={platformNoOrg ? 'platform-no-org-banner' : undefined}
+              data-testid="invite-user-btn"
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -753,6 +765,10 @@ export const UsersManagePage: React.FC = observer(() => {
             </div>
           </div>
         </div>
+
+        {/* Platform-admin-with-no-active-org honest state gate: explains why the
+            org-scoped write affordances above are disabled (see platformNoOrg). */}
+        {platformNoOrg && <PlatformNoOrgContextBanner />}
 
         {/* Error Banner — yields to the form-submit banner so exactly one
             role="alert" region is ever mounted (INV-1). Role violations /

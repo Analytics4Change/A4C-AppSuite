@@ -1,5 +1,7 @@
 # Tasks — superadmin-no-org-context-on-tenant-subdomain
 
+> **RESOLVED 2026-07-28** — see the RESOLUTION header in `plan.md`. Intent 1 (tenant-management) resolved via an honest-UX state gate (`usePlatformNoOrgContext` + `PlatformNoOrgContextBanner`, disable + explain; EF 403 kept as fail-safe); the acting-as-a-tenant capability is deferred to the scaffolded impersonation subsystem. Intent 2 (platform self-onboarding) split to `dev/active/platform-owner-self-onboarding-seed.md`. Options A–D adjudicated (A/B/C rejected — see plan.md). Investigation checklist below was completed during that analysis.
+
 ## Investigation (do before planning)
 
 - [ ] Grep the EF source for "No organization context in token" — confirm `invite-user/index.ts` is the source; find sibling EFs with the same check.
