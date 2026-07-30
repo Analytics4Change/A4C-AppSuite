@@ -346,7 +346,11 @@ export class OrganizationFormViewModel {
     return {
       firstName: contact.firstName,
       lastName: contact.lastName,
-      email: contact.email,
+      // Normalized to match the invariant the database now enforces
+      // (btrim(lower(email)), migration 20260730045737). This ViewModel heads
+      // the org-bootstrap chain, which validated email at zero of its five
+      // layers -- the sibling UserFormViewModel has trimmed here all along.
+      email: contact.email.trim().toLowerCase(),
       title: contact.title || undefined,
       department: contact.department || undefined,
       type: contact.type,
@@ -420,7 +424,8 @@ export class OrganizationFormViewModel {
     const providerAdmin = this.formData.providerAdminContact;
     const users = [
       {
-        email: providerAdmin.email,
+        // See transformContact above -- same invariant, same reason.
+        email: providerAdmin.email.trim().toLowerCase(),
         firstName: providerAdmin.firstName,
         lastName: providerAdmin.lastName,
         role: 'provider_admin',

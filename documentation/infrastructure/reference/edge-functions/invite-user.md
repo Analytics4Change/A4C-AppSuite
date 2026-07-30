@@ -83,6 +83,43 @@ Success carries an `action` discriminator:
 
 Existing-user failures surface the RPC envelope as `{ success: false, error, errorDetails?: { code } }` (e.g. `TARGET_DEACTIVATED`, role-violation codes) — HTTP 400, parsed via `data.success`, not HTTP status. Adding an existing user with zero roles returns 400 ("At least one role is required").
 
+### `PROCESSING_FAILED` — new in PR D (2026-07-30)
+
+**This is a contract change.** Both the create and the resend operations can now
+fail *after* `api.emit_domain_event` returned successfully:
+
+```jsonc
+{
+  "success": false,
+  "error": "Failed to create invitation",   // or "Failed to resend invitation"
+  "errorDetails": { "code": "PROCESSING_FAILED", "message": "<masked handler error>" },
+  "correlationId": "..."
+}
+```
+HTTP 500.
+
+**Why it exists.** `api.emit_domain_event` returning a UUID with no error does
+**not** mean the projection was written. `process_domain_event` catches every
+handler failure with `EXCEPTION WHEN OTHERS`, records it on
+`domain_events.processing_error`, and does not re-raise — so the outer INSERT
+commits and the RPC hands back an id while the handler's own write has already
+rolled back.
+
+Before PR D this function checked only the RPC's `error`. A handler failure
+therefore produced **200 OK, an invitation email sent, no row in
+`invitations_projection`, and a token that 404s** when the recipient clicks it —
+with nothing in the logs. The function now completes the Pattern A v2 contract by
+calling `api.get_event_processing_error` before sending any email
+(`_shared/emit-event.ts` → `readProcessingError`, which fails closed if the
+read-back itself errors).
+
+The lazy-expiration path is covered too: if the `invitation.expired` event does
+not process, `checkEmailStatus` returns `lookup_failed` rather than
+`expired_invitation`, so the caller does not mint a second invitation while the
+old row is still `pending`.
+
+`message` is passed through `maskPii` before it leaves the function.
+
 ## Frontend integration
 
 `SupabaseUserCommandService.inviteUser` returns `InviteUserResult` with `action`: for `invitation_sent` the `invitation` is populated; for the role-assignment actions only `userId` is set (no `invitation`). `UsersManagePage` shows an action-specific success toast (`data-testid="invite-success-<action>"`); errors flow through `UsersErrorBanner` + `extractEdgeFunctionError`. See [frontend Definition of Done](../../../../frontend/CLAUDE.md).

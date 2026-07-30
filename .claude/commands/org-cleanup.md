@@ -181,7 +181,8 @@ ORDER BY table_name;
   - Execute: `DELETE FROM public.users WHERE id = {user_id}`
   - Log: "Deleted shadow user: {user_email} (ID: {user_id})"
 - Also clean any orphaned shadow users by email:
-  - Execute: `DELETE FROM public.users WHERE email IN ({invited_emails})`
+  - Execute: `DELETE FROM public.users WHERE btrim(lower(email)) IN ({normalized_invited_emails})`
+  - Normalize `{invited_emails}` with `btrim(lower(...))` before substituting. `public.users.email` is canonical as of migration `20260730045737`, but the invited-email list is gathered from event payloads and workflow inputs, which are not. A bare `IN` misses a mixed-case entry and silently leaves the orphan behind — and because this is a runbook, not a plpgsql body, the A3 tripwire in that migration cannot see it.
   - Log orphan count if any deleted
 - If no shadow users found: Log "No shadow users to delete"
 

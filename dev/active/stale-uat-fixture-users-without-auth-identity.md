@@ -64,3 +64,18 @@ Recommended: (1) now, (3) after the UAT.
 
 - `dev/active/wireup-invite-form-email-status-lookup-seed.md` — the UAT this blocks
 - PR #106 F2 (the false "11 of 14" claim this replaces)
+
+---
+
+## Update — PR D (2026-07-30)
+
+- **`uat-deactivated` fixture flipped to `is_active = false`.** It was the
+  prerequisite for the parent UAT's S3 scenario, which would otherwise have
+  asserted "deactivated" against an `active_member` verdict and passed vacuously.
+- The three orphan rows are now **surfaced by assertion A2** in
+  `20260730045737_normalize_email_at_the_source.sql`, which uses a LEFT JOIN
+  precisely so rows with no auth identity are visible (an INNER join structurally
+  cannot see them).
+- They become **load-bearing in PR E**: all three have `deleted_at IS NULL`, so
+  they participate in `uq_users_email_normalized`. Deleting or re-seeding them is
+  now a PR E pre-flight step, not just hygiene. → `pr-e-email-uniqueness-constraints.md`

@@ -73,10 +73,16 @@ export const ValidationRules = {
    * Validate email format
    */
   email: (value: string): string | null => {
-    if (!value.trim()) {
+    const trimmed = value.trim();
+    if (!trimmed) {
       return 'Email is required';
     }
-    return EMAIL_REGEX.test(value) ? null : 'Invalid email format';
+    // Test the TRIMMED value, matching validateEmail() in types/user.types.ts.
+    // Previously this checked `value.trim()` for emptiness but then regex-tested
+    // the raw `value`, so "  bob@x.com  " was rejected as "Invalid email format"
+    // here while its sibling validator accepted it -- two different answers for
+    // the same address depending on which form you were on.
+    return EMAIL_REGEX.test(trimmed) ? null : 'Invalid email format';
   },
 
   /**
@@ -307,11 +313,17 @@ export function validateOrganizationForm(
     ValidationRules.email(data.providerAdminContact.email)
   );
 
-  // Email confirmation must match email for Provider Admin
+  // Email confirmation must match email for Provider Admin.
+  //
+  // Compared NORMALIZED on both sides. The addresses are equivalent to every
+  // consumer -- the database now stores btrim(lower(email)) -- so rejecting
+  // "Bob@x.com" against "bob@x.com" told the user their two identical addresses
+  // did not match. Normalizing only one side would be worse than neither.
   if (
     data.providerAdminContact.email &&
     data.providerAdminContact.emailConfirmation !== undefined &&
-    data.providerAdminContact.email !== data.providerAdminContact.emailConfirmation
+    data.providerAdminContact.email.trim().toLowerCase() !==
+      data.providerAdminContact.emailConfirmation.trim().toLowerCase()
   ) {
     addError(
       errors,

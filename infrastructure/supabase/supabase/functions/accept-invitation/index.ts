@@ -241,6 +241,38 @@ export async function checkExistingUserPath(
   };
 }
 
+/**
+ * Find the auth user matching an invitation's email address.
+ *
+ * ## Why this is not a bare `===`
+ *
+ * `auth.users.email` is lowercased by Supabase Auth. `invitation.email` is
+ * whatever was stored — and until `20260730045737_normalize_email_at_the_source`
+ * nothing normalized the org-bootstrap write path at any layer, so it could
+ * carry mixed case or surrounding whitespace.
+ *
+ * A case-sensitive compare therefore missed on the "user already registered"
+ * retry branch, which reported `500 "Inconsistent auth state"` and left the
+ * invitation permanently unacceptable — every retry took the same branch and
+ * missed the same way.
+ *
+ * The migration makes stored values canonical going forward, so this is now
+ * defence in depth rather than the only guard. It stays because the left-hand
+ * side comes from the Auth admin API and no database constraint can reach it.
+ * Note `:595` has always compared this pair case-insensitively; the two are now
+ * consistent.
+ *
+ * Extracted so the invariant is regression-testable in isolation, following the
+ * `checkExistingUserPath` precedent above.
+ */
+export function findAuthUserByEmail<T extends { email?: string | null }>(
+  users: T[],
+  invitationEmail: string
+): T | undefined {
+  const target = invitationEmail.trim().toLowerCase();
+  return users.find((u) => u.email?.trim().toLowerCase() === target);
+}
+
 export function resolveInvitationPhonePlaceholder(
   rawPhoneId: string | null | undefined,
   createdPhoneIds: CreatedInvitationPhone[],
@@ -531,7 +563,7 @@ serve(async (req) => {
             );
           }
 
-          const existingUser = existingUsers.users.find(u => u.email === invitation.email);
+          const existingUser = findAuthUserByEmail(existingUsers.users, invitation.email);
           if (existingUser) {
             userId = existingUser.id;
             console.log(`[accept-invitation v${DEPLOY_VERSION}] Found existing user: ${userId}`);

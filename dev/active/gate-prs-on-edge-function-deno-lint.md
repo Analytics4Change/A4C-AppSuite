@@ -249,3 +249,25 @@ here is how one of them goes stale.
    `push: [main]` too** — for the `strict: false` reason (a migration can land and
    generated-registry/matrix drift go undetected post-merge), NOT the bypass
    reason. They are not required checks, so they may keep their `paths:` filters.
+
+---
+
+## Pre-existing violations that must be cleared before the gate can go green (found during PR D, 2026-07-30)
+
+`deno lint` over `infrastructure/supabase/supabase/functions/` currently reports
+**2 errors**, both `require-await` on mock `rpc` methods in test files:
+
+- `accept-invitation/__tests__/existing-user-check-schema.test.ts:60`
+- `_shared/__tests__/check-invitation-eligibility.test.ts:44`
+
+Both are `async rpc(...)` stubs that return a value without awaiting. Fix is
+either dropping `async` (the callers `await` the returned promise anyway) or an
+inline `// deno-lint-ignore require-await`.
+
+PR D also cleared a third: an unused `Span` import in `_shared/emit-event.ts`,
+fixed inline because PR D was already editing that file. That one had been
+sitting undetected — which is the concrete argument for this card: **three lint
+errors accumulated in a tree nobody was linting.**
+
+Local note: Deno is not installed by default on the dev machine; PR D installed
+it to `~/.deno/bin/deno`.

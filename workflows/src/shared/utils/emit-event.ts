@@ -264,8 +264,62 @@ export async function emitEvent(params: EmitEventParams): Promise<string> {
 
   // The function returns the generated event UUID
   const emittedEventId = returnedEventId;
+
+  // Pattern A v2 read-back.
+  //
+  // `error` above being null means the domain_events INSERT succeeded — NOT that
+  // the projection was written. process_domain_event catches every handler
+  // failure with `EXCEPTION WHEN OTHERS`, records it on
+  // domain_events.processing_error, and does not re-raise, so the outer INSERT
+  // commits and this RPC returns an id. The handler's own write has already
+  // rolled back.
+  //
+  // Without this check every Temporal activity reports success for events that
+  // wrote nothing. In the org-bootstrap path that means generate-invitations
+  // pushes an invitation into the array send-invitation-emails consumes, and we
+  // email a token that has no row behind it.
+  //
+  // This lives in emitEvent rather than in the activities because this function
+  // is the single funnel for every activity emit — one check covers the tier.
+  const processingError = await readProcessingError(supabase, emittedEventId);
+  if (processingError) {
+    throw new Error(
+      `Event ${params.event_type} (${emittedEventId}) was recorded but failed to process: ${processingError}`
+    );
+  }
+
   console.log(`[Event Emitter] Emitted ${params.event_type} event: ${emittedEventId}`);
   return emittedEventId;
+}
+
+/**
+ * Read back the processing_error for an emitted event.
+ *
+ * Returns `null` when the event processed cleanly. Fails CLOSED: if the
+ * read-back itself errors we return a synthetic message rather than `null`,
+ * because "I could not determine whether this worked" must never be reported as
+ * success.
+ *
+ * Exported for testing.
+ *
+ * @param supabase - Supabase client (service_role; the RPC is Bucket E)
+ * @param eventId  - The id returned by api.emit_domain_event
+ */
+export async function readProcessingError(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  eventId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .schema('api')
+    .rpc('get_event_processing_error', { p_event_id: eventId });
+
+  if (error) {
+    // Fail closed — an undeterminable outcome is not a success.
+    return `Unable to verify event processing: ${error.message}`;
+  }
+
+  return (data as string | null) ?? null;
 }
 
 /**

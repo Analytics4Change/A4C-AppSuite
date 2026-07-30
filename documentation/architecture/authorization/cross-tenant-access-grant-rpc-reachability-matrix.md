@@ -52,9 +52,9 @@ last_updated: 2026-07-30
 | C | 31 |
 | D | 36 |
 | D-variant | 1 |
-| E | 47 |
+| E | 48 |
 | E-variant | 1 |
-| **Total** | **181** |
+| **Total** | **182** |
 <!-- GENERATED:PER-BUCKET-COUNTS:END -->
 
 > [!NOTE]
@@ -161,6 +161,7 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `get_contacts_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_current_org_unit` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
 | `get_emails_by_org` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_event_processing_error` | E | no | none |  |
 | `get_event_processing_stats` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `get_events_by_correlation` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `get_events_by_session` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |

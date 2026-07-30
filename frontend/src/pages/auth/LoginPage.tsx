@@ -113,7 +113,11 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await login({ email, password });
+      // Normalized to match the stored form (btrim(lower(email)), migration
+      // 20260730045737). Supabase Auth lowercases on its side, but a leading or
+      // trailing space from autofill/paste would still fail the lookup with a
+      // bare "invalid credentials" and no hint as to why.
+      await login({ email: email.trim().toLowerCase(), password });
       // Navigation handled by useEffect above
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Authentication failed';

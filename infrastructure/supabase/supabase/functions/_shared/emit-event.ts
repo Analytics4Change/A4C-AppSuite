@@ -34,7 +34,7 @@
  */
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import type { TracingContext, Span } from './tracing-context.ts';
+import type { TracingContext } from './tracing-context.ts';
 import { generateSpanId } from './tracing-context.ts';
 
 // =============================================================================
@@ -297,4 +297,55 @@ export function buildEventMetadata(
     operation_name: operationName,
     ...additionalMetadata,
   };
+}
+
+/**
+ * Read back the processing_error for an emitted event.
+ *
+ * ## Why this exists
+ *
+ * `api.emit_domain_event` returning a UUID with no error does NOT mean the
+ * projection was written. `process_domain_event`'s `EXCEPTION WHEN OTHERS`
+ * catches any handler failure, records it on `domain_events.processing_error`,
+ * and **does not re-raise** — so the outer INSERT succeeds and the RPC returns
+ * an id. The handler's write has already rolled back.
+ *
+ * Without this read-back a caller reports success for an operation that left no
+ * row behind. For `invite-user` that meant: 200 OK, invitation email sent, no
+ * invitation in the projection, and a token that 404s when the recipient clicks
+ * it — with nothing in the logs.
+ *
+ * This is the wire-tier half of Pattern A v2 (see
+ * `documentation/architecture/decisions/adr-rpc-readback-pattern.md`). SQL RPCs
+ * do this inline; Edge Functions have to ask.
+ *
+ * ## Fail-closed
+ *
+ * If the read-back itself fails we return a synthetic error rather than `null`.
+ * "I could not determine whether this worked" must not be reported as success —
+ * that is the exact failure mode this function exists to remove.
+ *
+ * @param supabase - Supabase client reaching the `api` schema (service_role;
+ *                   `api.get_event_processing_error` is Bucket E)
+ * @param eventId  - The id returned by `api.emit_domain_event`
+ * @returns The processing error message, or `null` when the event processed cleanly
+ */
+export async function readProcessingError(
+  supabase: SupabaseClient,
+  eventId: string
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc('get_event_processing_error', {
+    p_event_id: eventId,
+  });
+
+  if (error) {
+    console.error(
+      `[emit-event] Could not read processing_error for event_id=${eventId}:`,
+      error
+    );
+    // Fail closed — an undeterminable outcome is not a success.
+    return `Unable to verify event processing: ${error.message}`;
+  }
+
+  return (data as string | null) ?? null;
 }

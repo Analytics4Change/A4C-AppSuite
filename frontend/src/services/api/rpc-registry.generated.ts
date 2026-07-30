@@ -133,6 +133,7 @@ export type ReadRpcs =
   | 'get_contacts_by_org'
   | 'get_current_org_unit'
   | 'get_emails_by_org'
+  | 'get_event_processing_error'
   | 'get_event_processing_stats'
   | 'get_events_by_correlation'
   | 'get_events_by_session'
