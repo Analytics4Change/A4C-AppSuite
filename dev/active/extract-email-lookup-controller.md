@@ -46,8 +46,9 @@ production path is rerouted around a canonical VM method.
   and is the reason this isn't trivial.
 - `canSubmit` reads `isCheckingEmail` and `emailLookupResult`, so the delegation must
   stay observable (MobX) or the Send button stops reacting.
-- If `dev/active/normalize-email-case-in-lookup-rpcs.md` lands first, `lookupKey`
-  moves with the controller.
+- If `dev/active/normalize-email-at-the-source.md` lands first, `lookupKey` may
+  disappear entirely rather than move — normalizing at the write path removes the
+  reason for a client-side key.
 - Depending on the outcome of the RPC-widening follow-up, `prefilledNameFromLookup`
   and the revert may be **deleted** rather than moved — the deployed service returns
   `firstName: null` on every branch today. Check that before extracting.
