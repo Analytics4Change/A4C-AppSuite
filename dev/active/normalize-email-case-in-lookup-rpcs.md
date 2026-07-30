@@ -41,19 +41,28 @@ PR B therefore trimmed only (unambiguously safe: whitespace is never part of an
 address, `validateEmail` already trims, and `buildRequest` submits trimmed) and left
 case alone. See `UserFormViewModel.lookupKey`'s JSDoc.
 
-## First step: find out what is actually stored
+## Already investigated (2026-07-30, dev project) — the answer is: fix it in SQL
 
-```sql
-SELECT count(*) AS total,
-       count(*) FILTER (WHERE email <> lower(email)) AS mixed_case
-FROM users;
--- and the same for invitations_projection.email
-```
+| table | rows | mixed-case |
+|---|---|---|
+| `public.users` | 14 | **0** |
+| `invitations_projection` | 18 | **0** |
 
-If `mixed_case = 0` **and** something enforces that on write, client-side
-lowercasing is safe and this becomes a one-line VM change. If not, fix it in SQL.
+All-lowercase today — but **nothing enforces it**. A constraint scan over both
+tables returned no `lower(email)` CHECK (the only email-adjacent constraint found
+was `auth.users.email_change_confirm_status_check`, unrelated). And only **11 of 14**
+`public.users` rows match `auth.users.email` exactly, so Supabase Auth's own
+normalization is not reliably propagating into the projection either.
 
-## SQL route (if needed)
+So the lowercase property is **incidental, not guaranteed**. Client-side
+`toLowerCase()` would work today and break silently the first time a mixed-case row
+lands — reintroducing the same false-green from the other direction. That is why
+PR B trimmed only.
+
+**Conclusion: the fix belongs in SQL**, where it holds regardless of what is stored.
+A CHECK constraint or `citext` would also work; a client-side change would not.
+
+## SQL route
 
 Change the comparisons to `WHERE lower(u.email) = lower(p_email)` — but that is
 **not** free:
