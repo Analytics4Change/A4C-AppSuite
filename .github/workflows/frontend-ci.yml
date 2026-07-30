@@ -1,21 +1,58 @@
 name: Frontend CI
 
-# Pull-request gate for the frontend: type-check, lint, unit tests, and build.
-# This is the check that keeps `main` green — before this workflow the unit tests
-# ran nowhere (tsconfig excludes tests; the deploy workflow stubbed the test step).
+# Type-check, lint, unit tests, and build for the frontend. This is the check that
+# keeps `main` green — before this workflow the unit tests ran nowhere (tsconfig
+# excludes tests; the deploy workflow stubbed the test step).
 #
-# NOTE: this job is intended to be a REQUIRED status check. It therefore triggers on
-# EVERY pull request with NO `paths:` filter — a path-filtered workflow is *skipped*
-# on PRs that don't touch frontend/, and a skipped required check never reports,
-# which wedges the merge box. Instead we always run (so the check always reports) and
-# gate the expensive steps on whether frontend / CI files actually changed.
-
+# ---------------------------------------------------------------------------
+# Why `pull_request` has NO `paths:` filter
+# ---------------------------------------------------------------------------
+# This job is a REQUIRED status check. A path-filtered workflow is *skipped* on
+# PRs that don't touch frontend/, and a skipped required check never reports,
+# which wedges the merge box. So we always run (the check always reports) and gate
+# the expensive steps on whether frontend / CI files actually changed.
+#
+# ---------------------------------------------------------------------------
+# Why `push: [main]` — and what it does NOT do
+# ---------------------------------------------------------------------------
+# It exists because branch protection has `strict: false` ("require branches to be
+# up to date before merging" is OFF). The required check therefore validates the PR
+# HEAD and never the MERGE RESULT. Concretely: commit `deeff7b5` (the PR #103
+# squash-merge, which rewrote a service, deleted two test files and changed
+# eslint.config.js) carries NO `Type-check, lint, test, build` run at all. Without
+# this trigger, `main` holds no evidence that it typechecks, lints or passes tests.
+#
+# That is the same failure class as the `deno lint` error that sat on `main` from
+# 2026-06-23 to 2026-07-29 blocking every Edge Function deploy: work verified
+# somewhere other than where it ships.
+#
+# It does NOT remove the "Bypassed rule violations" warning on a direct push to
+# `main`, and must not be described as if it does. Required checks are evaluated at
+# PUSH time against the incoming head SHA — a SHA GitHub has not seen, so no check
+# run can exist yet. The ref update is accepted (bypass), and only THEN does this
+# `push` run start and attach. The check is a post-hoc verification record, not a
+# gate. Eliminating the bypass needs a different mechanism (PR + auto-merge, the
+# temp-branch/fast-forward flow, or a ruleset with a named bypass actor) — see
+# dev/active/gate-prs-on-edge-function-deno-lint.md, where that decision is open.
+#
+# Trigger shape follows the in-repo precedent at supabase-edge-functions-test.yml.
+# Accepted cost: a merged frontend PR now runs this suite twice (PR head, then the
+# merge commit). That duplication IS the point — it is what verifies `main`.
 on:
   pull_request:
+  push:
+    branches: [main]
 
 concurrency:
   group: frontend-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # PR runs are superseded by newer pushes to the same PR, so cancelling is right
+  # there. Main-push runs must NOT be cancelled: each one is the only verification
+  # record that commit will ever get (see `strict: false` above), and a cancelled
+  # run leaves the commit permanently unverified AND paints a grey X on `main` —
+  # manufacturing exactly the "a non-green check on main is normal" reflex this
+  # trigger exists to remove. Cross-event collision is impossible either way:
+  # github.ref is refs/pull/<n>/merge vs refs/heads/main.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
@@ -34,14 +71,45 @@ jobs:
         id: changes
         working-directory: .
         run: |
-          BASE='${{ github.event.pull_request.base.sha }}'
-          HEAD='${{ github.event.pull_request.head.sha }}'
-          if git diff --name-only "$BASE" "$HEAD" \
+          # Each event carries the diff range in a different place, and reading the
+          # wrong one yields EMPTY strings rather than an error — `git diff "" ""`
+          # then fails the job outright. Dispatch explicitly, and fail SAFE (run
+          # the suite) for anything unrecognised, so adding a trigger later cannot
+          # silently skip the checks.
+          #
+          # Named *_SHA to avoid shadowing git's own HEAD ref.
+          if [ "${{ github.event_name }}" = 'pull_request' ]; then
+            BASE_SHA='${{ github.event.pull_request.base.sha }}'
+            HEAD_SHA='${{ github.event.pull_request.head.sha }}'
+          elif [ "${{ github.event_name }}" = 'push' ]; then
+            # `before`..`sha` covers EVERY commit in the push, not just the tip.
+            BASE_SHA='${{ github.event.before }}'
+            HEAD_SHA='${{ github.sha }}'
+            # `before` is all-zeros on a branch's first push and a discarded commit
+            # after a force-push — not a resolvable object either way. Do NOT fall
+            # back to "$HEAD_SHA^": on a MULTI-commit push that sees only the tip,
+            # so a docs-only tip commit would skip the suite and report green while
+            # an earlier commit in the same push changed frontend/. Run instead.
+            # (`^{commit}` peels and type-checks in one step, rejecting both the
+            # all-zeros sentinel and a genuinely absent object.)
+            if [ -z "$BASE_SHA" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              echo "frontend=true" >> "$GITHUB_OUTPUT"
+              echo "Push range unresolvable (before='$BASE_SHA') — running the full suite rather than guessing."
+              exit 0
+            fi
+          else
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            echo "Unrecognised event '${{ github.event_name }}' — running the full suite (fail-safe)."
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
               | grep -qE '^(frontend/|\.github/workflows/frontend-ci\.yml)'; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
+            echo "Frontend or CI changes in $BASE_SHA..$HEAD_SHA — running checks."
           else
             echo "frontend=false" >> "$GITHUB_OUTPUT"
-            echo "No frontend or CI changes in this PR — skipping checks (job still reports success)."
+            echo "No frontend or CI changes in $BASE_SHA..$HEAD_SHA — skipping checks (job still reports success)."
           fi
 
       - name: Setup Node.js
