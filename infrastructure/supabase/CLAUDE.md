@@ -200,6 +200,53 @@ The five preconditions above are **load-bearing invariants**, not preferences. A
 
 Originating context: PR #73 Section B (2026-06-09) retired `platform.view_event_details` via direct DELETE. All five preconditions held; migration body L213-226 enumerates them inline. Codified per PR #73 architect N1 fold-in.
 
+### `CREATE INDEX IF NOT EXISTS` matches on NAME only — and an assertion that can't fail isn't one
+
+Two related traps, both found in PR #106 (2026-07-30).
+
+**(a) The index guard is name-based, not definition-based.** If an index with that name
+already exists, PG skips the statement entirely — it never compares the expression. So
+a migration that "updates" a functional index by re-issuing the same name with a new
+expression is a **silent no-op**: the stale index survives, and the new predicate
+seq-scans forever with no error anywhere.
+
+```sql
+-- ❌ WRONG: no-op if idx_users_email_lower already exists on lower(email)
+CREATE INDEX IF NOT EXISTS idx_users_email_lower ON public.users (btrim(lower(email)));
+
+-- ✅ CORRECT: DROP + CREATE, then assert on the DEFINITION
+DROP INDEX IF EXISTS public.idx_users_email_lower;
+CREATE INDEX idx_users_email_lower ON public.users (btrim(lower(email)));
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname='public' AND indexname='idx_users_email_lower'
+      AND indexdef LIKE '%btree (btrim(lower(email)))%'
+  ) THEN
+    RAISE EXCEPTION 'idx_users_email_lower does not match the new predicate'
+      USING ERRCODE='P9099';
+  END IF;
+END $$;
+```
+
+Note the DROP+CREATE (not `CREATE INDEX CONCURRENTLY`) is fine inside a migration
+transaction; if the table is large enough to care, split it out and use
+`CONCURRENTLY` outside a transaction — but then you must still assert on `indexdef`.
+
+**(b) A DO-block that greps a function body it wrote in the same transaction cannot
+fail.** `20260729184125:222-259` and `20260730032132` both assert that the function
+source contains the predicate the very same migration just installed. There is no
+state under which that is false, so it validates nothing and reads as coverage.
+
+**Rule**: an assertion must be able to observe something the migration did *not* just
+write. Legitimate targets: `pg_indexes.indexdef` (the planner's view, not your DDL
+text), `information_schema.columns` (pitfall above), a `COMMENT` retained across an
+OID change, or — best — a **behavioural** probe that calls the function under a
+simulated JWT (`set_config('request.jwt.claims', …)`, see the Mgmt-API SQL pattern).
+Asserting your own `CREATE OR REPLACE` body back to yourself is not a test.
+
 ### Handler-vs-schema column-name drift: parametric existence assertion at handler-deploy
 
 When a handler `INSERT`s or `UPDATE`s columns on a projection table, those column names are not validated at function-creation time — PL/pgSQL late-binds column references. A handler that writes to a column that doesn't exist on the projection will deploy successfully and only fail at event-process time, where it surfaces as a `processing_error` on `domain_events` (a Pattern A v2 envelope returns `PROCESSING_FAILED` to the caller, but the failure happens AFTER the audit row is durable).
