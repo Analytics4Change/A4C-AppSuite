@@ -1,14 +1,36 @@
 ---
-status: seed
-last_updated: 2026-07-29
+status: partial
+last_updated: 2026-07-30
 ---
 
 # Seed: Gate PRs on Edge Function `deno lint` (and `deno check`)
 
-**Two things here**: (1) add the missing PR-time lint gate, and (2) close the
-required-check reporting gap on direct pushes to `main` — see the ⚠️ section
-below. They ship together because (1) adds a second required check that would
-otherwise inherit the same gap.
+> ## ⚠️ PARTIAL — one of two halves shipped
+>
+> | half | state |
+> |---|---|
+> | **(1) PR-time `deno lint` / `deno check` gate for Edge Functions** | **STILL OPEN** — this is the remaining work |
+> | **(2) `push: [main]` on `frontend-ci.yml`** | **SHIPPED** — PR #104, `527284eb` |
+>
+> **(2) did not do what this card originally said it would.** It was framed as
+> "closes the required-check reporting gap so direct pushes stop needing a bypass".
+> That premise is false — see the CORRECTION section below. It shipped for a
+> different, better reason (`strict: false` left merge commits unverified), and the
+> bypass-elimination decision is **RE-OPENED**.
+>
+> Verified in production on `527284eb`: the push run resolved a real
+> `deeff7b5..527284eb` range, ran the full suite, and attached
+> `Type-check, lint, test, build: success` to the merge commit — the first time
+> `main` has carried that record.
+>
+> **Read the CORRECTION section before implementing (1).** It contains the two traps
+> that would otherwise bite: `github.base_ref` is also empty on push events, and the
+> required-check-vs-path-filter interaction.
+
+**Original framing (kept for provenance)**: (1) add the missing PR-time lint gate,
+and (2) close the required-check reporting gap on direct pushes to `main`. They were
+to ship together because (1) adds a second required check that would otherwise
+inherit the same gap — that reasoning still holds for (1).
 
 **Origin**: PR #103 (email-lookup PR A), 2026-07-29. Found while investigating why
 `edge-functions-deploy` was red.
