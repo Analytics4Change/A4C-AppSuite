@@ -60,6 +60,11 @@ If the S1–S6 run shows that, suspect the guard's member branch, not the mappin
 logic.
 
 ## Verification
+
+> **⚠️ Fix the fixtures first.** `lars.tice+uat-deactivated@gmail.com` currently has
+> `is_active = true`, so the S3 `deactivated` assertion passes vacuously against an
+> `active_member` verdict. See `dev/active/stale-uat-fixture-users-without-auth-identity.md`.
+
 - Enter each fixture email (S1–S6 set) → correct panel renders (new/pending/deactivated/active-member/other-org), `active_member`+`pending` disable fields, others don't.
 - **Guard member-branch check (new)**: an `active_member` fixture must render as `active_member`, NOT `other_org`. See the diagnostic above.
 - Lookup failure → orange "couldn't check" panel, submit still works, retry re-runs. Reachable in mock mode via a `lookupfail@…` address.
@@ -71,3 +76,20 @@ logic.
 - **PR A SHIPPED** (#103, `deeff7b5`, 2026-07-29) — service tier: `apiRpc`/api-schema fix, correlation-id threading, `lookup_failed` failure channel, Edge Function 503 fence, RPC tenancy guard. Shipped dead.
 - **PR B SHIPPED** (#105, 2026-07-30) — the wireup. `onEmailBlur` now calls `UserFormViewModel.checkEmailStatus`; lookup state consolidated onto the form VM; staleness + prefilled-name revert; always-mounted live region; retry wired. `onSuggestedAction` IS now wired (retry only).
 - **REMAINING: the UAT below.** That is the whole residual risk — see the fixture list.
+
+## ⚠️ Email casing is NOT solved (added 2026-07-30, PR #106 review)
+
+PRs #105/#106 normalized the **three lookup RPCs**. The architect's trace found at
+least **five** further case-sensitive email comparisons, two of them worse than a
+lookup miss:
+
+- an **RLS policy** on `invitations_projection` that makes a mixed-case invitation
+  invisible to its own invitee (authorization-visibility failure)
+- `accept-invitation:534`, which can 500 `"Inconsistent auth state"` and
+  **permanently wedge** an invitation
+- `api.get_invitation_by_org_and_email` — still bare `=`, and the org-bootstrap
+  **idempotency guard**, so it now disagrees with `check_pending_invitation` and a
+  cased retry creates a duplicate
+
+Tracked in `dev/active/normalize-email-at-the-source.md`. Do not read the UAT
+fixture below as covering the problem space.

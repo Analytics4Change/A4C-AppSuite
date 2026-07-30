@@ -149,22 +149,31 @@ export class UserFormViewModel {
    * compared downstream.
    *
    * `validateEmail` trims before validating, and `buildRequest` submits trimmed, so
-   * " bob@org.com" is a *valid* address with no field error. But the guarded RPCs
-   * compare with bare equality (`WHERE u.email = p_email`), so probing the
-   * untrimmed value matches nothing, all three probes come back empty, and the UI
-   * renders a confident "New user — invite them" for someone who is already an
-   * active member. That is the exact failure the service contract forbids, arriving
+   * " bob@org.com" is a *valid* address with no field error. Historically the
+   * guarded RPCs compared with bare equality (`WHERE u.email = p_email`), so
+   * probing the untrimmed value matched nothing, all three probes came back empty,
+   * and the UI rendered a confident "New user — invite them" for someone already an
+   * active member — the exact failure the service contract forbids, arriving
    * through the input path instead of the infrastructure path.
    *
-   * NOT lowercased, and it does not need to be: `20260730032132` made all three
-   * RPCs compare `lower(email) = lower(btrim(p_email))`, backed by matching
-   * functional indexes. Case is handled server-side, where it holds for every
-   * caller — including the invite-user Edge Function, which does not trim.
+   * `20260730034703` now normalizes BOTH sides server-side
+   * (`btrim(lower(email)) = btrim(lower(p_email))`), so that is closed at the
+   * source. The trim here is kept as cheap defence in depth, and because the
+   * repeat-blur memo and the in-flight guard want a stable key.
    *
-   * Lowercasing here would also have been wrong on its own: with the old bare `=`
-   * comparison it would have *created* the mirror-image false-green for any
-   * address stored mixed-case. The trim is kept as the client-side half — cheap,
-   * and it keeps the memo and the in-flight guard keyed on a stable value.
+   * NOT lowercased, and it does not need to be — case is handled server-side by
+   * `20260730032132` + `20260730034703`, where it holds for every caller including
+   * the invite-user Edge Function, which does not trim.
+   *
+   * Lowercasing here would also have been wrong on its own: against the old bare
+   * `=` comparison it would have *created* the mirror-image false-green for any
+   * address stored mixed-case.
+   *
+   * ⚠️ These two migrations fix the three lookup RPCs, NOT every email comparison
+   * in the system. At least five others remain case-sensitive, including an RLS
+   * policy on `invitations_projection` and `api.get_invitation_by_org_and_email`.
+   * See `dev/active/normalize-email-at-the-source.md` — do not read this as
+   * "email casing is solved".
    */
   private get lookupKey(): string {
     return this.formData.email.trim();

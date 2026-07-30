@@ -28,10 +28,24 @@
 --   invitations_projection     18 rows, 0 mixed-case
 --
 -- All-lowercase today — but **nothing enforces it**: no `lower(email)` CHECK on
--- either table, and only 11 of 14 `public.users` rows match `auth.users.email`
--- exactly, so Supabase Auth's own normalization is not reliably propagating into
--- the projection. The property is incidental, which is exactly why this belongs in
--- SQL rather than in a client-side `toLowerCase()`.
+-- either table.
+--
+-- CORRECTION (dbc review of PR #106, F2). An earlier draft of this header claimed
+-- "only 11 of 14 public.users rows match auth.users.email exactly, so Auth's
+-- normalization is not reliably propagating". That was FALSE and is retracted:
+-- 3 of the 14 rows have no auth row AT ALL, and of the 11 that do, 11/11 match
+-- exactly (auth_row_but_email_differs = 0).
+--
+-- The real support for "Auth's normalization does not propagate" is structural,
+-- not statistical: `accept-invitation/index.ts:663,761` emit
+-- `email: invitation.email` — the PROJECTION value — into `user.created`, never
+-- the Auth-lowercased `authUser.email`, even though :595 had just compared the two
+-- case-insensitively. So a divergence MECHANISM exists with zero instances
+-- observed to date. The property is incidental, which is why this belongs in SQL
+-- rather than a client-side `toLowerCase()`.
+--
+-- (The 3 orphan `public.users` rows with no auth identity are unrelated to this
+-- migration and are carded separately.)
 --
 -- INDEXES — THE PART THAT IS NOT FREE
 --
@@ -58,8 +72,16 @@
 --
 -- `lower(btrim(p_email))` — trims as well as lowercases, so non-frontend callers
 -- get the same protection. The invite-user Edge Function passes whatever it
--- received; only the frontend trims client-side. The column side is `lower(email)`
--- alone so it matches the functional index expression exactly.
+-- received; only the frontend trims client-side.
+--
+-- ⚠️ SUPERSEDED (dbc review of PR #106, F1) by
+-- `20260730034703_symmetric_email_normalization.sql`. This migration used
+-- `lower(email)` alone on the COLUMN side, justified as "so it matches the
+-- functional index expression exactly". That justification is FALSE — an index on
+-- `btrim(lower(email))` is used identically (proven by EXPLAIN). The asymmetry
+-- bought nothing and left a stored value carrying stray whitespace unmatchable,
+-- i.e. a false `not_found`, reachable via the org-bootstrap path which has no
+-- email validation at any layer. Both sides are now `btrim(lower(...))`.
 --
 -- PITFALL 6 — deployed bodies were fetched and diffed before writing this
 --
