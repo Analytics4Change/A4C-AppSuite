@@ -200,6 +200,57 @@ The five preconditions above are **load-bearing invariants**, not preferences. A
 
 Originating context: PR #73 Section B (2026-06-09) retired `platform.view_event_details` via direct DELETE. All five preconditions held; migration body L213-226 enumerates them inline. Codified per PR #73 architect N1 fold-in.
 
+### A constraint violation inside an event handler FAILS SILENT
+
+Discovered in PR #108 while adding the first CHECK constraint to a handler-written projection. This is the single most important thing to know before constraining any projection table.
+
+`process_domain_event` catches every handler exception with `EXCEPTION WHEN OTHERS`, records it on `domain_events.processing_error`, and **does not re-raise**. So the outer `domain_events` INSERT commits, `api.emit_domain_event` returns a UUID with no error, and a caller that checks only the RPC's `error` sees success. The handler's own write has already rolled back.
+
+Verified chain, end to end:
+
+1. `handle_user_invited` INSERT raises `23514` (or `23505`)
+2. `process_user_event` propagates — no local handler
+3. `handlers/trigger/process_domain_event.sql:52-62` catches, sets `NEW.processing_error`, `RETURN NEW`
+4. `api.emit_domain_event` returns the id
+5. `invite-user/index.ts` checked only `eventError` → sent the invitation email
+
+Net effect: **200 OK, invitation email sent, no row in `invitations_projection`, and a token that 404s when the recipient clicks it — with nothing in the logs.** Not a 500. An undiagnosable dead invitation.
+
+**Rule.** Before adding ANY constraint to a projection written by an event handler, do one or both:
+
+**(a) Make the constraint unreachable.** For a *normalization* invariant, put the fix in a `BEFORE INSERT OR UPDATE ... FOR EACH ROW` trigger, which rewrites `NEW` before constraint evaluation. The constraint then documents the invariant and survives the trigger being dropped, but no writer can trip it.
+
+```sql
+CREATE OR REPLACE FUNCTION public.a_normalize_email_before_write()
+RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public','pg_temp' AS $fn$
+BEGIN
+  IF NEW.email IS NOT NULL THEN NEW.email := btrim(lower(NEW.email)); END IF;
+  RETURN NEW;
+END; $fn$;
+```
+
+> **PostgreSQL fires BEFORE-row triggers in NAME order.** Prefix the function and trigger names (`a_…`) so no later trigger can sort ahead and observe the un-normalized value.
+
+**(b) Give the wire-tier caller a read-back.** This is mandatory for anything a trigger cannot pre-empt — uniqueness above all, because a duplicate is a real condition, not a formatting slip. Use `api.get_event_processing_error(p_event_id uuid)`:
+
+```ts
+const processingError = await readProcessingError(supabaseAdmin, eventId);
+if (processingError) { /* fail the request BEFORE any side effect */ }
+```
+
+Helpers already exist: `_shared/emit-event.ts` → `readProcessingError` (Edge Functions) and `shared/utils/emit-event.ts` → same name, called inside `emitEvent` so the whole Temporal activity tier is covered by one check. Both **fail closed** — a failed read-back returns a synthetic error, never `null`, because "I could not determine whether this worked" must not be reported as success.
+
+`api.get_event_processing_error` **must be `SECURITY DEFINER`**: `authenticated` has no GRANT on `public.domain_events`, so an INVOKER `api.*` function raises 42501 → 403 (pitfall from PR #47/#48). It returns `processing_error` (MESSAGE_TEXT, PII layer 1) and never `processing_error_detail`.
+
+**Audit query** — wire-tier emitters that do not read back:
+
+```bash
+grep -rn "emit_domain_event" infrastructure/supabase/supabase/functions/ workflows/src/ \
+  | grep -v "__tests__"
+```
+
+Every match should be followed by a `readProcessingError` call before any side effect (email, DNS, returning success). PR #108 found three in `invite-user` alone — including `emitExpirationEvent`, which returned `Promise<void>` and logged its failure, leaving a stale `pending` row that the very next create-invitation would collide with.
+
 ### `CREATE INDEX IF NOT EXISTS` matches on NAME only — and an assertion that can't fail isn't one
 
 Two related traps, both found in PR #106 (2026-07-30).
