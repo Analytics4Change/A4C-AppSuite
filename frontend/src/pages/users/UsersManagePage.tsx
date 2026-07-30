@@ -960,11 +960,6 @@ export const UsersManagePage: React.FC = observer(() => {
                       emailLookup={formViewModel.emailLookupResult}
                       isEmailLookupLoading={formViewModel.isCheckingEmail}
                       onEmailBlur={runEmailLookup}
-                      suggestedAction={
-                        formViewModel.suggestedAction === 'none'
-                          ? null
-                          : formViewModel.suggestedAction
-                      }
                       onSuggestedAction={handleLookupAction}
                       disabled={formViewModel.isSubmitting}
                       phones={formViewModel.formData.phones}
@@ -1048,6 +1043,18 @@ export const UsersManagePage: React.FC = observer(() => {
                       <Button
                         type="submit"
                         disabled={!formViewModel.canSubmit}
+                        // `canSubmit` is false while a lookup is in flight — a state
+                        // newly reachable in this PR, since nothing set that flag
+                        // before. Deliberately NOT adding a title/aria-describedby
+                        // here: a natively-disabled button leaves the tab order, so
+                        // neither is reachable (the lesson from PR #102's a11y fix).
+                        // The explanation is carried instead by the always-mounted
+                        // polite live region beside the email field, which announces
+                        // "Checking this email…" on its own. Native `disabled` is kept
+                        // because this is a real submit control and the state is
+                        // sub-second; switching to aria-disabled + a handler guard
+                        // would mean intercepting form submission for no real gain.
+                        data-testid="invite-submit-btn"
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <Mail className="w-4 h-4 mr-1" />
@@ -1249,7 +1256,6 @@ export const UsersManagePage: React.FC = observer(() => {
                         emailLookup={null}
                         isEmailLookupLoading={false}
                         onEmailBlur={() => {}}
-                        suggestedAction={null}
                         onSuggestedAction={() => {}}
                         disabled={
                           formViewModel.isSubmitting || currentItem.displayStatus === 'deactivated'

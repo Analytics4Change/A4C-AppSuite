@@ -28,9 +28,19 @@ import type { EmailLookupResult, EmailLookupStatus, RoleReference } from '@/type
 
 const ROLES: RoleReference[] = [{ roleId: 'r1', roleName: 'Clinician' }];
 
-/** Minimal query-service stub — only checkEmailStatus is exercised. */
+/**
+ * Minimal query-service stub — only checkEmailStatus is exercised.
+ *
+ * `satisfies Pick<…>` keeps the one stubbed method type-checked against the real
+ * interface, so a signature change (e.g. making correlationId required) fails here
+ * rather than being swallowed by a blind `as unknown as` cast.
+ */
 function stubService(impl: (email: string) => Promise<EmailLookupResult>) {
-  return { checkEmailStatus: vi.fn(impl) } as unknown as IUserQueryService;
+  const stub = { checkEmailStatus: vi.fn(impl) } satisfies Pick<
+    IUserQueryService,
+    'checkEmailStatus'
+  >;
+  return stub as unknown as IUserQueryService;
 }
 
 function verdict(
@@ -50,6 +60,21 @@ function verdict(
 }
 
 const FAILED: EmailLookupResult = { status: 'lookup_failed' };
+
+/**
+ * Every status, exhaustively — a `Record` keyed on the union, so adding an eighth
+ * member is a COMPILE error here rather than a silently-skipped matrix row. That
+ * gap is what let `suggestedAction`'s missing `lookup_failed` case survive.
+ */
+const BLOCKS_SUBMIT: Record<EmailLookupStatus, boolean> = {
+  not_found: false,
+  pending: false,
+  expired: false,
+  active_member: true,
+  deactivated: false,
+  other_org: false,
+  lookup_failed: false,
+};
 
 /** A form filled well enough that only the lookup can block submission. */
 function validForm(vm: UserFormViewModel, email = 'someone@example.com') {
@@ -86,17 +111,18 @@ describe('UserFormViewModel — email lookup', () => {
       expect(vm.canSubmit).toBe(false);
     });
 
-    it.each<[Exclude<EmailLookupStatus, 'lookup_failed'>]>([
-      ['not_found'],
-      ['pending'],
-      ['expired'],
-      ['deactivated'],
-      ['other_org'],
-    ])('canSubmit stays true on %s', (status) => {
-      validForm(vm);
-      vm.setEmailLookupResult(verdict(status));
-      expect(vm.canSubmit).toBe(true);
-    });
+    it.each(Object.entries(BLOCKS_SUBMIT) as Array<[EmailLookupStatus, boolean]>)(
+      '%s → blocks submit: %s',
+      (status, blocks) => {
+        validForm(vm);
+        vm.setEmailLookupResult(
+          status === 'lookup_failed'
+            ? FAILED
+            : verdict(status as Exclude<EmailLookupStatus, 'lookup_failed'>)
+        );
+        expect(vm.canSubmit).toBe(!blocks);
+      }
+    );
 
     it('suggestedAction is none for lookup_failed (no action to suggest)', () => {
       vm.setEmailLookupResult(FAILED);
@@ -146,6 +172,25 @@ describe('UserFormViewModel — email lookup', () => {
       expect(vm.formData.lastName).toBe('');
     });
 
+    it('does NOT revert a prefilled name the admin then EDITED', () => {
+      // The case the sibling test below misses: it types the name BEFORE the lookup,
+      // so the prefill never fires and the flag is never set. Here the lookup DOES
+      // prefill, the admin overwrites it (nothing locks the field for other_org),
+      // and the correction must survive the email change.
+      vm.updateField('email', 'external@other.com');
+      vm.setEmailLookupResult(
+        verdict('other_org', { userId: 'u9', firstName: 'External', lastName: 'User' })
+      );
+      expect(vm.formData.firstName).toBe('External');
+
+      vm.updateField('firstName', 'Alice'); // admin takes ownership
+      vm.updateField('email', 'corrected@other.com');
+
+      expect(vm.formData.firstName).toBe('Alice');
+      // lastName was never overwritten, so it is still the lookup's — and reverts.
+      expect(vm.formData.lastName).toBe('');
+    });
+
     it('does NOT revert a name the ADMIN typed', () => {
       validForm(vm, 'active@org.com'); // types Ada Lovelace
       vm.setEmailLookupResult(
@@ -167,6 +212,41 @@ describe('UserFormViewModel — email lookup', () => {
       vm.reset();
       expect(vm.emailLookupResult).toBeNull();
       expect(vm.isCheckingEmail).toBe(false);
+    });
+  });
+
+  describe('normalization — the key must match what the RPC compares', () => {
+    it('probes the TRIMMED address', async () => {
+      // validateEmail trims before validating, so " bob@org.com" is a valid address
+      // with no field error — but the RPCs compare with bare `=`, so probing the
+      // untrimmed value matches nothing and renders a confident "new user" panel
+      // for someone who may be an active member.
+      const svc = stubService(async () => verdict('active_member', { userId: 'u1' }));
+      vm.updateField('email', '  bob@org.com  ');
+
+      await vm.checkEmailStatus(svc);
+
+      expect(svc.checkEmailStatus).toHaveBeenCalledWith('bob@org.com');
+      expect(vm.emailLookupResult?.status).toBe('active_member');
+    });
+
+    it('writes the verdict despite surrounding whitespace in the field', async () => {
+      // Regression fence: trimming only the outgoing value, while still comparing
+      // the response against the RAW field, would discard every response and never
+      // write a verdict at all.
+      const svc = stubService(async () => verdict('pending', { invitationId: 'i1' }));
+      vm.updateField('email', ' pending@org.com ');
+      await vm.checkEmailStatus(svc);
+      expect(vm.emailLookupResult?.status).toBe('pending');
+    });
+
+    it('treats a whitespace-only edit as the same address (memo holds)', async () => {
+      const svc = stubService(async () => verdict('not_found'));
+      vm.updateField('email', 'same@org.com');
+      await vm.checkEmailStatus(svc);
+      vm.updateField('email', '  same@org.com  ');
+      await vm.checkEmailStatus(svc);
+      expect(svc.checkEmailStatus).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -220,6 +300,28 @@ describe('UserFormViewModel — email lookup', () => {
       await vm.checkEmailStatus(svc);
 
       expect(svc.checkEmailStatus).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('concurrency — one probe per address at a time', () => {
+    it('does not stack a second probe for an address already in flight', async () => {
+      // Reachable via edit-away-and-back (which clears the result, defeating the
+      // memo) and via repeat retry clicks. Two same-address probes cannot be told
+      // apart by value-keying, so the first to finish would clear the in-flight flag
+      // while the second was still out — aria-busy, spinner and canSubmit all
+      // reading "idle" while a late verdict could still land and re-lock the form.
+      const pending: Array<(r: EmailLookupResult) => void> = [];
+      const svc = stubService(() => new Promise<EmailLookupResult>((res) => pending.push(res)));
+
+      validForm(vm, 'a@org.com');
+      const first = vm.checkEmailStatus(svc);
+      const second = vm.checkEmailStatus(svc); // same address, still in flight
+
+      expect(svc.checkEmailStatus).toHaveBeenCalledTimes(1);
+
+      pending[0](verdict('not_found'));
+      await Promise.all([first, second]);
+      expect(vm.isCheckingEmail).toBe(false);
     });
   });
 

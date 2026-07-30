@@ -35,7 +35,7 @@ Replace the stub with a debounced lookup that populates `emailLookupResult` (and
 ## Decisions to make
 - ~~**Trigger**: onBlur vs debounced onChange.~~ **RESOLVED (PR A planning, 2026-07-29): onBlur.** One lookup is up to 3 sequential RPCs, and post-guard those are membership probes we do not want firing per keystroke. Reuses the `onEmailBlur` prop + `handleEmailBlur` that already exist. This **reverses** the §Proposed recommendation above (debounced) — noted here so the reversal is deliberate, not lost.
 - ~~**Fail-closed on lookup error (show nothing)**.~~ **RESOLVED (PR A, 2026-07-29): show an orange "couldn't check" panel instead.** Showing nothing is indistinguishable from "not looked up yet"; the panel says plainly that the check failed and that submit still works. Follows `MedicationStatusIndicator.tsx:63-68`. Also a reversal of §Proposed.
-- **Submit-button relabel**: keep static "Send Invitation", or relabel per status? (Backend routing is authoritative either way; this is UX honesty.) NOTE: `onSuggestedAction` is NOT wired in PR A — the `other_org` and `deactivated` action labels were removed (`addUserToOrganization` is a not-implemented stub; a standalone "Reactivate" would skip the roles the admin just selected).
+- **Submit-button relabel**: keep static "Send Invitation", or relabel per status? (Backend routing is authoritative either way; this is UX honesty.) NOTE (updated for PR B): `onSuggestedAction` IS wired, but for **retry only**. `pending` / `expired` / `active_member` / `deactivated` / `other_org` all carry `actionLabel: undefined` — resend needs id-parameterised handlers, View User needs discard semantics, `addUserToOrganization` is a not-implemented stub, and a standalone Reactivate would skip the selected roles. Seeded separately.
 - **Perf**: 3 RPCs per lookup — acceptable on blur.
 
 ## ⚠️ Backend dependency added by PR A (2026-07-29)
@@ -48,8 +48,9 @@ returned `{"user_id":…,"is_active":true}` for an arbitrary email/org pair.
 **What this means for the UI work**: the lookup now depends on the caller being
 recognised as a member of `p_org_id` via `users.accessible_organizations`. That
 branch is **the one path not yet exercised end-to-end** — the service-role
-(Edge Function) and anon-denied paths were both probed post-apply, but the
-authenticated-member path is unreachable until this card's stub is replaced.
+(Edge Function) and anon-denied paths were both probed post-apply. PR B (#105)
+replaced the stub, so this path is now **reachable and awaiting its first real
+exercise**.
 
 **Diagnostic if it is broken**: a denied caller gets RETURN-empty, not an error.
 So membership returns `[]`, pending returns `[]`, and the unguarded
@@ -62,8 +63,11 @@ logic.
 - Enter each fixture email (S1–S6 set) → correct panel renders (new/pending/deactivated/active-member/other-org), `active_member`+`pending` disable fields, others don't.
 - **Guard member-branch check (new)**: an `active_member` fixture must render as `active_member`, NOT `other_org`. See the diagnostic above.
 - Lookup failure → orange "couldn't check" panel, submit still works, retry re-runs. Reachable in mock mode via a `lookupfail@…` address.
+- **Whitespace / mixed-case fixture (NEW, dbc PR #105 F1)**: paste `"  <active-member-address>  "` with surrounding spaces. Must render `active_member`, NOT the blue "New user" panel. `validateEmail` trims before validating so there is no field error to warn you, and the RPCs compare with bare `=` — PR B trims the probe key, but **case is still unhandled**: a stored mixed-case address will still false-green. See `dev/active/normalize-email-case-in-lookup-rpcs.md`.
+- **Keyboard focus on retry (NEW, dbc PR #105 F2)**: tab to "Try again", activate by keyboard, confirm focus is NOT lost to `<body>` and the button disables in place rather than unmounting.
 - `npm run typecheck && npm run lint && npm run build` green; add a ViewModel unit test for the lookup → status mapping.
 
 ## Status
-- **PR A SHIPPED-pending-push (2026-07-29)** — service tier: `apiRpc`/api-schema fix, correlation-id threading, `lookup_failed` failure channel, Edge Function fence, RPC tenancy guard (applied to dev). Ships dead; the stub below is untouched.
-- **PR B NOT STARTED** — the actual wireup. Origin stub still at `UsersManagePage.tsx` `onEmailBlur`. Low-MED priority.
+- **PR A SHIPPED** (#103, `deeff7b5`, 2026-07-29) — service tier: `apiRpc`/api-schema fix, correlation-id threading, `lookup_failed` failure channel, Edge Function 503 fence, RPC tenancy guard. Shipped dead.
+- **PR B SHIPPED** (#105, 2026-07-30) — the wireup. `onEmailBlur` now calls `UserFormViewModel.checkEmailStatus`; lookup state consolidated onto the form VM; staleness + prefilled-name revert; always-mounted live region; retry wired. `onSuggestedAction` IS now wired (retry only).
+- **REMAINING: the UAT below.** That is the whole residual risk — see the fixture list.

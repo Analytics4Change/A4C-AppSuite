@@ -80,9 +80,6 @@ export interface UserFormFieldsProps {
   /** Called when email is blurred for lookup */
   onEmailBlur?: () => void;
 
-  /** Suggested action based on email lookup */
-  suggestedAction?: 'invite' | 'resend' | 'reactivate' | 'add_to_org' | null;
-
   /** Called when suggested action is accepted */
   onSuggestedAction?: (action: string) => void;
 
@@ -381,7 +378,6 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
     emailLookup,
     isEmailLookupLoading = false,
     onEmailBlur,
-    suggestedAction: _suggestedAction,
     onSuggestedAction,
     disabled = false,
     isEditMode = false,
@@ -499,18 +495,30 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
 
               It also announces the in-flight state, so a slow lookup is not
               silence — the spinner alone conveys nothing to AT.
+
+              An existing panel is kept MOUNTED while a re-check runs, rather than
+              being swapped for the "checking" line. Retry lives inside this region,
+              so unmounting the panel on activation would destroy the very button
+              the user just pressed and drop focus to <body> — forbidden by
+              command-feedback.md §Focus and CLAUDE.md §Focus Restoration, and
+              WCAG 2.4.3. The button disables itself instead, and the input's
+              aria-busy + spinner carry the in-flight state.
             */}
             <div id={`${emailId}-feedback`} role="status" aria-live="polite">
-              {isEmailLookupLoading ? (
-                <p className="mt-2 text-sm text-gray-600" data-testid="email-lookup-checking">
-                  Checking this email…
-                </p>
-              ) : showEmailFeedback ? (
+              {showEmailFeedback ? (
                 <EmailLookupFeedback
                   lookup={emailLookup}
                   onAction={onSuggestedAction}
-                  isLoading={disabled}
+                  // Track the LOOKUP, not form submission: this drives the retry
+                  // button's disabled state, and `lookup_failed` is deliberately
+                  // exempt from the repeat-blur memo, so without this a held-down
+                  // retry would fire unbounded probes.
+                  isLoading={isEmailLookupLoading || disabled}
                 />
+              ) : isEmailLookupLoading ? (
+                <p className="mt-2 text-sm text-gray-600" data-testid="email-lookup-checking">
+                  Checking this email…
+                </p>
               ) : null}
             </div>
           </div>

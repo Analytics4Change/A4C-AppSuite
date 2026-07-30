@@ -111,6 +111,15 @@ describe('UserFormFields — email lookup', () => {
       expect(screen.getByTestId('email-lookup-not_found')).toBeTruthy();
     });
 
+    it('has EXACTLY ONE live region — a nested one would double-announce', () => {
+      // liveRegion() is querySelector, i.e. first match. Before this PR the inner
+      // EmailLookupFeedback panel carried its own role="status" aria-live="polite";
+      // if that were reintroduced, every other assertion here would still pass while
+      // AT announced twice. Count, don't just find.
+      renderFields({ emailLookup: verdict('active_member') });
+      expect(document.querySelectorAll('[role="status"][aria-live="polite"]')).toHaveLength(1);
+    });
+
     it('announces the in-flight state rather than leaving silence', () => {
       renderFields({ isEmailLookupLoading: true });
       expect(screen.getByTestId('email-lookup-checking')).toBeTruthy();
@@ -171,6 +180,36 @@ describe('UserFormFields — email lookup', () => {
       btn.click();
 
       expect(onSuggestedAction).toHaveBeenCalledWith('retry');
+    });
+
+    it('keeps the retry button mounted and focused while the re-check runs', () => {
+      // Retry lives INSIDE the live region. Swapping the panel for the "checking"
+      // line on activation would unmount the button the user just pressed and drop
+      // focus to <body> (command-feedback.md §Focus, WCAG 2.4.3). The panel stays;
+      // the button disables instead.
+      const { rerender } = renderFields({ emailLookup: FAILED, onSuggestedAction: vi.fn() });
+      const btn = screen.getByTestId('email-lookup-action-lookup_failed');
+      btn.focus();
+      expect(document.activeElement).toBe(btn);
+
+      rerender(
+        <UserFormFields
+          formData={FORM}
+          onFieldChange={vi.fn()}
+          onFieldBlur={vi.fn()}
+          getFieldError={() => null}
+          availableRoles={[ROLE]}
+          onRoleToggle={vi.fn()}
+          emailLookup={FAILED}
+          isEmailLookupLoading
+          onSuggestedAction={vi.fn()}
+        />
+      );
+
+      const after = screen.getByTestId('email-lookup-action-lookup_failed') as HTMLButtonElement;
+      expect(after).toBe(btn); // same node — not remounted
+      expect(document.activeElement).toBe(after); // focus survived
+      expect(after.disabled).toBe(true); // and it can't be double-fired
     });
 
     it.each<[Exclude<EmailLookupStatus, 'lookup_failed'>]>([
