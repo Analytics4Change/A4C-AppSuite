@@ -125,19 +125,55 @@ bypassed. This is **not** a defect in PR #97's design (which is correct for its
 trigger); it is that branch protection expects a check on a path the workflow was
 never wired to cover.
 
-Two resolutions, and it is a **policy** call, not a CI bug:
+### ⚠️ CORRECTION (2026-07-29, dbc review of PR #104): (b) does NOT remove the bypass
 
-- **(a) Route everything through PRs**, including doc-only commits. The gap never
-  arises, and bypass stops being routine. Costs a PR for two-line card edits, and
-  cuts against the existing carve-out allowing card-archival/memory-only closeouts
-  directly on `main`.
-- **(b) Add `push: branches: [main]` to `frontend-ci.yml`'s trigger.** The check
-  then reports on direct pushes and the change-detection step no-ops it cheaply.
-  Keeps the carve-out; one line.
+This card originally framed the choice as (a) route everything through PRs vs
+(b) add `push: branches: [main]`, and recommended (b) as "the smaller change".
+**(b) cannot work for that purpose, and the recommendation was wrong.**
 
-**(b) is the smaller change and preserves current working habits.** Whichever is
-chosen, apply it to the new Edge Function lint check at the same time — otherwise
-this card ships a second required check with the identical gap.
+Required status checks under classic branch protection are evaluated **at push
+time, against the incoming head SHA** — which is why the warning comes from the
+remote during `git push`. GitHub's ordering is explicit: checks pass *first*, then
+the push. So a `push`-triggered workflow can only start **after** the ref update is
+accepted:
+
+1. `git push origin main` → pre-receive evaluates the required context against a
+   SHA GitHub has never seen → no check runs exist → `Required status check … is expected.`
+2. Bypass (`enforce_admins: false`) lets the ref update land.
+3. *Only now* does the `push` run start and attach — **after** the bypass.
+
+PR #104 shipped that trigger anyway, for a **different and better reason** (see
+below), and its header comment now says plainly that it does not remove the bypass.
+
+**Options that actually eliminate it** — this decision is **RE-OPENED**:
+
+- **(i) Docs commits via PR + auto-merge.** Works: a PR merged via the merge button
+  is evaluated against the PR head SHA, which carries the check. Costs a PR per
+  two-line card edit; cuts against the `feedback-branch-on-decision` carve-out.
+- **(ii) Temp-branch → checks → fast-forward** (GitHub's documented workaround).
+  Requires broadening the push trigger beyond `[main]` — use a narrow explicit
+  namespace like `branches: [main, 'ci-precheck/**']`, never `'**'` (that would
+  double-run every PR-branch push).
+- **(iii) Migrate to a ruleset with the maintainer as a named `bypass_actor`,** so
+  the carve-out is an audited policy decision rather than an accident that trains
+  the wrong reflex. The honest option if the carve-out is genuinely wanted.
+
+### What PR #104 actually bought (the real justification)
+
+Branch protection has **`strict: false`** — "require branches to be up to date
+before merging" is OFF. The required check therefore validates the **PR head** and
+never the **merge result**. Verified: `deeff7b5` (the PR #103 squash-merge, which
+rewrote a service, deleted two test files and changed `eslint.config.js`) carries
+**no** `Type-check, lint, test, build` run at all. Before #104, `main` held no
+evidence it typechecked, linted or passed tests.
+
+That is the **same failure class as this card's own origin story** — the `deno lint`
+error that sat on `main` for two months. Work verified somewhere other than where
+it ships.
+
+**Implication for the lint gate this card proposes:** copy `frontend-ci.yml`'s
+always-run + detect-changes shape for the PR trigger (unchanged advice), and add
+`push: [main]` for the `strict: false` reason — *not* to avoid a bypass.
 
 **Why this matters beyond tidiness**: routine bypassing trains the reflex that a
 red or unreported required check is normal. That reflex is precisely how a `deno
@@ -149,9 +185,12 @@ lint` failure survived on `main` for two months.
   check FAILS on the PR, not after merge.
 - Open a PR touching **no** Edge Function → the check does not sit `pending`
   (the trap above).
-- **Push a docs-only commit directly to `main`** → the required check reports
-  (green, no-op) instead of needing a bypass. This is the residual-gap fix; if
-  it still says "Bypassed rule violations", (b) was not applied.
+- **Push a docs-only commit directly to `main`** → a `Frontend CI` run appears on
+  that commit with event `push`, its detect step logs a real `before..after` range,
+  and it reports. **The "Bypassed rule violations" message STILL APPEARS — that is
+  expected, not a failure** (see the correction above; the run attaches after the
+  push). What this verifies is that `main` commits now carry a verification record,
+  not that the gate blocks.
 - Confirm PR lint and deploy-time lint agree: same Deno version, same flags,
   same per-function loop.
 
@@ -176,3 +215,15 @@ here is how one of them goes stale.
 - `.github/workflows/frontend-ci.yml` — the always-run + detect-changes exemplar
   to copy; its header comment is the canonical statement of the rule
 - PR #97 — where that pattern was established
+- PR #104 — added `push: [main]` for the `strict: false` reason; corrected this card
+
+### Two traps for whoever implements the lint gate
+
+1. **Do NOT blanket-add `push:` triggers.** `supabase-edge-functions-lint.yml:33-36`
+   uses `github.base_ref`, which is **empty on a push event** — adding a push
+   trigger there re-creates the exact empty-SHA bug PR #104 just fixed for
+   `base.sha`. Same pitfall, different field.
+2. **`rpc-registry-sync.yml` and `rpc-reachability-matrix-sync.yml` want
+   `push: [main]` too** — for the `strict: false` reason (a migration can land and
+   generated-registry/matrix drift go undetected post-merge), NOT the bypass
+   reason. They are not required checks, so they may keep their `paths:` filters.

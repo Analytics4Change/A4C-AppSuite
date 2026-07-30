@@ -41,6 +41,7 @@ purpose: agent-navigation
 | `access-blocked` | [organization-management-architecture.md](architecture/data/organization-management-architecture.md) | frontend-auth-architecture.md, JWT-CLAIMS-SETUP.md |
 | `accessibility` | [frontend/CLAUDE.md](../frontend/CLAUDE.md) | TESTING.md, component docs |
 | `activities-reference` | [activities-reference.md](workflows/reference/activities-reference.md) | error-handling-and-compensation.md |
+| `required-status-check` | [frontend-ci.yml](../.github/workflows/frontend-ci.yml) | gate-prs-on-edge-function-deno-lint.md (dev/active), supabase-edge-functions-test.yml |
 | `assignment` | [user_client_assignments_projection.md](infrastructure/reference/database/tables/user_client_assignments_projection.md) | schedule_user_assignments_projection.md, organizations_projection.md |
 | `activity` | [workflows/CLAUDE.md](../workflows/CLAUDE.md) | activities-reference.md |
 | `automatic-tracing` | [event-observability.md](infrastructure/guides/event-observability.md) | event-metadata-schema.md |
