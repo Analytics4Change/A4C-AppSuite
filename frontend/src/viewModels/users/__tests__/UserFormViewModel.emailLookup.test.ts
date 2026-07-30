@@ -405,3 +405,56 @@ describe('UserFormViewModel — email lookup', () => {
     });
   });
 });
+
+/**
+ * isDirty must not treat a case-only email edit as a change.
+ *
+ * The backend canonicalizes to `btrim(lower(email))` (migration
+ * `20260730045737`), so `Bob@x.com` and `bob@x.com` are the same address to
+ * every consumer. Before this fix, retyping your own email with different
+ * capitalization armed the unsaved-changes guard and prompted the admin to
+ * confirm discarding a change that did not exist.
+ */
+describe('UserFormViewModel — isDirty email comparison', () => {
+  const existingUser = {
+    id: 'u1',
+    email: 'bob@example.com',
+    firstName: 'Bob',
+    lastName: 'Smith',
+    roles: [{ roleId: 'r1', roleName: 'Clinician' }],
+    isActive: true,
+  } as unknown as Parameters<typeof UserFormViewModel>[2];
+
+  function editVm() {
+    return new UserFormViewModel(ROLES, 'edit', existingUser);
+  }
+
+  it('is not dirty when nothing changed', () => {
+    expect(editVm().isDirty).toBe(false);
+  });
+
+  it('is NOT dirty for a case-only email edit', () => {
+    const vm = editVm();
+    vm.updateField('email', 'BOB@Example.COM');
+    expect(vm.isDirty).toBe(false);
+  });
+
+  it('is NOT dirty for a whitespace-only email edit', () => {
+    const vm = editVm();
+    vm.updateField('email', '  bob@example.com  ');
+    expect(vm.isDirty).toBe(false);
+  });
+
+  it('IS dirty for a genuine email change', () => {
+    // The guard still has to work — normalizing must not swallow real edits.
+    const vm = editVm();
+    vm.updateField('email', 'robert@example.com');
+    expect(vm.isDirty).toBe(true);
+  });
+
+  it('IS dirty for a non-email change', () => {
+    const vm = editVm();
+    vm.updateField('firstName', 'Robert');
+    expect(vm.isDirty).toBe(true);
+  });
+});

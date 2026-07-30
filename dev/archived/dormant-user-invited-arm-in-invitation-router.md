@@ -1,5 +1,5 @@
 ---
-status: seed
+status: DONE (PR D, 2026-07-30)
 last_updated: 2026-07-30
 ---
 
@@ -69,3 +69,20 @@ projection starts getting a different shape than every existing row, and the
 - `dev/active/normalize-email-at-the-source.md` — `handle_user_invited` is one of the
   unnormalized write paths in that card's table
 - PR #106 F13
+
+
+---
+
+## RESOLVED — PR D (`20260730045737_normalize_email_at_the_source.sql`, 2026-07-30)
+
+Option 1 taken: the arm was **deleted**. Confirmed dead before removal (all 26
+`user.invited` events carry `stream_type='user'`), and
+`contracts/asyncapi/domains/invitation.yaml:69-71` pins
+`UserInvitedEvent.stream_type` to `const: user`, so the arm contradicted the
+published contract as well as the observed traffic.
+
+The router's existing `ELSE RAISE EXCEPTION ... P9001` now handles a stray
+`user.invited` on the invitation stream, which is the correct behaviour.
+`v_org_id` was dropped from the DECLARE block with the arm — it had no other
+reader. Reference file `handlers/routers/process_invitation_event.sql` updated to
+match.

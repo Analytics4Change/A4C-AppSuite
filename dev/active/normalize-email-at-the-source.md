@@ -1,5 +1,5 @@
 ---
-status: seed
+status: RESOLVED (PR D, 2026-07-30) — uniqueness follow-up in PR E
 last_updated: 2026-07-30
 ---
 
@@ -124,3 +124,68 @@ accidental protection, and only on that one path.
 - `dev/active/extract-email-lookup-controller.md` — if this lands first,
   `UserFormViewModel.lookupKey` may disappear rather than move
 - PR #105 F1, PR #106 F1/F5/F7/F8/F11/F12
+
+
+---
+
+## RESOLVED — PR D (2026-07-30)
+
+`20260730045737_normalize_email_at_the_source.sql` establishes the property this
+card asked for, plus the wire-tier fixes that made it safe to establish.
+
+**What shipped**
+
+- BEFORE-row trigger `a_normalize_email_before_write` on `users` and
+  `invitations_projection` canonicalizing every write to `btrim(lower(email))`,
+  paired with `chk_users_email_normalized` / `chk_invitations_email_normalized`.
+- F11 (RLS `invitations_user_own_select`), F5 (`get_invitation_by_org_and_email`
+  **and** `get_invitation_by_id`) normalized — symmetric form, matching #106.
+- F12 (`accept-invitation:534`) fixed via an extracted, tested
+  `findAuthUserByEmail`.
+- Frontend: `OrganizationFormViewModel`, `organization-validation` (both the
+  raw-value regex test and the case-sensitive confirmation compare),
+  `InvitationAcceptanceViewModel`, `LoginPage`, `UserFormViewModel.isDirty`.
+- Temporal: normalization in `generate-invitations`, and a read-back in
+  `emitEvent` covering the whole activity tier.
+
+**The citext decision — recorded here because the deleted predecessor lost it once**
+
+Rejected, on three grounds:
+
+1. **It does not trim.** `'  a@b.com  '::citext <> 'a@b.com'::citext`, and
+   trimming is half the bug.
+2. **It would silently gut the CHECK.** Under citext,
+   `email = btrim(lower(email))` evaluates TRUE for a mixed-case value, because
+   `=` is case-insensitive. The constraint would read as if it enforced both
+   properties while enforcing only one.
+3. **It cannot reach `accept-invitation:534`** — a JavaScript `===` against the
+   Auth admin API, which no SQL operator touches.
+
+Also blocking: `ALTER COLUMN ... TYPE citext` fails while
+`public.event_history_by_entity` projects `users.email`, and `supabase gen types`
+emits `unknown` for extension types (`ltree` precedent at
+`database.types.ts:160,525`).
+
+**What did NOT ship — F7 uniqueness → PR E**
+
+A CHECK violation can be made unreachable by the trigger; a **uniqueness**
+violation cannot, because a duplicate is a real condition. And per
+`infrastructure/supabase/CLAUDE.md`, a handler exception is absorbed into
+`processing_error` without re-raising — so a 23505 inside `handle_user_invited`
+degrades to a silent no-row failure. PR D adds the read-backs that turn that into
+a visible error; PR E adds the indexes once probe P3 confirms those read-backs
+are live in the **deployed** Edge Function.
+
+PR E scope: `uq_users_email_normalized` (`WHERE deleted_at IS NULL` —
+`handle_user_deleted.sql:13` soft-deletes and retains the email),
+`uq_invitations_pending_org_email` (`WHERE status = 'pending'`), the orphan
+pre-flight, behavioural probes for the partial predicates, and a guard for the
+`expired → resend → 23505` sequence described below.
+
+**Blocker PR E must clear first (verified during PR D)**
+
+`handle_invitation_resent.sql:7-13` sets `status = 'pending'` unconditionally.
+`invite-user:833-845` refuses to resend `accepted` and `revoked` invitations but
+**not `expired`** ones. So: invitation A expires → B is created (pending) →
+someone resends A → A flips to pending → two pending rows for the same
+`(org, normalized email)`. Two ordinary steps, no race.

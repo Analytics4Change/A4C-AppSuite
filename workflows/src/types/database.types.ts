@@ -540,6 +540,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_event_processing_error: {
+        Args: { p_event_id: string }
+        Returns: string
+      }
       get_event_processing_stats: { Args: never; Returns: Json }
       get_events_by_correlation: {
         Args: { p_correlation_id: string; p_limit?: number }

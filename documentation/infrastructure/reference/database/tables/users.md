@@ -323,7 +323,27 @@ SELECT * FROM users;  -- Only own user record
 CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
 ```
 
-### Check Constraints
+### Check Constraint: email is canonical
+
+```sql
+CONSTRAINT chk_users_email_normalized CHECK (email = btrim(lower(email)))
+```
+
+- **Added**: `20260730045737_normalize_email_at_the_source.sql` (PR D)
+- **Purpose**: states the invariant that a stored email is always
+  `btrim(lower(email))`, so a bare `=` comparison against stored state is safe
+  to write. Before this, three lookup RPCs had been patched one at a time
+  (PRs #103/#106) to work around the absence of the property.
+- **Upheld by**: the `a_normalize_email_users` trigger below, which rewrites `NEW.email`
+  *before* constraint evaluation. In normal operation this CHECK is therefore
+  unreachable — it exists to make the invariant legible and to survive the
+  trigger being dropped.
+- **⚠️ Do not drop the trigger and keep the CHECK.** `process_domain_event`
+  absorbs handler exceptions into `processing_error` without re-raising, so a
+  reachable CHECK degrades to a *silent* no-projection-row failure rather than a
+  visible error.
+
+### Other Check Constraints
 
 **None explicitly defined** - Consider adding validation constraints:
 
@@ -340,9 +360,29 @@ CHECK (
 
 ## Triggers
 
-### None Currently
+### `a_normalize_email_users` — BEFORE INSERT OR UPDATE, FOR EACH ROW
 
-**Rationale**: User management is handled by Supabase Auth hooks and Edge Functions, not database triggers.
+```sql
+CREATE TRIGGER a_normalize_email_users
+  BEFORE INSERT OR UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.a_normalize_email_before_write();
+```
+
+Canonicalizes `NEW.email` to `btrim(lower(NEW.email))`. Added by
+`20260730045737_normalize_email_at_the_source.sql` (PR D); canonical reference at
+`infrastructure/supabase/handlers/trigger/a_normalize_email_before_write.sql`.
+
+The `a_` prefix is **load-bearing**: PostgreSQL fires BEFORE-row triggers in
+*name order*, so it guarantees no future trigger sorts ahead of this one and
+observes a non-normalized value.
+
+This does not bypass the event stream — it cannot fire unless a handler wrote,
+and it introduces no data not derived from that write. Replay stays correct
+because `btrim(lower(x))` is deterministic, total and idempotent.
+
+### No other triggers
+
+**Rationale**: User management is otherwise handled by Supabase Auth hooks and Edge Functions, not database triggers.
 
 **User Creation Flow**:
 1. User signs up via Supabase Auth (creates `auth.users` record)

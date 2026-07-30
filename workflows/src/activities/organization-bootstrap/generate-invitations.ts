@@ -29,13 +29,19 @@ const log = getLogger('GenerateInvitations');
 
 /**
  * RPC result from api.get_invitation_by_org_and_email
+ *
+ * These four columns are the RPC's ENTIRE RETURNS TABLE. It previously also
+ * declared `contact_id`, which the RPC has never returned -- so the
+ * idempotency-hit branch below read `undefined` and silently dropped
+ * contact-user linkage on every retry. Do not re-add a field here without
+ * adding it to the RPC's signature first (and re-issuing all four @a4c-* tags,
+ * since a signature change is a DROP+CREATE that loses the OID comment).
  */
 interface InvitationRpcResult {
   invitation_id: string;
   email: string;
   token: string;
   expires_at: string;
-  contact_id: string | null;
 }
 
 /**
@@ -69,16 +75,22 @@ export async function generateInvitations(
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   for (const user of params.users) {
+    // Canonicalize once. The DB now stores btrim(lower(email)) (see migration
+    // 20260730045737), and this is the only bootstrap layer that can normalize
+    // before the value fans out to three different consumers: the contact map,
+    // the idempotency probe, and the emitted event payload.
+    const normalizedEmail = user.email.trim().toLowerCase();
+
     // Look up contact_id for this user's email (if contact was created during org bootstrap)
-    const contactId = params.contactsByEmail?.[user.email.toLowerCase()];
-    log.debug('Processing invitation', { email: user.email, contactId });
+    const contactId = params.contactsByEmail?.[normalizedEmail];
+    log.debug('Processing invitation', { email: normalizedEmail, contactId });
 
     // Check if invitation already exists (idempotency) via RPC
     const { data: existingData } = await supabase
       .schema('api')
       .rpc('get_invitation_by_org_and_email', {
         p_org_id: params.orgId,
-        p_email: user.email
+        p_email: normalizedEmail
       });
 
     const existing = existingData && existingData.length > 0
@@ -86,13 +98,16 @@ export async function generateInvitations(
       : null;
 
     if (existing) {
-      log.debug('Invitation already exists', { email: user.email });
+      log.debug('Invitation already exists', { email: normalizedEmail });
       invitations.push({
         invitationId: existing.invitation_id,
         email: existing.email,
         token: existing.token,
         expiresAt: new Date(existing.expires_at),
-        contactId: existing.contact_id ?? undefined
+        // From the local contact map, NOT from the RPC -- it does not return
+        // contact_id (see InvitationRpcResult). Reading it off `existing` meant
+        // this branch always yielded undefined and dropped the linkage.
+        contactId
       });
       continue;
     }
@@ -111,7 +126,7 @@ export async function generateInvitations(
       event_data: {
         invitation_id: invitationId,
         org_id: params.orgId,
-        email: user.email,
+        email: normalizedEmail,
         first_name: user.firstName,
         last_name: user.lastName,
         roles: [{ role_id: null, role_name: user.role }],
@@ -124,11 +139,16 @@ export async function generateInvitations(
       ...buildTracingForEvent(params.tracing, 'generateInvitation')
     });
 
-    log.debug('Generated invitation', { email: user.email, contactId });
+    log.debug('Generated invitation', { email: normalizedEmail, contactId });
 
     invitations.push({
       invitationId,
-      email: user.email,
+      // normalizedEmail, not user.email. The idempotency-hit branch above
+      // returns `existing.email` -- the stored, canonical value -- so returning
+      // the raw input here would make one function hand back differently
+      // normalized addresses depending on which branch it took. That value is
+      // what send-invitation-emails passes to Resend.
+      email: normalizedEmail,
       token,
       expiresAt,
       contactId

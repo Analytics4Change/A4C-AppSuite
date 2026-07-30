@@ -320,6 +320,48 @@ UNIQUE (token)
 - **Purpose**: Prevents duplicate aggregate IDs and tokens
 - **Security**: Token uniqueness critical for invitation security
 
+### Check Constraint: email is canonical
+
+```sql
+CONSTRAINT chk_invitations_email_normalized CHECK (email = btrim(lower(email)))
+```
+
+- **Added**: `20260730045737_normalize_email_at_the_source.sql` (PR D)
+- **Purpose**: states the invariant that a stored email is always
+  `btrim(lower(email))`, so a bare `=` comparison against stored state is safe
+  to write. Before this, three lookup RPCs had been patched one at a time
+  (PRs #103/#106) to work around the absence of the property.
+- **Upheld by**: the `a_normalize_email_invitations` trigger below, which rewrites `NEW.email`
+  *before* constraint evaluation. In normal operation this CHECK is therefore
+  unreachable — it exists to make the invariant legible and to survive the
+  trigger being dropped.
+- **⚠️ Do not drop the trigger and keep the CHECK.** `process_domain_event`
+  absorbs handler exceptions into `processing_error` without re-raising, so a
+  reachable CHECK degrades to a *silent* no-projection-row failure rather than a
+  visible error.
+
+## Triggers
+
+### `a_normalize_email_invitations` — BEFORE INSERT OR UPDATE, FOR EACH ROW
+
+```sql
+CREATE TRIGGER a_normalize_email_invitations
+  BEFORE INSERT OR UPDATE ON public.invitations_projection
+  FOR EACH ROW EXECUTE FUNCTION public.a_normalize_email_before_write();
+```
+
+Canonicalizes `NEW.email` to `btrim(lower(NEW.email))`. Added by
+`20260730045737_normalize_email_at_the_source.sql` (PR D); canonical reference at
+`infrastructure/supabase/handlers/trigger/a_normalize_email_before_write.sql`.
+
+The `a_` prefix is **load-bearing**: PostgreSQL fires BEFORE-row triggers in
+*name order*, so it guarantees no future trigger sorts ahead of this one and
+observes a non-normalized value.
+
+This does not bypass the event stream — it cannot fire unless a handler wrote,
+and it introduces no data not derived from that write. Replay stays correct
+because `btrim(lower(x))` is deterministic, total and idempotent.
+
 ## CQRS Event Sourcing
 
 ### Source Events

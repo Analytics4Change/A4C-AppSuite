@@ -153,6 +153,22 @@ export class InvitationAcceptanceViewModel {
   }
 
   /**
+   * The email as it should be SENT, rather than as typed.
+   *
+   * `this.email` is the raw bound field value and stays raw so the input does
+   * not fight the user mid-type. Everything that crosses the wire uses this.
+   *
+   * Matches the invariant the database enforces as of migration
+   * `20260730045737`: stored email is always `btrim(lower(email))`. Validation
+   * at `:182`/`:402` already guarded on `.trim()`, but the value actually sent
+   * to `accept-invitation` was the untrimmed original — so a pasted address with
+   * a trailing space passed validation and then failed to match the invitation.
+   */
+  private get normalizedEmail(): string {
+    return this.email.trim().toLowerCase();
+  }
+
+  /**
    * Update password
    */
   setPassword(value: string): void {
@@ -233,7 +249,7 @@ export class InvitationAcceptanceViewModel {
     }
 
     return this.acceptInvitation({
-      email: this.email,
+      email: this.normalizedEmail,
       password: this.password,
     });
   }
@@ -272,7 +288,7 @@ export class InvitationAcceptanceViewModel {
     // Store invitation context BEFORE OAuth redirect
     const invitationContext: InvitationAuthContext = {
       token: this.token,
-      email: this.email,
+      email: this.normalizedEmail,
       flow: 'invitation_acceptance',
       authMethod: { type: 'oauth', provider },
       platform,
@@ -285,7 +301,7 @@ export class InvitationAcceptanceViewModel {
       log.info('Initiating OAuth for invitation acceptance', {
         provider,
         platform,
-        email: this.email,
+        email: this.normalizedEmail,
       });
 
       // Initiate OAuth redirect - this will leave the page

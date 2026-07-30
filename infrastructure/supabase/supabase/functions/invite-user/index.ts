@@ -54,7 +54,7 @@ import {
   endSpan,
   type TracingContext,
 } from '../_shared/tracing-context.ts';
-import { buildEventMetadata } from '../_shared/emit-event.ts';
+import { buildEventMetadata, readProcessingError } from '../_shared/emit-event.ts';
 import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
@@ -230,8 +230,19 @@ export async function checkEmailStatus(
     const now = new Date();
 
     if (expiresAt < now) {
-      // Invitation is expired - emit lazy expiration event
-      await emitExpirationEvent(supabase, invitation, orgId, tracingContext);
+      // Invitation is expired - emit lazy expiration event.
+      //
+      // Fail CLOSED if that event did not process. The caller treats
+      // 'expired_invitation' as "the old row is out of the way, mint a new one",
+      // but the status flip happens in a handler whose failure is swallowed into
+      // processing_error. If it did not land, the old invitation is STILL
+      // 'pending' and creating a second one leaves two live invitations for the
+      // same address in the same org — the duplicate state PR E's partial unique
+      // index will reject outright.
+      const expirationResult = await emitExpirationEvent(supabase, invitation, orgId, tracingContext);
+      if (!expirationResult.ok) {
+        return { status: 'lookup_failed' };
+      }
       return {
         status: 'expired_invitation',
         invitationId: invitation.id,
@@ -490,7 +501,7 @@ async function emitExpirationEvent(
   invitation: { id: string; email: string; expires_at: string },
   orgId: string,
   tracingContext?: TracingContext
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   console.log(`[invite-user v${DEPLOY_VERSION}] Emitting lazy expiration event for invitation ${invitation.id}`);
 
   // Build metadata with tracing if context provided
@@ -504,7 +515,7 @@ async function emitExpirationEvent(
         detected_by: 'invite-user-edge-function',
       };
 
-  const { error } = await supabase.rpc('emit_domain_event', {
+  const { data: eventId, error } = await supabase.rpc('emit_domain_event', {
     p_stream_id: invitation.id,
     p_stream_type: 'invitation',
     p_event_type: 'invitation.expired',
@@ -520,7 +531,24 @@ async function emitExpirationEvent(
 
   if (error) {
     console.error(`[invite-user v${DEPLOY_VERSION}] Failed to emit expiration event:`, error);
+    return { ok: false, error: error.message };
   }
+
+  // The emit returning an id does not mean the projection moved to 'expired' —
+  // process_domain_event absorbs handler failures into processing_error without
+  // re-raising. If the status did not actually flip, the row is STILL 'pending'
+  // and the caller must not fall through to creating a second invitation for the
+  // same address.
+  const processingError = await readProcessingError(supabase, eventId as string);
+  if (processingError) {
+    console.error(
+      `[invite-user v${DEPLOY_VERSION}] Expiration event ${eventId} failed to process:`,
+      processingError
+    );
+    return { ok: false, error: processingError };
+  }
+
+  return { ok: true };
 }
 
 /**
@@ -864,7 +892,7 @@ serve(async (req) => {
         invitation_id: existingInvitation.invitation_id,
       });
 
-      const { error: eventError } = await (supabaseAdmin as AnySchemaSupabaseClient)
+      const { data: resendEventId, error: eventError } = await (supabaseAdmin as AnySchemaSupabaseClient)
         .schema('api')
         .rpc('emit_domain_event', {
           p_stream_id: existingInvitation.invitation_id,  // Stream ID is invitation (matches other invitation lifecycle events)
@@ -885,6 +913,33 @@ serve(async (req) => {
       if (eventError) {
         console.error(`[invite-user v${DEPLOY_VERSION}] Failed to emit resend event:`, eventError);
         return handleRpcError(eventError, correlationId, corsHeaders, 'resend invitation');
+      }
+
+      // Pattern A v2 read-back. `eventError` only covers the emit itself; a
+      // handler failure is recorded on processing_error and NOT re-raised, so
+      // without this we would email a new token for an invitation whose token
+      // was never actually rotated.
+      const resendProcessingError = await readProcessingError(
+        supabaseAdmin as AnySchemaSupabaseClient,
+        resendEventId as string
+      );
+      if (resendProcessingError) {
+        console.error(
+          `[invite-user v${DEPLOY_VERSION}] Resend event ${resendEventId} failed to process:`,
+          resendProcessingError
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Failed to resend invitation',
+            errorDetails: {
+              code: 'PROCESSING_FAILED',
+              message: maskPii(resendProcessingError),
+            },
+            correlationId,
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       // Send the invitation email
@@ -1224,6 +1279,37 @@ serve(async (req) => {
     }
 
     console.log(`[invite-user v${DEPLOY_VERSION}] Event emitted: ${eventId}`);
+
+    // Pattern A v2 read-back — the load-bearing half of this function's contract.
+    //
+    // `eventError` above is null whenever the domain_events INSERT succeeded,
+    // which it does even when the handler blew up: process_domain_event catches
+    // WHEN OTHERS, writes processing_error, and returns NEW without re-raising.
+    // Before this check, a handler failure produced 200 OK + an invitation email
+    // + NO invitations_projection row — the recipient clicked a token that 404'd
+    // and nothing anywhere said why.
+    const processingError = await readProcessingError(
+      supabaseAdmin as AnySchemaSupabaseClient,
+      eventId as string
+    );
+    if (processingError) {
+      console.error(
+        `[invite-user v${DEPLOY_VERSION}] Event ${eventId} failed to process:`,
+        processingError
+      );
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to create invitation',
+          errorDetails: {
+            code: 'PROCESSING_FAILED',
+            message: maskPii(processingError),
+          },
+          correlationId,
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // ==========================================================================
     // SEND INVITATION EMAIL

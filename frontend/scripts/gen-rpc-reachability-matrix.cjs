@@ -307,6 +307,22 @@ function updateFrontmatterLastUpdated(doc) {
   return doc.replace(/^last_updated:\s*\S+$/m, `last_updated: ${today}`);
 }
 
+/**
+ * True when the only difference between two revisions is the frontmatter date.
+ *
+ * The sync CI check re-runs this generator and fails if the result differs from
+ * what is committed. Stamping `last_updated` unconditionally made that check
+ * TIME-dependent: a branch opened yesterday and pushed today produced a one-line
+ * diff with no content change, so the check went red for a doc that was
+ * perfectly in sync. It fired on PR #103 and again on PR #106.
+ *
+ * Comparing with the date line neutralized lets us stamp only on real changes.
+ */
+function contentEqualIgnoringDate(a, b) {
+  const strip = (d) => d.replace(/^last_updated:\s*\S+$/m, 'last_updated: <ignored>');
+  return strip(a) === strip(b);
+}
+
 function main() {
   info(`Querying ${DB_URL}`);
   const rows = runQuery();
@@ -344,14 +360,25 @@ function main() {
     fail(`Matrix doc not found at ${MATRIX_DOC}`);
   }
 
-  let doc = fs.readFileSync(MATRIX_DOC, 'utf8');
+  const original = fs.readFileSync(MATRIX_DOC, 'utf8');
+  let doc = original;
 
   doc = replaceSection(doc, 'PER-BUCKET-COUNTS', emitPerBucketCounts(classified));
   doc = replaceSection(doc, 'PER-RPC-TABLE', emitPerRpcTable(classified));
   doc = replaceSection(doc, 'PHASE-3-TARGETS', emitPhase3Targets(classified));
   doc = replaceSection(doc, 'PHASE-4-TARGETS', emitPhase4Targets(classified));
-  doc = updateFrontmatterLastUpdated(doc);
 
+  // Stamp the date ONLY when a generated section actually changed. Stamping
+  // unconditionally makes the sync CI check time-dependent rather than
+  // content-dependent -- see contentEqualIgnoringDate above.
+  if (contentEqualIgnoringDate(original, doc)) {
+    success(
+      `${MATRIX_DOC} already in sync\n   ${classified.length} api.* RPCs tagged across 4 sections (no rewrite; date left untouched)`
+    );
+    return;
+  }
+
+  doc = updateFrontmatterLastUpdated(doc);
   fs.writeFileSync(MATRIX_DOC, doc, 'utf8');
   success(
     `Updated ${MATRIX_DOC}\n   ${classified.length} api.* RPCs tagged across 4 sections`

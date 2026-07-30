@@ -169,11 +169,18 @@ export class UserFormViewModel {
    * `=` comparison it would have *created* the mirror-image false-green for any
    * address stored mixed-case.
    *
-   * ⚠️ These two migrations fix the three lookup RPCs, NOT every email comparison
-   * in the system. At least five others remain case-sensitive, including an RLS
-   * policy on `invitations_projection` and `api.get_invitation_by_org_and_email`.
-   * See `dev/active/normalize-email-at-the-source.md` — do not read this as
-   * "email casing is solved".
+   * As of `20260730045737_normalize_email_at_the_source` the database enforces
+   * the invariant directly: a BEFORE-row trigger canonicalizes every write to
+   * `btrim(lower(email))` on `users` and `invitations_projection`, and a CHECK
+   * constraint states it. The RLS policy on `invitations_projection`,
+   * `api.get_invitation_by_org_and_email` and `api.get_invitation_by_id` were
+   * normalized in the same migration, so the previously-noted divergence is
+   * closed.
+   *
+   * Trimming here is still correct — it keeps the staleness key stable so a
+   * trailing space does not read as a new address and re-fire the lookup. We do
+   * NOT lowercase: the key doubles as the value rendered back to the user, and
+   * the RPCs compare case-insensitively anyway.
    */
   private get lookupKey(): string {
     return this.formData.email.trim();
@@ -288,7 +295,10 @@ export class UserFormViewModel {
       }
 
       return (
-        this.formData.email !== this.originalData.email ||
+        // Compared normalized: the backend canonicalizes to btrim(lower(email)),
+        // so a case-only edit is not a change and must not mark the form dirty.
+        this.formData.email.trim().toLowerCase() !==
+          this.originalData.email.trim().toLowerCase() ||
         this.formData.firstName !== this.originalData.firstName ||
         this.formData.lastName !== this.originalData.lastName ||
         JSON.stringify(this.formData.roleIds?.slice().sort() ?? []) !==
