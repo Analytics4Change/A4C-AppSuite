@@ -25,6 +25,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { Logger } from '@/utils/logger';
 import type { IUserCommandService } from '@/services/users/IUserCommandService';
+import type { IUserQueryService } from '@/services/users/IUserQueryService';
 import type {
   InviteUserFormData,
   InviteUserRequest,
@@ -116,6 +117,64 @@ export class UserFormViewModel {
 
   /** Whether email lookup is in progress */
   isCheckingEmail = false;
+
+  /**
+   * Which name fields the lookup filled in (as opposed to the admin typing them).
+   * Only these are reverted when the email changes — an admin-typed name is never
+   * touched, and writing one clears its flag.
+   *
+   * Bookkeeping, not UI state — but note it IS observable: `makeAutoObservable`
+   * annotates `private` fields regardless of the TS modifier, and this one deeply.
+   * Harmless (class-field-initialized before the call, and `reset()` replaces the
+   * object wholesale), and MobX's `AnnotationsMap` type does not admit `private`
+   * keys so it cannot be opted out without a cast. Do not read it in a computed —
+   * it would create a dependency nothing intends.
+   *
+   * Forward-looking: the deployed `SupabaseUserQueryService.checkEmailStatus`
+   * returns `firstName: null` on every branch (the RPCs do not select names), so
+   * today only `MockUserQueryService` can trigger the prefill. The union permits
+   * names, so this keeps the invariant honest if the RPCs are ever widened.
+   */
+  private prefilledNameFromLookup = { first: false, last: false };
+
+  /**
+   * The address the current `emailLookupResult` was fetched for, so repeated blurs
+   * on an unchanged address don't re-probe. Scoped to this form instance, which is
+   * why it needs no reset in `enterCreateMode` — that builds a fresh VM.
+   */
+  private lastLookedUpEmail: string | null = null;
+
+  /**
+   * The address a lookup is keyed on — trimmed, because that is what actually gets
+   * compared downstream.
+   *
+   * `validateEmail` trims before validating, and `buildRequest` submits trimmed, so
+   * " bob@org.com" is a *valid* address with no field error. But the guarded RPCs
+   * compare with bare equality (`WHERE u.email = p_email`), so probing the
+   * untrimmed value matches nothing, all three probes come back empty, and the UI
+   * renders a confident "New user — invite them" for someone who is already an
+   * active member. That is the exact failure the service contract forbids, arriving
+   * through the input path instead of the infrastructure path.
+   *
+   * NOT lowercased. Emails are case-insensitive by convention but nothing in this
+   * codebase normalizes case on write, and the RPC comparison is bare `=` — so
+   * lowercasing here would *create* the same false-green for any address stored
+   * mixed-case. Fixing that needs `lower()`/`btrim()` in the RPCs plus an index
+   * check; seeded separately rather than guessed at.
+   */
+  private get lookupKey(): string {
+    return this.formData.email.trim();
+  }
+
+  /**
+   * Address of the lookup currently in flight, or null.
+   *
+   * Distinct from comparing against `formData.email`: when a stale response
+   * resolves and NO newer probe is running, the flag must still clear — otherwise
+   * `isCheckingEmail` stays true forever and `canSubmit` wedges the form shut.
+   * Comparing to this tells us whether a newer probe has taken ownership.
+   */
+  private inFlightFor: string | null = null;
 
   /** Available roles for selection */
   assignableRoles: RoleReference[];
@@ -326,6 +385,14 @@ export class UserFormViewModel {
   /**
    * Whether the email lookup suggests a specific action
    */
+  /**
+   * NOTE: currently has NO consumer. `UserFormFields` used to take a
+   * `suggestedAction` prop, destructure it as `_suggestedAction` and never read it;
+   * PR B's review removed the prop and the page mapping that fed it. The getter is
+   * kept because the per-status intent is the natural input to wiring the panel's
+   * action buttons (resend / view-user), which is seeded — but until then, changing
+   * it changes nothing that renders.
+   */
   get suggestedAction(): 'invite' | 'resend' | 'reactivate' | 'add_to_org' | 'none' | null {
     if (!this.emailLookupResult) return null;
 
@@ -342,6 +409,10 @@ export class UserFormViewModel {
         return 'reactivate';
       case 'other_org':
         return 'add_to_org';
+      case 'lookup_failed':
+        // Not a verdict, so there is nothing to suggest. Explicit rather than
+        // falling through to `default` so a new status can't inherit it silently.
+        return 'none';
       default:
         return null;
     }
@@ -356,10 +427,43 @@ export class UserFormViewModel {
    */
   updateField<K extends FormField>(field: K, value: InviteUserFormData[K]): void {
     runInAction(() => {
+      // Compare the NORMALIZED key, not the raw value: the memo, the in-flight guard
+      // and the RPC all key on the trimmed address, so a whitespace-only edit is the
+      // same address and must not invalidate a still-valid verdict.
+      const prevKey = this.lookupKey;
+
       this.formData[field] = value;
+
+      const emailChanged = field === 'email' && this.lookupKey !== prevKey;
       this.touchedFields.add(field);
       this.submissionError = null;
       this.validateField(field);
+
+      // A lookup result describes ONE address. The moment the address changes the
+      // result is stale, and stale is dangerous here rather than merely untidy:
+      // `shouldDisableFields` locks the name/role inputs on active_member|pending
+      // and `canSubmit` blocks on active_member, so leaving a stale verdict in
+      // place traps the admin in a form they cannot edit their way out of.
+      //
+      // Done at the single mutation point so `setEmail` and every other writer is
+      // covered. No reentrancy: this runs before any lookup writes, and
+      // setEmailLookupResult touches formData directly rather than via updateField.
+      if (emailChanged) {
+        this.emailLookupResult = null;
+        this.lastLookedUpEmail = null;
+        this.revertLookupPrefilledNames();
+      }
+
+      // Writing a name field takes ownership of it. Without this the revert above
+      // would later wipe an admin's own edit: a lookup prefills "External", the
+      // admin corrects it to "Alice" (nothing locks the field for other_org), then
+      // corrects the email — and "Alice" is deleted.
+      if (field === 'firstName') {
+        this.prefilledNameFromLookup.first = false;
+      }
+      if (field === 'lastName') {
+        this.prefilledNameFromLookup.last = false;
+      }
     });
   }
 
@@ -703,11 +807,108 @@ export class UserFormViewModel {
   // ============================================
 
   /**
+   * Run the smart email lookup for the address currently in the form.
+   *
+   * **Owns the whole operation** — the call, the in-flight flag, the result, and
+   * the staleness guard. The query service arrives per call rather than being
+   * held, matching `submit(commandService, …)`; this VM deliberately holds no
+   * services. Never throws: the service maps every failure to `lookup_failed`.
+   *
+   * **The guard is keyed on the email string, not a sequence counter.** A counter
+   * only catches out-of-order responses. The case that actually bites is
+   * edit-during-flight: blur fires, the admin returns to the field and corrects a
+   * typo, then the original response lands — and that response IS the latest one,
+   * so a counter admits it. Comparing the issued address against `formData.email`
+   * at the *write* site rejects it, and subsumes the out-of-order case too.
+   *
+   * Guard is per form instance, which is why this lives here rather than on
+   * `UsersViewModel`: `enterCreateMode` builds a fresh `UserFormViewModel` each
+   * time, so a lookup in flight for a cancelled form cannot land on a new one.
+   */
+  async checkEmailStatus(queryService: IUserQueryService): Promise<void> {
+    const issuedFor = this.lookupKey;
+
+    if (!issuedFor || issuedFor.trim().length < 3) {
+      this.clearEmailLookup();
+      return;
+    }
+
+    // Don't re-probe an address we already have a verdict for — blur fires on every
+    // focus loss, and each lookup is up to three membership probes.
+    //
+    // `lookup_failed` is deliberately EXEMPT: it is not a verdict, it means "we
+    // could not find out". Memoising it would make the failure permanent for that
+    // address and leave the "Try again" button unable to do anything — the exact
+    // dead affordance this PR is closing.
+    if (
+      this.emailLookupResult &&
+      this.emailLookupResult.status !== 'lookup_failed' &&
+      this.lastLookedUpEmail === issuedFor
+    ) {
+      return;
+    }
+
+    // Already probing this exact address — don't stack a second one. Reachable via
+    // edit-away-and-back (which clears the result and so defeats the memo above)
+    // and via repeat retry clicks, since lookup_failed is memo-exempt. Value-keying
+    // cannot tell two same-address probes apart, so the first to finish would clear
+    // the in-flight flag while the second is still out: aria-busy, the spinner and
+    // canSubmit would all read "idle" while a late verdict was still able to land
+    // and re-lock the form after the admin clicked Send.
+    if (this.inFlightFor === issuedFor) {
+      return;
+    }
+
+    runInAction(() => {
+      this.isCheckingEmail = true;
+      this.inFlightFor = issuedFor;
+    });
+
+    // The service never rejects — it maps no-session / no-org / RPC error /
+    // exception to `lookup_failed`. try/finally only guarantees the in-flight
+    // flag clears if that contract is ever broken.
+    try {
+      // No correlation id passed on purpose. Per services/CLAUDE.md §4
+      // "Service-mints variant", this leaf owns its own failure logging and
+      // DEFAULTS the id, so threading one here would mint a second and break the
+      // very join the id exists to make.
+      const result = await queryService.checkEmailStatus(issuedFor);
+
+      if (issuedFor !== this.lookupKey) {
+        // Address changed while we waited. Discard — do NOT clear the result:
+        // a newer lookup may already have written a valid verdict, and wiping it
+        // here is the bug the value-keyed guard exists to prevent.
+        log.debug('Discarding stale email lookup', { status: result.status });
+        return;
+      }
+
+      this.setEmailLookupResult(result);
+      runInAction(() => {
+        this.lastLookedUpEmail = issuedFor;
+      });
+    } finally {
+      runInAction(() => {
+        // Clear only if WE are still the in-flight lookup. If a newer probe has
+        // started it owns the flag; if none has, this must clear even though the
+        // address changed, or the form is left permanently "checking".
+        if (this.inFlightFor === issuedFor) {
+          this.isCheckingEmail = false;
+          this.inFlightFor = null;
+        }
+      });
+    }
+  }
+
+  /**
    * Set email lookup result.
    *
    * A `lookup_failed` result carries no identity by construction, so the
    * name pre-fill below is unreachable for it — we never put a name in the
    * form on the strength of a lookup we could not complete.
+   *
+   * Prefilled names are TRACKED (`prefilledNameFromLookup`) so an email edit can
+   * revert them. Without that, correcting a mistyped address leaves the previous
+   * person's name sitting in the form, and it submits.
    */
   setEmailLookupResult(result: EmailLookupResult | null): void {
     runInAction(() => {
@@ -718,15 +919,21 @@ export class UserFormViewModel {
       // Pre-fill name if available from lookup
       if (identity?.firstName && !this.formData.firstName) {
         this.formData.firstName = identity.firstName;
+        this.prefilledNameFromLookup.first = true;
       }
       if (identity?.lastName && !this.formData.lastName) {
         this.formData.lastName = identity.lastName;
+        this.prefilledNameFromLookup.last = true;
       }
     });
   }
 
   /**
-   * Set email checking state
+   * Set email checking state.
+   *
+   * @internal No production caller — `checkEmailStatus` owns this flag end to end.
+   * Retained only so a test can stage the in-flight state directly; prefer
+   * exercising the real path where practical.
    */
   setIsCheckingEmail(isChecking: boolean): void {
     runInAction(() => {
@@ -741,7 +948,35 @@ export class UserFormViewModel {
     runInAction(() => {
       this.emailLookupResult = null;
       this.isCheckingEmail = false;
+      this.lastLookedUpEmail = null;
+      this.revertLookupPrefilledNames();
     });
+  }
+
+  /**
+   * Drop any name the lookup put in the form, leaving admin-typed names alone
+   * (writing a name field clears its flag, so an admin edit is never reverted).
+   *
+   * The failure mode: admin types an active member's address, the lookup prefills
+   * that person's name, admin realises the typo and corrects the email — and
+   * without this the *other* person's name stays and submits.
+   *
+   * FORWARD-LOOKING, not a live fix. The deployed
+   * `SupabaseUserQueryService.checkEmailStatus` returns `firstName: null` on every
+   * branch, because the three RPCs do not select names — so today only
+   * `MockUserQueryService` can trigger the prefill this reverts. Kept because the
+   * result union permits names and widening those RPCs is an open follow-up; if
+   * that never happens, this and `prefilledNameFromLookup` can both go.
+   */
+  private revertLookupPrefilledNames(): void {
+    if (this.prefilledNameFromLookup.first) {
+      this.formData.firstName = '';
+      this.prefilledNameFromLookup.first = false;
+    }
+    if (this.prefilledNameFromLookup.last) {
+      this.formData.lastName = '';
+      this.prefilledNameFromLookup.last = false;
+    }
   }
 
   // ============================================
@@ -1139,6 +1374,10 @@ export class UserFormViewModel {
       this.submissionErrorDetails = null;
       this.emailLookupResult = null;
       this.isCheckingEmail = false;
+      // reset() rebuilds formData wholesale, so the names are already gone —
+      // clear the tracking flags too or the next lookup's revert misfires.
+      this.prefilledNameFromLookup = { first: false, last: false };
+      this.lastLookedUpEmail = null;
       log.debug('Form reset');
     });
   }

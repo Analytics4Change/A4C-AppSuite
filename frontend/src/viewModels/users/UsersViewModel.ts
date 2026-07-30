@@ -40,7 +40,6 @@ import type {
   UserListItem,
   UserWithRoles,
   Invitation,
-  EmailLookupResult,
   UserQueryOptions,
   UserFilterOptions,
   UserSortOptions,
@@ -162,16 +161,6 @@ export class UsersViewModel {
 
   /** Roles that can be assigned to users */
   assignableRoles: RoleReference[] = [];
-
-  // ============================================
-  // Observable State - Email Lookup
-  // ============================================
-
-  /** Result of email lookup (for invitation form) */
-  emailLookupResult: EmailLookupResult | null = null;
-
-  /** Loading state for email lookup */
-  isCheckingEmail = false;
 
   // ============================================
   // Observable State - Extended Data (Phase 0A)
@@ -769,59 +758,6 @@ export class UsersViewModel {
     await this.loadUsers();
   }
 
-  // ============================================
-  // Actions - Email Lookup
-  // ============================================
-
-  /**
-   * Check email status for smart invitation form
-   */
-  async checkEmailStatus(email: string): Promise<EmailLookupResult | null> {
-    if (!email || email.trim().length < 3) {
-      runInAction(() => {
-        this.emailLookupResult = null;
-      });
-      return null;
-    }
-
-    // Email is PII (utils/maskPii) — log the outcome, never the address. Matches
-    // the `failed()` convention in SupabaseUserQueryService.checkEmailStatus.
-    log.debug('Checking email status');
-
-    runInAction(() => {
-      this.isCheckingEmail = true;
-    });
-
-    try {
-      const result = await this.queryService.checkEmailStatus(email);
-
-      runInAction(() => {
-        this.emailLookupResult = result;
-        this.isCheckingEmail = false;
-        log.info('Email lookup result', { status: result.status });
-      });
-
-      return result;
-    } catch (error) {
-      log.error('Failed to check email status', error);
-
-      runInAction(() => {
-        this.isCheckingEmail = false;
-        this.emailLookupResult = null;
-      });
-
-      return null;
-    }
-  }
-
-  /**
-   * Clear email lookup result
-   */
-  clearEmailLookup(): void {
-    runInAction(() => {
-      this.emailLookupResult = null;
-    });
-  }
 
   // ============================================
   // Actions - Invitation Operations
