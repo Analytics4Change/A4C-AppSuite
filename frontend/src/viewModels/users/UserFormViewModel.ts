@@ -156,11 +156,15 @@ export class UserFormViewModel {
    * active member. That is the exact failure the service contract forbids, arriving
    * through the input path instead of the infrastructure path.
    *
-   * NOT lowercased. Emails are case-insensitive by convention but nothing in this
-   * codebase normalizes case on write, and the RPC comparison is bare `=` — so
-   * lowercasing here would *create* the same false-green for any address stored
-   * mixed-case. Fixing that needs `lower()`/`btrim()` in the RPCs plus an index
-   * check; seeded separately rather than guessed at.
+   * NOT lowercased, and it does not need to be: `20260730032132` made all three
+   * RPCs compare `lower(email) = lower(btrim(p_email))`, backed by matching
+   * functional indexes. Case is handled server-side, where it holds for every
+   * caller — including the invite-user Edge Function, which does not trim.
+   *
+   * Lowercasing here would also have been wrong on its own: with the old bare `=`
+   * comparison it would have *created* the mirror-image false-green for any
+   * address stored mixed-case. The trim is kept as the client-side half — cheap,
+   * and it keeps the memo and the in-flight guard keyed on a stable value.
    */
   private get lookupKey(): string {
     return this.formData.email.trim();
