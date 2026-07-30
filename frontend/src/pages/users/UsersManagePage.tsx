@@ -396,6 +396,40 @@ export const UsersManagePage: React.FC = observer(() => {
   }, [viewModel, availableRoles]);
 
   // Handle create button click with dirty check
+  /**
+   * Run the email status lookup. Fired on blur of the email field.
+   *
+   * Thin on purpose — `UserFormViewModel.checkEmailStatus` owns the in-flight flag,
+   * the result, the staleness guard and the repeat-blur memo, so there is nothing
+   * for the page to orchestrate. No `touchField('email')` here: `UserFormFields`
+   * already calls `onFieldBlur('email')` on the same event.
+   */
+  const runEmailLookup = useCallback(() => {
+    if (!formViewModel) return;
+    // Belt-and-braces: handleCreateClick already refuses to open this panel when
+    // platformNoOrg, so this should be unreachable. Kept because the lookup would
+    // otherwise probe with an empty org_id, and the service's honest answer for
+    // that ('lookup_failed') is right but wasted work.
+    if (platformNoOrg) return;
+    void formViewModel.checkEmailStatus(getUserQueryService());
+  }, [formViewModel, platformNoOrg]);
+
+  /**
+   * Act on the lookup panel's button. Only `retry` is wired — every other status
+   * has had its `actionLabel` removed, so no other action can reach here. See
+   * EMAIL_STATUS_CONFIG for the per-status reason.
+   */
+  const handleLookupAction = useCallback(
+    (action: string) => {
+      if (action !== 'retry') {
+        log.warn('Unwired email-lookup action', { action });
+        return;
+      }
+      runEmailLookup();
+    },
+    [runEmailLookup]
+  );
+
   const handleCreateClick = useCallback(() => {
     // aria-disabled (not native `disabled`) keeps this button focusable so its
     // aria-describedby explanation is reachable; swallow the activation here.
@@ -925,21 +959,13 @@ export const UsersManagePage: React.FC = observer(() => {
                       onRoleToggle={formViewModel.toggleRole.bind(formViewModel)}
                       emailLookup={formViewModel.emailLookupResult}
                       isEmailLookupLoading={formViewModel.isCheckingEmail}
-                      onEmailBlur={() => {
-                        // Email lookup integration - for now just mark as touched
-                        formViewModel.touchField('email');
-                      }}
+                      onEmailBlur={runEmailLookup}
                       suggestedAction={
                         formViewModel.suggestedAction === 'none'
                           ? null
                           : formViewModel.suggestedAction
                       }
-                      onSuggestedAction={() => {
-                        // Handle suggested action based on status
-                        log.debug('Suggested action clicked', {
-                          action: formViewModel.suggestedAction,
-                        });
-                      }}
+                      onSuggestedAction={handleLookupAction}
                       disabled={formViewModel.isSubmitting}
                       phones={formViewModel.formData.phones}
                       onPhonesChange={formViewModel.setPhones.bind(formViewModel)}

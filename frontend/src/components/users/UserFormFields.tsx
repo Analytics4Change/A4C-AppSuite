@@ -196,24 +196,30 @@ const EMAIL_STATUS_CONFIG: Record<
     bgClass: 'bg-yellow-50',
     textClass: 'text-yellow-700',
     message: 'This email has a pending invitation.',
-    actionLabel: 'Resend Invitation',
-    actionVariant: 'outline',
+    // No button yet. `viewModel.resendInvitation(invitationId)` exists, but the
+    // page's resend handlers read `currentItem`, which is null in create mode —
+    // they need parameterising on an explicit id first. Deferred to its own card
+    // rather than shipped half-wired.
+    actionLabel: undefined,
   },
   expired: {
     icon: <XCircle size={16} />,
     bgClass: 'bg-red-50',
     textClass: 'text-red-700',
     message: 'Previous invitation expired.',
-    actionLabel: 'Send New Invitation',
-    actionVariant: 'default',
+    // No button: "Send New Invitation" is exactly what the form's own Send button
+    // does. A second control for the same action is noise.
+    actionLabel: undefined,
   },
   active_member: {
     icon: <CheckCircle size={16} />,
     bgClass: 'bg-green-50',
     textClass: 'text-green-700',
     message: 'This user is already an active member of this organization.',
-    actionLabel: 'View User',
-    actionVariant: 'outline',
+    // No button yet. "View User" is genuinely useful and cheap to dispatch, but it
+    // navigates away from a partly-filled create form, which needs the dirty/discard
+    // dance — out of scope for the wireup. Deferred to the same card as resend.
+    actionLabel: undefined,
   },
   deactivated: {
     icon: <XCircle size={16} />,
@@ -250,13 +256,11 @@ const EMAIL_STATUS_CONFIG: Record<
     // fail too. Promise only what is guaranteed: that it re-checks.
     message:
       "Couldn't check this email's status. You can still send the invitation; the server re-checks before routing.",
-    // No action button — same test applied to `deactivated` and `other_org`
-    // above: a label without a working handler is a dead affordance, and
-    // `onSuggestedAction` is still a no-op stub. A retry IS worth having (it is
-    // the one action here that would genuinely work), so PR B should add this
-    // label and its handler together, in one change. The copy already tells the
-    // admin they may proceed, so nothing is lost by waiting.
-    actionLabel: undefined,
+    // Retry is the ONE action in this config that is both wanted and fully
+    // implementable, and PR B wires its handler — so the label ships with it,
+    // never ahead of it.
+    actionLabel: 'Try again',
+    actionVariant: 'outline',
   },
 };
 
@@ -290,10 +294,11 @@ const EmailLookupFeedback: React.FC<EmailLookupFeedbackProps> = ({
       case 'active_member':
         action = 'view';
         break;
-      // 'deactivated', 'other_org' and 'lookup_failed' carry no actionLabel, so
-      // this handler is unreachable for them — see EMAIL_STATUS_CONFIG for why.
-      // PR B adds `case 'lookup_failed': action = 'retry'` together with the
-      // label and a real handler.
+      case 'lookup_failed':
+        action = 'retry';
+        break;
+      // Every other status carries no actionLabel, so this handler is unreachable
+      // for them — see EMAIL_STATUS_CONFIG for the per-status reason.
       default:
         action = 'invite';
     }
@@ -305,11 +310,12 @@ const EmailLookupFeedback: React.FC<EmailLookupFeedbackProps> = ({
   // a name or role for a lookup we could not complete" structural.
   const identity = lookup.status === 'lookup_failed' ? null : lookup;
 
+  // NOTE: no role/aria-live here. The live region is the always-mounted wrapper in
+  // UserFormFields — a region inserted into the DOM in the same tick as its text is
+  // not reliably announced, so it must exist and be observed BEFORE content lands.
   return (
     <div
       className={cn('mt-2 p-3 rounded-lg flex items-start gap-3', config.bgClass)}
-      role="status"
-      aria-live="polite"
       data-testid={`email-lookup-${lookup.status}`}
     >
       <span className={cn('mt-0.5', config.textClass)} aria-hidden="true">
@@ -335,6 +341,7 @@ const EmailLookupFeedback: React.FC<EmailLookupFeedbackProps> = ({
           onClick={handleActionClick}
           disabled={isLoading}
           className="shrink-0"
+          data-testid={`email-lookup-action-${lookup.status}`}
         >
           {isLoading ? (
             <Loader2 size={14} className="mr-1.5 animate-spin" aria-hidden="true" />
@@ -458,6 +465,7 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
                   className={cn('pl-10', emailError && 'border-red-300 focus:ring-red-500')}
                   aria-required="true"
                   aria-invalid={!!emailError}
+                  aria-busy={isEmailLookupLoading || undefined}
                   aria-describedby={
                     emailError
                       ? `${emailId}-error`
@@ -467,25 +475,44 @@ export const UserFormFields: React.FC<UserFormFieldsProps> = observer(
                   }
                 />
                 {isEmailLookupLoading && (
+                  // Decorative: the live region below announces the in-flight state.
+                  // A bare <svg aria-label> has no role="img", so the name may not be
+                  // exposed at all — don't rely on it to carry meaning.
                   <Loader2
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin"
                     size={16}
-                    aria-label="Checking email..."
+                    aria-hidden="true"
+                    data-testid="email-lookup-spinner"
                   />
                 )}
               </div>
             </FieldWrapper>
 
-            {/* Email Lookup Feedback */}
-            {showEmailFeedback && (
-              <div id={`${emailId}-feedback`}>
+            {/*
+              Email lookup feedback — the live region is ALWAYS mounted.
+
+              Screen readers only announce changes to a region they were already
+              observing; one inserted together with its text is routinely missed.
+              Mounting the container unconditionally and swapping only its children
+              is what makes the "couldn't check this email" panel audible rather
+              than sighted-users-only.
+
+              It also announces the in-flight state, so a slow lookup is not
+              silence — the spinner alone conveys nothing to AT.
+            */}
+            <div id={`${emailId}-feedback`} role="status" aria-live="polite">
+              {isEmailLookupLoading ? (
+                <p className="mt-2 text-sm text-gray-600" data-testid="email-lookup-checking">
+                  Checking this email…
+                </p>
+              ) : showEmailFeedback ? (
                 <EmailLookupFeedback
                   lookup={emailLookup}
                   onAction={onSuggestedAction}
                   isLoading={disabled}
                 />
-              </div>
-            )}
+              ) : null}
+            </div>
           </div>
         )}
 
