@@ -180,6 +180,67 @@ function generateSecureToken(): string {
 }
 
 /**
+ * Outcome of the resend supersede check. `superseded` carries the invitation the
+ * admin should act on instead, so the caller can offer a real next action.
+ */
+export type ResendSupersedeVerdict =
+  | { verdict: 'proceed' }
+  | { verdict: 'lookup_failed' }
+  | { verdict: 'superseded'; supersedingInvitationId: string };
+
+/**
+ * Decide whether an EXPIRED invitation may still be resent.
+ *
+ * `handle_invitation_resent` sets `status = 'pending'` unconditionally, keyed on
+ * invitation_id and blind to every other row, so resending a superseded
+ * invitation produces a SECOND pending invitation for the same address:
+ *
+ *   1. invitation A for bob@x expires
+ *   2. admin invites bob@x again -> check_pending_invitation finds nothing
+ *      (A is expired) -> pending invitation B is created
+ *   3. admin resends A -> A flips to pending -> two pending rows for bob@x
+ *
+ * Two ordinary steps, no race. With uq_invitations_pending_org_email in place
+ * that becomes a 23505 inside the handler — surfaced rather than silent, thanks
+ * to the PR D read-back, but as an opaque processing error. Refuse it here so
+ * the admin gets a clear reason and an obvious next action instead.
+ *
+ * Deliberately narrow: resending an expired invitation stays legal when nothing
+ * has superseded it. Only the collision is refused.
+ */
+export async function checkResendSupersede(
+  supabase: AnySchemaSupabaseClient,
+  email: string,
+  orgId: string
+): Promise<ResendSupersedeVerdict> {
+  const { data: supersedingRows, error: supersedeError } = await supabase
+    .rpc('check_pending_invitation', { p_email: email, p_org_id: orgId });
+
+  if (supersedeError) {
+    // Fail CLOSED, consistent with the lookup fences added in PR A: we cannot
+    // establish that resending is safe, and proceeding risks the duplicate.
+    console.error(`[invite-user v${DEPLOY_VERSION}] Supersede check failed:`, supersedeError);
+    return { verdict: 'lookup_failed' };
+  }
+
+  // No identity comparison against the invitation being resent, and one would be
+  // actively wrong here: `check_pending_invitation` returns the projection PK
+  // (`ip.id`) while `get_invitation_for_resend` also exposes the business key
+  // (`invitation_id`), and those are DIFFERENT columns — 0 of 18 rows on dev have
+  // them equal, so comparing across them would fire on every resend.
+  //
+  // It is also unnecessary: the caller only invokes this for an `expired`
+  // invitation and the RPC filters `status = 'pending'`, so any row returned is
+  // by construction a different, live invitation.
+  const superseding = supersedingRows?.[0];
+  if (superseding) {
+    return { verdict: 'superseded', supersedingInvitationId: superseding.id };
+  }
+
+  return { verdict: 'proceed' };
+}
+
+/**
  * Check email status via smart lookup
  */
 export async function checkEmailStatus(
@@ -871,6 +932,39 @@ serve(async (req) => {
           JSON.stringify({ error: 'Cannot resend revoked invitation' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // An EXPIRED invitation may have been superseded — see checkResendSupersede
+      // for why that collides with uq_invitations_pending_org_email.
+      if (existingInvitation.status === 'expired') {
+        const supersede = await checkResendSupersede(
+          supabaseAdmin,
+          existingInvitation.email,
+          orgId
+        );
+
+        if (supersede.verdict === 'lookup_failed') {
+          return new Response(
+            JSON.stringify({
+              error: 'Could not verify whether this invitation was superseded; no resend was sent',
+              emailStatus: 'lookup_failed',
+              suggestedAction: 'Try again in a moment',
+            }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (supersede.verdict === 'superseded') {
+          return new Response(
+            JSON.stringify({
+              error:
+                'This invitation expired and a newer one is already pending for that address. Resend the current invitation instead.',
+              invitationId: supersede.supersedingInvitationId,
+              suggestedAction: 'Resend the pending invitation',
+            }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
 
       // Generate new token and expiration

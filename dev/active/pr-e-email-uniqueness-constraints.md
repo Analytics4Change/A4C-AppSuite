@@ -1,9 +1,46 @@
 ---
-status: seed
+status: implemented-pending-review
 last_updated: 2026-07-30
 ---
 
-# Seed: PR E — uniqueness on the normalized email
+# PR E — uniqueness on the normalized email
+
+> ## Implementation record (2026-07-30) — branch `feat/email-uniqueness-constraints`
+>
+> Both indexes are **deployed to dev** with the intended partial predicates
+> (`20260730125034_email_uniqueness_constraints.sql`). Creating them proved no
+> existing row violates either.
+>
+> **The blocker is closed in the Edge Function, not the handler.**
+> `handle_invitation_resent` is unchanged; `invite-user` now refuses a resend of
+> an *expired* invitation that a pending one has superseded (409, pointing the
+> admin at the live invitation) and fails **closed** on a probe error (503).
+> Extracted as the exported `checkResendSupersede` so the branch is reachable
+> from tests at all — the repo's known "`index.ts` branching only reachable via
+> `serve()`" gap. 4 tests added; suite 133 → 137.
+>
+> **E4's premise was wrong and the mitigation was NOT retired.** The card
+> expected `uq_users_email_normalized` to retire the `ORDER BY u.is_active DESC,
+> u.created_at` dedup in `api.check_user_org_membership`. It does not: the index
+> is **partial** (`WHERE deleted_at IS NULL`) and that query does **not** filter
+> `deleted_at`, so a soft-deleted row can still share an address with a live one
+> — 2 soft-deleted rows exist on dev today. The `INNER JOIN
+> user_roles_projection` also fans out one row per role held. Retiring the
+> ORDER BY would have reintroduced exactly the bug it was added for.
+> `20260730125941_narrow_membership_dedup_rationale.sql` corrects the now-false
+> comment premise ("There is no unique index on email on this table") and keeps
+> the mitigation.
+>
+> **Probe lesson.** The behavioural probe creates its **own** throwaway org.
+> `invitations_projection.organization_id` is FK-constrained, so a synthetic uuid
+> raised `foreign_key_violation` — not `unique_violation`, so the inner handlers
+> did not catch it and the migration aborted. The org is typed `platform_owner`
+> because `chk_subdomain_conditional` demands a non-null `subdomain_status` for
+> every type where `is_subdomain_required()` is true, and `platform_owner` is the
+> one where it is false. Creating the fixture also keeps the probe meaningful on
+> a **fresh CI container**, which has no organizations at all.
+>
+> **Still open**: architect review, then UAT.
 
 **Origin**: split out of PR D (`20260730045737_normalize_email_at_the_source.sql`)
 on the architect's recommendation. The user chose "normalize + unique"; this is
