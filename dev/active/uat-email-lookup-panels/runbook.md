@@ -194,15 +194,48 @@ Cleaning up the orphans removes the failure →
 - **Live region**: the `role="status"` wrapper is always mounted (PR B B4), so a
   screen reader announces the panel. Verify a result is actually announced.
 
-## 8. Results
+## 8. Results — S1–S6 + S9 RUN 2026-07-31 ✅ ALL PASS
 
-| # | Verdict rendered | Expected | Pass? | Notes |
-|---|---|---|---|---|
-| S1 | | | | |
-| S2 | | | | |
-| S3 | | | | |
-| S4 | | | | |
-| S5 ⭐ | | | | |
-| S6 | | | | |
-| S7 | | | | |
-| S8 | | | | |
+Run as `johnltice@yahoo.com` (provider_admin, TestOrg-20260329) at
+`https://testorg-20260329.firstovertheline.com/users/manage?mode=create`.
+Verdict read from `data-testid`, not inferred from copy.
+
+| # | Fixture | Expected | `data-testid` | Fields locked | Pass |
+|---|---|---|---|---|---|
+| S1 | `+uat-greenfield` | `expired` | `email-lookup-expired` | no | ✅ |
+| S2 | `+test3` | `active_member` | `email-lookup-active_member` | **yes** | ✅ |
+| S3 | `+uat-deactivated` | `deactivated` | `email-lookup-deactivated` | no | ✅ |
+| S4 | `+uat-xorg-zombie` | `expired` | `email-lookup-expired` | no | ✅ |
+| S5 ⭐ | `+test2` | `active_member` | `email-lookup-active_member` | **yes**, submit disabled | ✅ |
+| S6 | `+uat-xorg-member` | `other_org` | `email-lookup-other_org` | no | ✅ |
+| S9 | fresh address | `not_found` | `email-lookup-not_found` | no | ✅ |
+| §7 | `"   LARS.TICE+Test2@GMail.COM   "` | `active_member` | `email-lookup-active_member` | **yes** | ✅ |
+
+**⭐ S5 — the tenancy guard's authenticated-member branch executed correctly for the
+first time.** It rendered `active_member`, not `other_org`. S2 corroborates
+independently: both require `check_user_org_membership` to return a row, which only
+happens if the guard admitted the caller. The disguised failure mode described in §4
+did not occur.
+
+The mixed-case + surrounding-whitespace probe resolving to `active_member` exercises
+the full PR C + PR D chain end-to-end through the UI — the field trimmed to
+`"LARS.TICE+Test2@GMail.COM"` and still matched the member.
+
+Console: clean. All 41 messages came from an unrelated Chrome extension content
+script (`chrome-extension://pejdij…`), none from the app.
+
+### Correction to §2's predicted vocabulary
+
+§2 predicted `other_org_member` for S6. That verdict does not exist in the frontend.
+`EmailLookupVerdict` has exactly six members and the correct one is **`other_org`**.
+`SupabaseUserQueryService.ts:908` documents the deliberate gap: the Edge Function
+splits this case (`other_org_member` vs a roleless zombie) via
+`check_user_has_any_role`, and the frontend union intentionally does not — the known
+R1 limitation. So `existing_user_no_roles`, which earlier drafts of this card
+predicted for S2/S4, was never a reachable frontend verdict at all.
+
+### Remaining
+
+- **S7** (§5) — needs a deliberate `UPDATE` on dev to force an invitation to
+  `expired`. Not run.
+- **S8** (§6) — needs an invitation accept against an orphan address. Not run.
