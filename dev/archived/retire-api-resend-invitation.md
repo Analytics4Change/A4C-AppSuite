@@ -1,8 +1,24 @@
 # Retire `api.resend_invitation`
 
-**Status**: seed
+**Status**: DONE (PR A commit 3, 2026-07-31) — dropped in `20260731202951`
 **Created**: 2026-07-31 (PR #110 architect review, finding F2)
 **Priority**: LOW — the safety hole is CLOSED; this is surface reduction only
+
+> ## RESOLVED — and the reason got stronger
+>
+> Dropped in `20260731202951` (PR A commit 3). While retiring it we measured the
+> defect the PR #110 review only inferred: the RPC selects `WHERE id =
+> p_invitation_id` but emits that value as `invitation_id`, and
+> `handle_invitation_resent` matches on `invitation_id`. **0 of 20 rows have
+> `id = invitation_id`**, so it was a guaranteed no-op returning `true`.
+>
+> PR #110's Pattern A v2 read-back could not see it: a 0-row UPDATE raises
+> nothing, so `processing_error` was null and the RPC reported success. Carried
+> forward as a rule — *a `processing_error` check proves the handler did not
+> throw, not that it did anything.*
+>
+> All four generated artifacts regenerated in the same commit (registry, both
+> `database.types.ts` copies, matrix doc). Both consumers typecheck clean.
 **Origin**: `dev/archived/pr-e-email-uniqueness-constraints.md`
 
 ## What already happened

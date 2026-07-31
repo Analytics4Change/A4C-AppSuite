@@ -1,6 +1,6 @@
 ---
 status: current
-last_updated: 2026-07-30
+last_updated: 2026-07-31
 ---
 
 <!-- TL;DR-START -->
@@ -50,11 +50,11 @@ last_updated: 2026-07-30
 | A-variant | 1 |
 | B | 63 |
 | C | 31 |
-| D | 36 |
+| D | 37 |
 | D-variant | 1 |
 | E | 48 |
 | E-variant | 1 |
-| **Total** | **182** |
+| **Total** | **183** |
 <!-- GENERATED:PER-BUCKET-COUNTS:END -->
 
 > [!NOTE]
@@ -173,6 +173,8 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `get_invitation_by_org_and_email` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_invitation_by_token` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_invitation_for_resend` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_token_for_resend` | E | no | none | service_role-only orchestration helper; never reachable by a consultant or any authenticated caller. |
+| `get_invitation_token_state` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_organization_by_id` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_organization_details` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_organization_direct_care_settings` | D | pending-phase4-rls | 4 | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
@@ -237,7 +239,6 @@ In addition to the formal `@a4c-bucket` / `@a4c-consultant-callable` / `@a4c-pha
 | `remove_client_insurance` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
 | `remove_client_phone` | B | no | none | JWT-bound (derives org via get_current_org_id); consultant variant deferred to case-by-case Phase 2+ work. |
 | `remove_user_phone` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
-| `resend_invitation` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `retry_deletion_workflow` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `retry_failed_event` | E | yes | none | No tenancy context; grant-irrelevant by default. Per-RPC sub-classification ([admin-only] / [service-role-only] / [pre-auth] / [emitter-primitive]) deferred to follow-up. |
 | `revoke_access_grant` | B | no | none | Provider-admin authority (HIPAA gate at provider org path via has_effective_permission('grant.revoke', v_provider_path)); consultant variant N/A by design — revocations are issued by the data-owner provider, not by the consultant. |
@@ -386,6 +387,7 @@ The per-table audit cluster (each row in the per-RPC table above lists the under
 | `get_invitation_by_org_and_email` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_invitation_by_token` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_invitation_for_resend` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
+| `get_invitation_token_state` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_organization_by_id` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_organization_details` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |
 | `get_organization_direct_care_settings` | D | Entity-lookup signature with RLS-enforced tenancy; per-table RLS extension required in Phase 4. |

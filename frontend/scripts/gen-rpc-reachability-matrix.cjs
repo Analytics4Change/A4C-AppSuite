@@ -56,6 +56,16 @@ const DB_URL =
   process.env.SUPABASE_DB_URL ||
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
+/**
+ * Strip the password from a connection string before it is logged. The failure
+ * path below used to echo DB_URL verbatim, which leaks a live password whenever
+ * this is run against a remote via SUPABASE_DB_URL rather than CI's throwaway
+ * local container.
+ */
+function redactDbUrl(url) {
+  return String(url).replace(/(:\/\/[^:/@]+:)[^@]*(@)/, '$1***$2');
+}
+
 const FIELD_SEP = '<<<A4C_FIELD>>>';
 // Row separator: pg_description.description can contain literal newlines
 // (multi-line COMMENTs in baseline_v4 like "Validation:\n...", "Used by:\n...",
@@ -101,7 +111,7 @@ function runQuery() {
   try {
     output = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) {
-    fail(`psql query failed: ${e.message || e}\nDB_URL: ${DB_URL}`);
+    fail(`psql query failed: ${e.message || e}\nDB_URL: ${redactDbUrl(DB_URL)}`);
   }
   return output
     .split(ROW_SEP)
@@ -324,7 +334,7 @@ function contentEqualIgnoringDate(a, b) {
 }
 
 function main() {
-  info(`Querying ${DB_URL}`);
+  info(`Querying ${redactDbUrl(DB_URL)}`);
   const rows = runQuery();
   if (rows.length === 0) fail('No api.* functions returned by query');
   info(`Found ${rows.length} api.* function rows (incl. overloads)`);

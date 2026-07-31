@@ -49,6 +49,20 @@ const DB_URL =
   process.env.SUPABASE_DB_URL ||
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
+/**
+ * Strip the password from a connection string before it is logged.
+ *
+ * This script used to log DB_URL verbatim. Harmless in CI, which points at a
+ * throwaway local container (postgres:postgres@127.0.0.1) — but the documented
+ * workflow also invites running it against a remote via SUPABASE_DB_URL, and
+ * then every invocation printed a live database password to stdout, into CI
+ * logs, terminal scrollback, and agent transcripts.
+ */
+function redactDbUrl(url) {
+  // postgresql://user:password@host/db -> postgresql://user:***@host/db
+  return String(url).replace(/(:\/\/[^:/@]+:)[^@]*(@)/, '$1***$2');
+}
+
 // NOTE: We use CASE WHEN ... ~ ... instead of regexp_matches inside COALESCE.
 // regexp_matches is a set-returning function and Postgres forbids it inside
 // COALESCE ('set-returning functions are not allowed in COALESCE'). The
@@ -99,7 +113,7 @@ function runQuery() {
   try {
     output = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) {
-    fail(`psql query failed: ${e.message || e}\nDB_URL: ${DB_URL}`);
+    fail(`psql query failed: ${e.message || e}\nDB_URL: ${redactDbUrl(DB_URL)}`);
   }
   return output
     .trim()
@@ -141,7 +155,7 @@ function emitUnion(name, set) {
 }
 
 function main() {
-  info(`Querying ${DB_URL}`);
+  info(`Querying ${redactDbUrl(DB_URL)}`);
   const rows = runQuery();
   if (rows.length === 0) fail('No api.* functions returned by query');
   info(`Found ${rows.length} api.* function rows (incl. overloads)`);

@@ -706,6 +706,11 @@ export type Database = {
           status: string
         }[]
       }
+      get_invitation_token_for_resend: {
+        Args: { p_invitation_id: string; p_org_id: string }
+        Returns: string
+      }
+      get_invitation_token_state: { Args: { p_token: string }; Returns: string }
       get_organization_by_id: {
         Args: { p_org_id: string }
         Returns: {
@@ -1379,14 +1384,6 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
-      }
-      resend_invitation: {
-        Args: {
-          p_invitation_id: string
-          p_new_expires_at: string
-          p_new_token: string
-        }
-        Returns: boolean
       }
       retry_deletion_workflow: { Args: { p_org_id: string }; Returns: Json }
       retry_failed_event: { Args: { p_event_id: string }; Returns: Json }
