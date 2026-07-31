@@ -285,11 +285,51 @@ With A back to `pending`, the lookup was re-run against it:
 `expired`, `active_member`, `deactivated`, `other_org`. Only `lookup_failed` is
 unexercised against a real backend — it is reachable in mock mode only, by design.
 
-### Leftover fixture state
+## 11. S8 — accept-path orphan collision — RUN 2026-07-31 ✅ PASS
 
-`lars.tice+uat-supersede@gmail.com` has **A pending** and **B revoked** in
-TestOrg-20260329. Harmless, and A doubles as a durable `pending` fixture. Revoke A if
-a clean roster is wanted.
+Fixture: `lars.tice+uat-xorg-zombie@gmail.com` (orphan `841e6e80…`, `deleted_at IS
+NULL`, so it participates in `uq_users_email_normalized`).
+
+Resent its invitation to mint a fresh token, then accepted via
+`/accept-invitation?token=…` with email/password.
+
+**Result: HTTP 500, "Failed to create your account record."** That is the pass.
+
+```
+public.users for the address   → still exactly ONE row (841e6e80…, created 2026-06-24)
+domain_events (2 attempts)     → user.created, processing_error =
+    'duplicate key value violates unique constraint "uq_users_email_normalized"'
+```
+
+`handle_user_created` raised 23505 — the new auth id differs from the orphan's, so
+`ON CONFLICT (id)` could not absorb it — `process_domain_event` swallowed it, and
+`readBackUserCreated` caught the swallow and failed the request. **Pre-PR-E this
+returned 200 OK with a working login and no `public.users` row.** The
+`processing_error` stayed masked: it names the constraint, not the address.
+
+An `auth.users` row WAS created (expected — PR E makes this loud, not absent) and was
+deleted during cleanup.
+
+## 12. Post-UAT cleanup (2026-07-31) — ⚠️ FIXTURE STATE CHANGED, read before re-running
+
+| Item | Before UAT | After cleanup |
+|---|---|---|
+| stray `auth.users` for `+uat-xorg-zombie` | — | **deleted** (`82556230…`) |
+| `+uat-supersede` A and B | — | both **revoked** |
+| **`+uat-xorg-zombie` invitation** | `pending`, date-expired | **`revoked`** |
+| orphan census | 3 | **3** (unchanged — the migration's asserted ceiling) |
+| `public.users` rows | unchanged | unchanged |
+
+**⚠️ S4's expected verdict has changed.** Its invitation is now `revoked`, and
+`check_pending_invitation` filters `status='pending'` — so a revoked row is invisible
+to the lookup. S4 will now fall through to step 3 and render **`other_org`**, not
+`expired`.
+
+This is the same class of drift that made three of six predictions wrong at the start
+of this run. **Re-run §1's snapshot before trusting §2 next time.**
+
+`+uat-greenfield` (S1) is untouched and still carries its 2026-07-01 `pending`
+date-expired invitation, so S1 still yields `expired`.
 
 ### Remaining
 
