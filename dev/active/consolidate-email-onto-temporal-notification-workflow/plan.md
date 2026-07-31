@@ -44,8 +44,44 @@ domain_events INSERT
 - Per-user notification preferences (does the user want assignment emails?) — check `user.notification_preferences` before sending.
 - SMTP-fallback parity for the EF-originated invitation template once migrated.
 
+## Interaction with `invitation-resend-token-rotation-dead-links` (added 2026-07-31)
+
+**These are separate cards. Sequence them; do not merge them.** The token card should
+land FIRST.
+
+They sit at different tiers — that one is token lifecycle + pre-auth error reporting,
+this one is side-effect transport — and neither fix delivers the other. Fixing the
+token message needs no change to email delivery; moving email to Temporal leaves the
+rotation and the misleading "Invitation not found" exactly as they are.
+
+**But this card makes that defect materially worse, which is why the order matters.**
+`handle_invitation_resent` overwrites `invitations_projection.token` in place, so every
+resend kills all previously emailed links. Today `sendInvitationEmail` is
+**synchronous** and runs immediately after the read-back, so token rotation and email
+delivery are effectively atomic from the admin's point of view: by the time the resend
+reports success, the replacement email is out.
+
+Going async breaks that coupling:
+
+- **A dead-link window opens.** Between the projection write and the queued email
+  landing, the recipient's older link is already dead and its replacement has not
+  arrived. Today that window is ~0; under async it is however long the queue takes.
+- **A failed/retrying workflow makes it unbounded.** The old token stays dead
+  indefinitely while no new email ever arrives — and the only user-visible symptom is
+  `Invitation not found`, which says nothing about a replacement being in flight.
+
+That failure is very hard to diagnose from the recipient's side, and it is exactly the
+sort of thing the async cutover gate in scope (b) exists to catch. Landing the token
+card first (even just its cheap copy-only option) means the async migration degrades
+into an honest message rather than a lie.
+
+**Add to this card's cutover gate**: the invitation-email path must not go async until
+a superseded/stale link produces an accurate message.
+
 ## Dependencies / sequencing
 
+- **`invitation-resend-token-rotation-dead-links` should land before scope (b)** — see
+  the Interaction section above.
 - Independent of the rest of the invite-user epic (PR 3 ships without it). Can be scheduled whenever.
 - Touches all three components (infra trigger, workflows, and removes EF code) → likely its own multi-step PR with workflow replay tests + a deploy plan for the worker.
 
