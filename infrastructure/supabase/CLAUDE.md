@@ -260,6 +260,15 @@ together, even when they ship in the same commit.
 |---|---|
 | SQL migration | on `supabase db push` — **immediately**, typically while you are still developing |
 | Edge Function | on **merge**, via `.github/workflows/edge-functions-deploy.yml` |
+| Frontend bundle | on **merge**, via `.github/workflows/frontend-deploy.yml` |
+
+**Three clocks, not two.** The frontend is the one that catches people out during UAT:
+`a4c.firstovertheline.com` serves the last *merged* build, so unmerged UI simply is not
+there. During the PR A UAT this produced a scenario that looked like a failure — the page
+rendered correctly but reported no form, purely because the old bundle has none of the new
+`data-testid` attributes. Run the frontend locally (`npm run dev` with `.env.local`
+pointed at the dev project) against the deployed backend rather than deploying unmerged
+UI.
 
 So every coupled change has a live window: new schema behaviour running against
 the **previously deployed** function. Putting both halves in one commit does not
