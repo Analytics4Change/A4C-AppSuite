@@ -116,6 +116,8 @@ Cleaning up the orphans removes the failure entirely →
 - **PR C SHIPPED** (#106, `8fc2a769`, 2026-07-30) — all three RPCs compare `btrim(lower(...))` on **both** sides, with matching functional indexes. The first pass was asymmetric (trimmed the argument, not the column); `20260730034703` supersedes it.
 - **PR D SHIPPED** (#108, `42d4719f`, 2026-07-30) — normalization moved to the **source** (BEFORE-row trigger + CHECK), which is what actually closed the RLS-visibility and wedged-invitation defects. Also flipped the `uat-deactivated` fixture.
 - **PR E SHIPPED** (#110, `0ca750f9`, 2026-07-31) — the two partial unique indexes, plus read-backs on `accept-invitation`'s two `user.created` emits and a supersede guard on resend. → `memory/pr-e-uniqueness-close-out.md`
+- **REMAINING: the UAT.** Executable runbook (pre-flight snapshot, per-fixture
+  expected panels, S7/S8 setup, results table): `dev/active/uat-email-lookup-panels/runbook.md`.
 - **REMAINING: the UAT below.** That is the whole residual risk — five PRs of implementation, zero end-to-end exercise of the guard's member branch.
 
 ## ✅ Email casing — RESOLVED (PR D #108, 2026-07-30)
