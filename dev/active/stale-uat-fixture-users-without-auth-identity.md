@@ -96,4 +96,4 @@ Recommended: (1) now, (3) after the UAT.
   cannot see them).
 - They become **load-bearing in PR E**: all three have `deleted_at IS NULL`, so
   they participate in `uq_users_email_normalized`. Deleting or re-seeding them is
-  now a PR E pre-flight step, not just hygiene. → `pr-e-email-uniqueness-constraints.md`
+  now a PR E pre-flight step, not just hygiene. → `dev/archived/pr-e-email-uniqueness-constraints.md` (SHIPPED #110)

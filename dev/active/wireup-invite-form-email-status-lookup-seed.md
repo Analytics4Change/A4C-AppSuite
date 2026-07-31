@@ -1,6 +1,6 @@
 ---
-status: seed
-last_updated: 2026-07-29
+status: uat-pending — all five implementation PRs SHIPPED; this UAT is the only residual risk
+last_updated: 2026-07-31
 ---
 
 # Seed: Wire up the invite-user form's email status-lookup (built-but-disconnected)
@@ -61,9 +61,15 @@ logic.
 
 ## Verification
 
-> **⚠️ Fix the fixtures first.** `lars.tice+uat-deactivated@gmail.com` currently has
-> `is_active = true`, so the S3 `deactivated` assertion passes vacuously against an
-> `active_member` verdict. See `dev/active/stale-uat-fixture-users-without-auth-identity.md`.
+> **✅ Fixture prerequisite CLEARED (PR D, 2026-07-30).**
+> `lars.tice+uat-deactivated@gmail.com` was flipped to `is_active = false`. Before
+> that it would have made the S3 `deactivated` assertion pass vacuously against an
+> `active_member` verdict. **Do not re-fix it** — the older warning in
+> `dev/active/stale-uat-fixture-users-without-auth-identity.md`'s row table predates
+> the flip; that card's "Update — PR D" section is the current statement.
+>
+> The three orphan rows in that card are still present and are now load-bearing for
+> a different reason — see S8 below.
 
 - Enter each fixture email (S1–S6 set) → correct panel renders (new/pending/deactivated/active-member/other-org), `active_member`+`pending` disable fields, others don't.
 - **Guard member-branch check (new)**: an `active_member` fixture must render as `active_member`, NOT `other_org`. See the diagnostic above.
@@ -72,24 +78,63 @@ logic.
 - **Keyboard focus on retry (NEW, dbc PR #105 F2)**: tab to "Try again", activate by keyboard, confirm focus is NOT lost to `<body>` and the button disables in place rather than unmounting.
 - `npm run typecheck && npm run lint && npm run build` green; add a ViewModel unit test for the lookup → status mapping.
 
+### S7 — resend supersede refusal (NEW, PR E #110)
+
+PR E made resending a superseded invitation a **refusal** rather than a silent
+duplicate. Reproduce the three-step collision:
+
+1. Invite `bob@x` → invitation A, pending.
+2. Expire A (or wait it out) → A is `expired`.
+3. Invite `bob@x` again → invitation B is created, pending.
+4. **Resend A.**
+
+Expect **409** with `code: 'INVITATION_SUPERSEDED'` and
+`errorDetails.supersedingInvitationId` = B's id — not a second pending row, and not
+an opaque processing error. Confirm B is the invitation the UI points at.
+
+Also confirm the **narrowness**: resending an expired invitation that has *not* been
+superseded must still work. That is the common, legitimate case and the guard must
+not block it.
+
+### S8 — accept-path orphan collision (NEW, PR E #110, expect FAILURE-BY-DESIGN)
+
+The three orphan `public.users` rows (no `auth.users` identity, `deleted_at IS NULL`)
+participate in `uq_users_email_normalized`. Inviting one of those addresses and
+**accepting** now returns a **500 `PROCESSING_FAILED`** from `accept-invitation`
+rather than the pre-PR-E behaviour, which was a 200 OK plus a working login with no
+`public.users` row, no membership and no roles.
+
+So a failure here is the fix working. What must NOT happen is a 2xx. If you see one,
+the read-back regressed.
+
+Cleaning up the orphans removes the failure entirely →
+`dev/active/stale-uat-fixture-users-without-auth-identity.md`.
+
 ## Status
 - **PR A SHIPPED** (#103, `deeff7b5`, 2026-07-29) — service tier: `apiRpc`/api-schema fix, correlation-id threading, `lookup_failed` failure channel, Edge Function 503 fence, RPC tenancy guard. Shipped dead.
 - **PR B SHIPPED** (#105, 2026-07-30) — the wireup. `onEmailBlur` now calls `UserFormViewModel.checkEmailStatus`; lookup state consolidated onto the form VM; staleness + prefilled-name revert; always-mounted live region; retry wired. `onSuggestedAction` IS now wired (retry only).
-- **REMAINING: the UAT below.** That is the whole residual risk — see the fixture list.
+- **PR C SHIPPED** (#106, `8fc2a769`, 2026-07-30) — all three RPCs compare `btrim(lower(...))` on **both** sides, with matching functional indexes. The first pass was asymmetric (trimmed the argument, not the column); `20260730034703` supersedes it.
+- **PR D SHIPPED** (#108, `42d4719f`, 2026-07-30) — normalization moved to the **source** (BEFORE-row trigger + CHECK), which is what actually closed the RLS-visibility and wedged-invitation defects. Also flipped the `uat-deactivated` fixture.
+- **PR E SHIPPED** (#110, `0ca750f9`, 2026-07-31) — the two partial unique indexes, plus read-backs on `accept-invitation`'s two `user.created` emits and a supersede guard on resend. → `memory/pr-e-uniqueness-close-out.md`
+- **REMAINING: the UAT below.** That is the whole residual risk — five PRs of implementation, zero end-to-end exercise of the guard's member branch.
 
-## ⚠️ Email casing is NOT solved (added 2026-07-30, PR #106 review)
+## ✅ Email casing — RESOLVED (PR D #108, 2026-07-30)
 
-PRs #105/#106 normalized the **three lookup RPCs**. The architect's trace found at
-least **five** further case-sensitive email comparisons, two of them worse than a
-lookup miss:
+*Superseded. Kept for the audit trail; the warning below no longer applies.*
 
-- an **RLS policy** on `invitations_projection` that makes a mixed-case invitation
-  invisible to its own invitee (authorization-visibility failure)
-- `accept-invitation:534`, which can 500 `"Inconsistent auth state"` and
-  **permanently wedge** an invitation
-- `api.get_invitation_by_org_and_email` — still bare `=`, and the org-bootstrap
-  **idempotency guard**, so it now disagrees with `check_pending_invitation` and a
-  cased retry creates a duplicate
+At the #106 review this section read "email casing is NOT solved" and listed five
+further case-sensitive comparisons — including an **RLS policy** that made a
+mixed-case invitation invisible to its own invitee, and `accept-invitation:534`,
+which could 500 and **permanently wedge** an invitation.
 
-Tracked in `dev/active/normalize-email-at-the-source.md`. Do not read the UAT
-fixture below as covering the problem space.
+PR D fixed all of them **at the source** rather than at the call sites: a
+`BEFORE INSERT OR UPDATE ... FOR EACH ROW` trigger (`a_normalize_email_*`) rewrites
+`NEW.email := btrim(lower(email))` on `users` and `invitations_projection`, plus a
+CHECK documenting the invariant. Every downstream comparison is therefore comparing
+already-normalized values.
+
+PR E (#110) added uniqueness on top: `uq_users_email_normalized` and
+`uq_invitations_pending_org_email`.
+
+Both source cards are archived — `dev/archived/normalize-email-at-the-source.md`
+and `dev/archived/pr-e-email-uniqueness-constraints.md`.

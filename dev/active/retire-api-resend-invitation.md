@@ -3,7 +3,7 @@
 **Status**: seed
 **Created**: 2026-07-31 (PR #110 architect review, finding F2)
 **Priority**: LOW — the safety hole is CLOSED; this is surface reduction only
-**Origin**: `dev/active/pr-e-email-uniqueness-constraints.md`
+**Origin**: `dev/archived/pr-e-email-uniqueness-constraints.md`
 
 ## What already happened
 
@@ -52,5 +52,5 @@ was not runnable at the time (vault locked). Scope decision, not a safety one.
 ## Related
 
 - Pitfall: a constraint violation inside an event handler fails silent.
-- `dev/active/pr-e-email-uniqueness-constraints.md` — parent.
+- `dev/archived/pr-e-email-uniqueness-constraints.md` — parent (SHIPPED #110).
 - `retag-email-lookup-rpcs-bucket-a` — separate, still open; do not conflate.
