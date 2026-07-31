@@ -10,6 +10,27 @@ last_updated: 2026-07-30
 **Priority**: Low. No runtime effect — but these assertions read as safety and provide
 none, which is worse than their absence.
 
+> ## A subtler variant found in PR #110 (F6) — worth adding to this card's taxonomy
+>
+> The original problem is an assertion that **cannot fail**. PR #110 surfaced the
+> near neighbour: an assertion that **can** fail, but does not test the property
+> its comment advertises.
+>
+> `20260730125034` probe (b) inserted a mixed-case duplicate and claimed it
+> "proves the index is on the normalized expression, not the raw column". It does
+> not. PR D's `a_normalize_email_invitations` BEFORE-row trigger rewrites
+> `NEW.email` before any index is evaluated, so a plain unique index on
+> `(organization_id, email)` would block it identically — the probe cannot
+> distinguish the two, and cannot be made to (dropping the trigger trades the
+> 23505 for a 23514 the `WHEN unique_violation` handler would not catch).
+>
+> Fixed by correcting the claim, not the code: the probe is genuinely useful as a
+> trigger-and-index-agree check, and the expression claim is carried by the
+> `indexdef` assertion where it belongs.
+>
+> **Taxonomy for this card**: (1) assertions that cannot fail; (2) assertions that
+> can fail but prove something other than what they claim. Both read as coverage.
+
 ## Problem
 
 `20260729184125_guard_email_lookup_rpcs.sql:222-259` (and the same shape copied into

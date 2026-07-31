@@ -1,5 +1,5 @@
 ---
-status: review-folded-in
+status: SHIPPED (PR #110, 2026-07-31) — architect F1-F11 folded in
 last_updated: 2026-07-31
 ---
 

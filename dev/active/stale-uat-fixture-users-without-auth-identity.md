@@ -10,7 +10,25 @@ don't match auth"; that was wrong (11 of 11 real users match). What the query
 actually turned up was **3 rows in `public.users` with no `auth.users` row at all**.
 
 **Priority**: Low as data hygiene. **Medium as a blocker for the PR B UAT** — see
-the second section.
+the second section. **Raised again by PR #110 (2026-07-31)**: these rows are now
+the live collision surface for `uq_users_email_normalized` on the accept path.
+
+> ## Why PR E changed the stakes (architect finding F1)
+>
+> An orphan holds an address with no `auth.users` identity. If someone is later
+> invited at that same address and accepts, `accept-invitation` mints a NEW auth
+> id; `checkExistingUserPath` keys on `p_user_id`, **not email**, so the orphan is
+> invisible and the accept takes the `isExistingUser = false` branch. It emits
+> `user.created`, and `handle_user_created`'s `ON CONFLICT (id)` cannot absorb a
+> collision coming from a *different* id — so `uq_users_email_normalized` raises
+> 23505 inside the handler, where `process_domain_event` swallows it.
+>
+> PR #110 closed the *silence*: `accept-invitation` now reads back and fails the
+> request instead of minting a login with no user row. It did NOT remove the
+> orphans, so the accept still FAILS for that address — just loudly now.
+> `20260730125034` asserts the count cannot grow past 3.
+>
+> Cleaning these up removes the failure entirely. That is the remaining work.
 
 ## The rows (verified live on dev, 2026-07-30)
 
