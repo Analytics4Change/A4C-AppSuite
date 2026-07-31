@@ -36,7 +36,7 @@ components:
     InvitationResent:
       name: invitation.resent
       title: Invitation Resent
-      summary: An existing invitation was resent to a user (new token generated)
+      summary: An existing invitation was resent; expiry extended and the ORIGINAL link re-sent (the token is write-once)
       contentType: application/json
       payload:
         $ref: '#/components/schemas/InvitationResentEvent'
@@ -491,7 +491,6 @@ components:
         - invitation_id
         - org_id
         - email
-        - token
         - expires_at
         - resent_by
       properties:
@@ -507,9 +506,6 @@ components:
           type: string
           format: email
           description: Email address of the invited user
-        token:
-          type: string
-          description: New cryptographically secure token generated for this resend
         expires_at:
           type: string
           format: date-time
@@ -518,9 +514,12 @@ components:
           type: string
           format: uuid
           description: User ID who triggered the resend
-        previous_token:
-          type: string
-          description: Previous token that was invalidated (for audit trail)
+        # `token` and `previous_token` were REMOVED 2026-07-31 (migration
+        # 20260731201018). invitations_projection.token is write-once: a resend
+        # extends expiry and re-opens status, it does not mint a new secret, so
+        # handle_invitation_resent no longer reads a token from this payload.
+        # Emitting one would also write a live credential into the immutable
+        # domain_events audit log for no functional gain.
         resend_count:
           type: integer
           minimum: 1

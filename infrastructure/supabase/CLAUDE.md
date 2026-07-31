@@ -258,7 +258,7 @@ together, even when they ship in the same commit.
 
 | Artifact | Reaches the database/runtime |
 |---|---|
-| SQL migration | on `supabase db push` — **immediately**, typically while you are still developing |
+| SQL migration | on `supabase db push` — **immediately**, typically while you are still developing — **or** on merge via `supabase-migrations.yml`, whichever happens first |
 | Edge Function | on **merge**, via `.github/workflows/edge-functions-deploy.yml` |
 | Frontend bundle | on **merge**, via `.github/workflows/frontend-deploy.yml` |
 
@@ -291,17 +291,40 @@ depends on, decide explicitly which of these you are doing:
    `supabase functions deploy <slug> --project-ref <ref>` for every affected
    function. Simplest, and correct for a prototype environment. It does put
    unmerged code live — which is what a dev project is for, but say so.
-2. **Expand / contract**, when the window genuinely must not exist. Naive
-   ordering does not help — for the example above, migration-first breaks the
-   emailed link, and function-first is *worse*: the handler's
-   `token = safe_jsonb_extract_text(...)` would resolve to NULL against a
-   `NOT NULL` column, raising inside the handler where
-   `process_domain_event` swallows it into `processing_error` and reports success.
-   The safe shape is three steps: a **tolerant** migration
-   (`token = COALESCE(safe_jsonb_extract_text(...), ip.token)`) that accepts
+2. **Work out which ordering fails CLOSED, and take that one.** This is the test
+   to apply, not a fixed preference for either artifact.
+
+   For the worked example the answer is **function-first**, because the new
+   `invite-user` acquired a hard dependency on a new RPC
+   (`api.get_invitation_token_for_resend`, created by the same migration). Deploy
+   the function first and that RPC does not exist yet, so `fetchResendToken`
+   errors, and `invite-user` returns **503 `INVITATION_TOKEN_UNAVAILABLE` before
+   it emits anything and before it sends any email**. Nothing is written, nothing
+   is mailed, the resend button simply reports failure until the migration lands.
+   Migration-first is the ordering that broke dev.
+
+   Generalise it: **a coupled change where the new function depends on a new RPC
+   is self-blocking in the function-first direction.** That is a property to look
+   for deliberately, because when it holds you need no ceremony at all.
+
+   > ⚠️ An earlier draft of this section claimed function-first was *worse* here —
+   > that the handler would write NULL into a `NOT NULL` column and have the error
+   > swallowed. **That was wrong**, on two counts: the handler is never reached
+   > (the 503 above short-circuits first), and even if it were, the Pattern A v2
+   > `readProcessingError` added in PR #108 returns 500 *before* the email. The
+   > claim was written from reasoning about the code rather than reading it.
+   > Recorded rather than quietly deleted: guidance asserted from plausibility is
+   > exactly what this whole section exists to warn about.
+
+3. **Expand / contract**, for the harder case where **neither** direction fails
+   closed — typically a handler change with no new RPC dependency, where both the
+   old and new function versions can reach the handler and one of them writes
+   something the schema no longer tolerates. Three steps: a **tolerant** migration
+   (e.g. `token = COALESCE(safe_jsonb_extract_text(...), ip.token)`) that accepts
    either function version → deploy the function → a final migration that drops
-   the write.
-3. **Do not push until merge.** Costs you the ability to verify on dev, which is
+   the write. Only reach for this when the fails-closed test in (2) comes back
+   negative in both directions.
+4. **Do not push until merge.** Costs you the ability to verify on dev, which is
    usually the wrong trade here.
 
 **Detection.** Compare what is deployed against what you changed — the versions

@@ -28,11 +28,15 @@ import type { InvitationUnusableReason } from '@/types/organization.types';
 import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
 import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
 import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { sanitizeCommandError } from '@/utils/sanitizeCommandError';
 import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
 import { Building, Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
+
+/** Friendly fallback when the raw accept error looks internal. */
+const ACCEPT_FAILURE_FALLBACK = 'We could not complete your account setup. Please try again.';
 
 /**
  * Heading + guidance per unusable reason.
@@ -90,12 +94,31 @@ export const AcceptInvitationPage: React.FC = observer(() => {
   const feedback = useCommandFeedback('accept-invitation');
   const acceptFocus = useCommandFeedbackFocus<HTMLDivElement>(!!viewModel.acceptanceError);
 
-  /** Sanitized display string for the accept failure; null when there is none. */
+  /**
+   * Sanitized display string for the accept failure; null when there is none.
+   *
+   * Derived PURELY. `feedback.failed()` both `setState`s the echo and `log.warn`s
+   * the raw error, so calling it here — in the render body — would fire a
+   * "command failed" log line on every re-render. This is an `observer` component
+   * wrapping a live form, so that is once per keystroke, against a standard that
+   * says the raw error is logged once per command. The side effect belongs in the
+   * effect below, keyed on the error identity.
+   *
+   * Every sibling command-feedback page routes `failed()` through an event
+   * handler for the same reason; this was the only render-phase caller.
+   */
   const acceptanceDisplayError = viewModel.acceptanceError
-    ? feedback.failed(viewModel.acceptanceError, {
-        fallback: 'We could not complete your account setup. Please try again.',
-      })
+    ? sanitizeCommandError(viewModel.acceptanceError, ACCEPT_FAILURE_FALLBACK).display
     : null;
+
+  useEffect(() => {
+    if (viewModel.acceptanceError) {
+      feedback.failed(viewModel.acceptanceError, { fallback: ACCEPT_FAILURE_FALLBACK });
+    }
+    // `feedback` is stable across renders (useCallback-backed); keying on the
+    // error identity is what makes this fire once per command.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewModel.acceptanceError]);
 
   useEffect(() => {
     if (!token) {

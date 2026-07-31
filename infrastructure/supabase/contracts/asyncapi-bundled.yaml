@@ -4291,7 +4291,9 @@ channels:
                       description: Additional context or notes
           - name: invitation.resent
             title: Invitation Resent
-            summary: An existing invitation was resent to a user (new token generated)
+            summary: >-
+              An existing invitation was resent; expiry extended and the
+              ORIGINAL link re-sent (the token is write-once)
             contentType: application/json
             payload:
               title: InvitationResentEvent
@@ -4321,7 +4323,6 @@ channels:
                     - invitation_id
                     - org_id
                     - email
-                    - token
                     - expires_at
                     - resent_by
                   properties:
@@ -4337,11 +4338,6 @@ channels:
                       type: string
                       format: email
                       description: Email address of the invited user
-                    token:
-                      type: string
-                      description: >-
-                        New cryptographically secure token generated for this
-                        resend
                     expires_at:
                       type: string
                       format: date-time
@@ -4350,9 +4346,6 @@ channels:
                       type: string
                       format: uuid
                       description: User ID who triggered the resend
-                    previous_token:
-                      type: string
-                      description: Previous token that was invalidated (for audit trail)
                     resend_count:
                       type: integer
                       minimum: 1
@@ -22562,7 +22555,9 @@ channels:
                       description: Additional context or notes
           - name: invitation.resent
             title: Invitation Resent
-            summary: An existing invitation was resent to a user (new token generated)
+            summary: >-
+              An existing invitation was resent; expiry extended and the
+              ORIGINAL link re-sent (the token is write-once)
             contentType: application/json
             payload:
               title: InvitationResentEvent
@@ -22592,7 +22587,6 @@ channels:
                     - invitation_id
                     - org_id
                     - email
-                    - token
                     - expires_at
                     - resent_by
                   properties:
@@ -22608,11 +22602,6 @@ channels:
                       type: string
                       format: email
                       description: Email address of the invited user
-                    token:
-                      type: string
-                      description: >-
-                        New cryptographically secure token generated for this
-                        resend
                     expires_at:
                       type: string
                       format: date-time
@@ -22621,9 +22610,6 @@ channels:
                       type: string
                       format: uuid
                       description: User ID who triggered the resend
-                    previous_token:
-                      type: string
-                      description: Previous token that was invalidated (for audit trail)
                     resend_count:
                       type: integer
                       minimum: 1

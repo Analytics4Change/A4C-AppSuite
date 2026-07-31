@@ -230,7 +230,7 @@ export enum RoleScope {
   UNIT = "unit",
 }
 
-export enum AnonymousSchema_5814 {
+export enum AnonymousSchema_5810 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -240,7 +240,7 @@ export enum AnonymousSchema_5814 {
   JSONB = "jsonb",
 }
 
-export enum AnonymousSchema_5842 {
+export enum AnonymousSchema_5838 {
   RESERVED_TEXT = "text",
   RESERVED_NUMBER = "number",
   DATE = "date",
@@ -424,12 +424,12 @@ export interface UserAddressUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.updated';
-  'event_data': AnonymousSchema_3472;
+  'event_data': AnonymousSchema_3470;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3472 {
+export interface AnonymousSchema_3470 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -451,12 +451,12 @@ export interface UserAddressRemovedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.address.removed';
-  'event_data': AnonymousSchema_3504;
+  'event_data': AnonymousSchema_3502;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3504 {
+export interface AnonymousSchema_3502 {
   'address_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -492,12 +492,12 @@ export interface UserPhoneUpdatedEvent {
   'stream_id': string;
   'stream_type': 'user';
   'event_type': 'user.phone.updated';
-  'event_data': AnonymousSchema_3553;
+  'event_data': AnonymousSchema_3551;
   'event_metadata': EventMetadata;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_3553 {
+export interface AnonymousSchema_3551 {
   'phone_id': string;
   'user_id': string;
   'org_id'?: string;
@@ -849,10 +849,8 @@ export interface InvitationResentData {
   'invitation_id': string;
   'org_id': string;
   'email': string;
-  'token': string;
   'expires_at': string;
   'resent_by': string;
-  'previous_token'?: string;
   'resend_count'?: number;
   'additionalProperties'?: Map<string, any>;
 }
@@ -2244,13 +2242,13 @@ export interface AccessGrantPolicyOverrideAppliedEvent {
 
 export interface AccessGrantPolicyOverrideAppliedData {
   'grant_id': string;
-  'permissions': AnonymousSchema_5656[];
+  'permissions': AnonymousSchema_5652[];
   'override_reason': string;
   'applied_by': string;
   'additionalProperties'?: Map<string, any>;
 }
 
-export interface AnonymousSchema_5656 {
+export interface AnonymousSchema_5652 {
   'p'?: string;
   's'?: string;
   'additionalProperties'?: Map<string, any>;
@@ -2383,7 +2381,7 @@ export interface ClientFieldDefinitionCreatedData {
   'category_id': string;
   'field_key': string;
   'display_name': string;
-  'field_type'?: AnonymousSchema_5814;
+  'field_type'?: AnonymousSchema_5810;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
@@ -2408,7 +2406,7 @@ export interface ClientFieldDefinitionUpdatedData {
   'organization_id': string;
   'display_name'?: string;
   'category_id'?: string;
-  'field_type'?: AnonymousSchema_5842;
+  'field_type'?: AnonymousSchema_5838;
   'is_visible'?: boolean;
   'is_required'?: boolean;
   'validation_rules'?: Map<string, any>;
