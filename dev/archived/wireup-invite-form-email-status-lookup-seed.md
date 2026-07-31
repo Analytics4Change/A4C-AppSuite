@@ -1,5 +1,5 @@
 ---
-status: uat-pending — all five implementation PRs SHIPPED; this UAT is the only residual risk
+status: COMPLETE (2026-07-31) — all 5 PRs SHIPPED + UAT PASSED (S1-S9, S7, S8)
 last_updated: 2026-07-31
 ---
 
@@ -116,9 +116,15 @@ Cleaning up the orphans removes the failure entirely →
 - **PR C SHIPPED** (#106, `8fc2a769`, 2026-07-30) — all three RPCs compare `btrim(lower(...))` on **both** sides, with matching functional indexes. The first pass was asymmetric (trimmed the argument, not the column); `20260730034703` supersedes it.
 - **PR D SHIPPED** (#108, `42d4719f`, 2026-07-30) — normalization moved to the **source** (BEFORE-row trigger + CHECK), which is what actually closed the RLS-visibility and wedged-invitation defects. Also flipped the `uat-deactivated` fixture.
 - **PR E SHIPPED** (#110, `0ca750f9`, 2026-07-31) — the two partial unique indexes, plus read-backs on `accept-invitation`'s two `user.created` emits and a supersede guard on resend. → `memory/pr-e-uniqueness-close-out.md`
-- **REMAINING: the UAT.** Executable runbook (pre-flight snapshot, per-fixture
-  expected panels, S7/S8 setup, results table): `dev/active/uat-email-lookup-panels/runbook.md`.
-- **REMAINING: the UAT below.** That is the whole residual risk — five PRs of implementation, zero end-to-end exercise of the guard's member branch.
+- **UAT PASSED 2026-07-31.** All six real verdicts exercised plus the supersede
+  refusal (S7, both halves) and the orphan accept-path collision (S8). Only
+  `lookup_failed` is unexercised against a real backend — mock-only by design.
+  Full record: `dev/archived/uat-email-lookup-panels/runbook.md`.
+  **The guard's authenticated-member branch executed correctly** — the one path five
+  PRs shipped without ever running.
+  One NEW defect surfaced during the run (needs a card): every resend overwrites the
+  invitation token in place, so older emailed links die as "Invitation not found".
+- ~~REMAINING: the UAT below.~~ **DONE — passed 2026-07-31.**
 
 ## ✅ Email casing — RESOLVED (PR D #108, 2026-07-30)
 

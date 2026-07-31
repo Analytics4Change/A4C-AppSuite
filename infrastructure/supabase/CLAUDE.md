@@ -251,6 +251,51 @@ grep -rn "emit_domain_event" infrastructure/supabase/supabase/functions/ workflo
 
 Every match should be followed by a `readProcessingError` call before any side effect (email, DNS, returning success). PR #108 found three in `invite-user` alone — including `emitExpirationEvent`, which returned `Promise<void>` and logged its failure, leaving a stale `pending` row that the very next create-invitation would collide with.
 
+### A safety argument holds for the WRITERS you enumerated, not for the constraint
+
+The companion to the silent-failure rule above. That rule tells you a constraint on a
+handler-written projection needs a wire-tier read-back. This one tells you the read-back
+must exist on **every** writer — and that the easiest mistake is proving it for one and
+generalizing.
+
+Discovered in PR #110 (2026-07-31). PR E reasoned rigorously about
+`uq_invitations_pending_org_email` × the `invite-user` Edge Function, closed the gap
+there, and shipped. Architect review found the same constraint reachable through three
+other paths, none of which had a read-back:
+
+| Writer | Why it was missed |
+|---|---|
+| `accept-invitation` | emits `user.created` at two sites, discards both event ids — **zero** `readProcessingError` calls in the whole function |
+| `api.resend_invitation` | `PERFORM api.emit_domain_event(...)` — the `PERFORM` form **discards the id**, so it structurally cannot read back |
+| `handle_user_invited` ON CONFLICT arm | reachable only by event **replay** (Temporal retry, `api.retry_failed_event`) — no wire tier exists to guard |
+
+The `accept-invitation` case was the damaging one: `handle_user_created` INSERTs
+`ON CONFLICT (id) DO UPDATE`, which **cannot absorb a collision arriving from a
+different id**. An orphan `public.users` row holding the invitee's address therefore
+produced a 23505 that the trigger swallowed — yielding an auth account that could log
+in with no `users` row, no membership, no roles, and **200 OK**.
+
+**Rule.** Before constraining a handler-written projection, grep for every emitter and
+check each one reads back:
+
+```bash
+grep -rn "emit_domain_event" infrastructure/supabase/supabase/functions/ workflows/src/ | grep -v __tests__
+grep -rnE "PERFORM api\.emit_domain_event|:= api\.emit_domain_event" infrastructure/supabase/supabase/migrations/
+```
+
+Three corollaries:
+
+- **`PERFORM` is a red flag.** It throws away the id, so the RPC cannot verify its own
+  write. Convert to `v_event_id := api.emit_domain_event(...)` + `processing_error`
+  check (Pattern A v2).
+- **Replay paths have no wire tier.** Fix those in the *handler*, which covers every
+  emitter at once. PR #110 stopped `handle_user_invited` resurrecting terminal
+  invitations by dropping `status` from its `ON CONFLICT DO UPDATE` list.
+- **Editing an already-applied migration reaches nothing.** `db push` skips versions
+  already in the remote ledger and never diffs contents, so an in-place edit lands only
+  on fresh databases. A deployed-body change needs a NEW migration. Check with
+  `supabase migration list --linked` before editing.
+
 ### `CREATE INDEX IF NOT EXISTS` matches on NAME only — and an assertion that can't fail isn't one
 
 Two related traps, both found in PR #106 (2026-07-30).
