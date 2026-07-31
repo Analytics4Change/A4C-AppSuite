@@ -65,22 +65,51 @@ SELECT f.email,
 Derive each expected verdict from the snapshot using §3's decision order, then fill
 in §2. **If a snapshot row contradicts §2, the snapshot wins** — §2 is a prediction.
 
-## 2. Expected panel per fixture
+## 2. Expected panel per fixture — DERIVED FROM LIVE SNAPSHOT 2026-07-31
+
+**Caller org = `TestOrg-20260329`** (`2d0829ae-224b-4a79-ac3a-726b00d6c172`, provider,
+subdomain verified). Snapshot taken 2026-07-31; re-run §1 if anything has moved.
 
 `roles_in_caller_org > 0` is what makes membership match — `check_user_org_membership`
 INNER JOINs `user_roles_projection`, so a **roleless** same-org user does NOT match it.
 
-| # | Fixture | Predicted verdict | Panel | Fields locked? |
+| # | Fixture | Live state | **Verdict** | Fields locked? |
 |---|---|---|---|---|
-| S1 | `+uat-greenfield` | `not_found` **⚠️ unless its #85 invitation survives → `pending`/`expired`** | blue "New user" | no |
-| S2 | `+test3` | `existing_user_no_roles` (same org, 0 roles) | — | no |
-| S3 | `+uat-deactivated` | `deactivated` (role in caller org, `is_active=false`) | gray, **no** action button | no |
-| S4 | `+uat-xorg-zombie` | `existing_user_no_roles` **⚠️ same #85 caveat as S1** | — | no |
-| S5 ⭐ | `+test2` | **`active_member`** | — | **yes** |
-| S6 | `+uat-xorg-member` | `other_org_member` (role in Live for Life) | — | no |
+| S1 | `+uat-greenfield` | no `users` row; **`pending` invitation from 2026-07-01, date-expired** | **`expired`** | no |
+| S2 | `+test3` | role in TestOrg (Aspen Med Viewer), active | **`active_member`** | **yes** |
+| S3 | `+uat-deactivated` | role in TestOrg, `is_active=false`, orphan | **`deactivated`** | no |
+| S4 | `+uat-xorg-zombie` | 0 roles anywhere; **`pending` invitation from 2026-07-01, date-expired** | **`expired`** | no |
+| S5 ⭐ | `+test2` | role in TestOrg (Sequoia Med Admin), active | **`active_member`** | **yes** |
+| S6 | `+uat-xorg-member` | role in **Live for Life** only, orphan | **`other_org_member`** | no |
+| S9 | any never-seen address, e.g. `lars.tice+uat-lookup-fresh@gmail.com` | nothing anywhere | **`not_found`** | no |
 
-⭐ **S5 is the headline.** It is the ONLY assertion that exercises the tenancy
-guard's authenticated-member branch — the one path five PRs never executed.
+⭐ **S5 is the headline.** The only assertion exercising the tenancy guard's
+authenticated-member branch — the path five PRs never executed.
+
+### ⚠️ Three predictions changed against the pre-run guesses. Read this before judging a failure.
+
+- **S1 and S4 are `expired`, NOT `not_found` / `existing_user_no_roles`.** The
+  PR #85 run left both a `status='pending'` invitation in TestOrg dated 2026-07-01,
+  and the lookup checks pending invitations at step 2 — *before* user-existence at
+  step 3. Both rows are past `expires_at`, so the verdict resolves `expired`.
+- **S2 is `active_member`, NOT `existing_user_no_roles`.** The PR #85 S2 scenario
+  *assigned it a role* (its whole point: 0→1 in `user_roles_projection`). The
+  "same-org roleless" description is pre-#85 and no longer true.
+
+None of these is a defect. Judging S1/S2/S4 against the stale table would produce
+three false failures.
+
+### Coverage gap this leaves, and the zero-mutation fix
+
+As it stands the six fixtures cover only four of seven verdicts —
+`expired`, `active_member`, `deactivated`, `other_org_member`. Missing: `not_found`,
+`pending`, `lookup_failed`.
+
+Rather than mutate dev data to restore S1/S4:
+
+- **`not_found`** → S9 above: any address never seen before. No setup.
+- **`pending`** → falls out of the §5 S7 setup for free (invitation B is pending).
+- **`lookup_failed`** → §7, mock mode via a `lookupfail@…` address.
 
 ## 3. Verdict decision order (from `SupabaseUserQueryService.checkEmailStatus`)
 
