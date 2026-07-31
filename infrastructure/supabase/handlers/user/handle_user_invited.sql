@@ -37,7 +37,13 @@ BEGIN
   ) ON CONFLICT (invitation_id) DO UPDATE SET
     token = EXCLUDED.token,
     expires_at = EXCLUDED.expires_at,
-    status = 'pending',
+    -- `status` DELIBERATELY OMITTED (20260731005639). It was `status = 'pending'`
+    -- here, which resurrected accepted/revoked/expired invitations on any event
+    -- replay (Temporal activity retry, api.retry_failed_event) and could then
+    -- collide with a live pending invitation for the same address under
+    -- uq_invitations_pending_org_email — a 23505 raised inside a handler, which
+    -- process_domain_event absorbs silently. Status transitions belong to the
+    -- lifecycle handlers, not to a replay of the creation event.
     phones = EXCLUDED.phones,
     notification_preferences = EXCLUDED.notification_preferences,
     correlation_id = COALESCE(invitations_projection.correlation_id, EXCLUDED.correlation_id),

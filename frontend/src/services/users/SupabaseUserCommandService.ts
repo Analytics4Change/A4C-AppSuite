@@ -212,13 +212,21 @@ export class SupabaseUserCommandService implements IUserCommandService {
         const errorMessage = errorInfo.correlationId
           ? `${errorInfo.message} (Ref: ${errorInfo.correlationId})`
           : errorInfo.message;
+        // Carry `errorDetails` through, not just `details`. INVITATION_SUPERSEDED
+        // puts the invitation the admin should act on instead in
+        // `errorDetails.supersedingInvitationId`; dropping it leaves the caller
+        // with prose and no target to act on.
+        const context = {
+          ...(errorInfo.details ? { details: errorInfo.details } : {}),
+          ...(errorInfo.errorDetails ?? {}),
+        };
         return {
           success: false,
           error: errorMessage,
           errorDetails: {
             code: (errorInfo.code ?? 'UNKNOWN') as UserOperationErrorCode,
             message: errorInfo.message,
-            context: errorInfo.details ? { details: errorInfo.details } : undefined,
+            context: Object.keys(context).length > 0 ? context : undefined,
             correlationId: errorInfo.correlationId,
           },
         };

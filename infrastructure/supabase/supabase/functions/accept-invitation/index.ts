@@ -54,10 +54,11 @@ import {
   createSpan,
   endSpan,
 } from '../_shared/tracing-context.ts';
-import { buildEventMetadata } from '../_shared/emit-event.ts';
+import { buildEventMetadata, readProcessingError } from '../_shared/emit-event.ts';
+import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v25-cross-provider-invitation-gate';
+const DEPLOY_VERSION = 'v26-user-created-readback';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -239,6 +240,67 @@ export async function checkExistingUserPath(
     isDeleted: !!result.isDeleted,
     rolesCheckError: null,
   };
+}
+
+/**
+ * Read back whether a `user.created` event actually produced its projection row,
+ * and build the failure response if it did not.
+ *
+ * # Why this exists (PR E — uq_users_email_normalized)
+ *
+ * `emit_domain_event` returning an id does NOT mean `handle_user_created` ran.
+ * `process_domain_event` catches every handler exception with `WHEN OTHERS`,
+ * records it on `domain_events.processing_error`, and **does not re-raise** — so
+ * the outer INSERT commits, the RPC reports no error, and a caller that checks
+ * only `error` sees success. That is the codified silent-handler-failure pitfall.
+ *
+ * Before PR E this was survivable here: `handle_user_created` INSERTs
+ * `ON CONFLICT (id) DO UPDATE`, and nothing else could make it raise. PR E adds
+ * `uq_users_email_normalized`, a UNIQUE index on `btrim(lower(email))` over live
+ * rows — and `ON CONFLICT (id)` cannot absorb a collision from a *different* id.
+ *
+ * Concrete failure this closes: a live `public.users` row already holds
+ * `bob@x.com` under some other id (an orphan with no `auth.users` identity, or an
+ * SSO duplicate — `auth.users` enforces uniqueness only `WHERE is_sso_user=false`).
+ * A new person is invited at `bob@x.com` and accepts. `checkExistingUserPath` keys
+ * on `p_user_id`, not email, so the collision is invisible and `isExistingUser` is
+ * false. `user.created` is emitted, `handle_user_created` raises 23505, the trigger
+ * swallows it — and without this read-back the function proceeds to emit roles,
+ * mark the invitation accepted, and return 200. The person can log in and has no
+ * `public.users` row, no membership, and no roles, with nothing in the logs.
+ *
+ * `readProcessingError` fails CLOSED: a failed read-back returns a synthetic error
+ * rather than `null`, because "I could not determine whether this worked" must
+ * never be reported as success.
+ *
+ * @returns a 500 `Response` when the projection write failed, else `null` to proceed.
+ */
+export async function readBackUserCreated(
+  // deno-lint-ignore no-explicit-any
+  client: any,
+  eventId: string,
+  correlationId: string,
+  corsHeaders: Record<string, string>,
+  logLabel: string,
+): Promise<Response | null> {
+  const processingError = await readProcessingError(client, eventId);
+  if (!processingError) return null;
+
+  console.error(
+    `[accept-invitation v${DEPLOY_VERSION}] ${logLabel}: event ${eventId} failed to process:`,
+    processingError,
+  );
+  return new Response(
+    JSON.stringify({
+      error: 'Failed to create your account record',
+      errorDetails: {
+        code: 'PROCESSING_FAILED',
+        message: maskPii(processingError),
+      },
+      correlationId,
+    }),
+    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  );
 }
 
 /**
@@ -685,7 +747,7 @@ serve(async (req) => {
 
       // Only emit user.created for NEW users (Sally scenario: skip for existing)
       if (!isExistingUser) {
-        const { data: _oauthEventId, error: oauthEventError } = await supabase
+        const { data: oauthEventId, error: oauthEventError } = await supabase
           .rpc('emit_domain_event', {
             p_stream_id: userId,
             p_stream_type: 'user',
@@ -714,6 +776,19 @@ serve(async (req) => {
           console.error(`[accept-invitation v${DEPLOY_VERSION}] Failed to emit user.created for OAuth user:`, oauthEventError);
           return handleRpcError(oauthEventError, correlationId, corsHeaders, 'Emit user.created event (OAuth)');
         }
+
+        // The emit returning an id does NOT mean the users row exists — see
+        // readBackUserCreated. Gate BEFORE contact linking and before the
+        // invitation is marked accepted, so no side effect outlives a failure.
+        const oauthReadBack = await readBackUserCreated(
+          supabase,
+          oauthEventId as string,
+          correlationId,
+          corsHeaders,
+          'OAuth user.created',
+        );
+        if (oauthReadBack) return oauthReadBack;
+
         console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted for new ${provider} user, contact_id=${invitation.contact_id || 'none'}`);
 
         // Emit contact.user.linked if user is also a contact
@@ -783,7 +858,7 @@ serve(async (req) => {
     // Emit user.created event for email/password users only
     // OAuth users already have this event emitted in the OAuth block above (lines 335-393)
     if (isEmailPassword) {
-      const { data: _eventId, error: eventError } = await supabase
+      const { data: eventId, error: eventError } = await supabase
         .rpc('emit_domain_event', {
           p_stream_id: userId,
           p_stream_type: 'user',
@@ -809,11 +884,25 @@ serve(async (req) => {
 
       if (eventError) {
         console.error('Failed to emit user.created event:', eventError);
-        // CRITICAL: Event emission failure or processing failure
+        // CRITICAL: Event EMISSION failure.
         // User account exists but has no role - return error to prevent silent failure
         return handleRpcError(eventError, correlationId, corsHeaders, 'Emit user.created event');
       }
-      console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted: event_id=${_eventId}, user_id=${userId}, org_id=${invitation.organization_id}, contact_id=${invitation.contact_id || 'none'}`);
+
+      // CRITICAL: Event PROCESSING failure. The comment above this branch has
+      // claimed to cover this case since it was written, but `eventError` is
+      // null whenever the domain_events INSERT succeeded — which it does even
+      // when the handler raised. Only the read-back can tell the difference.
+      const emailReadBack = await readBackUserCreated(
+        supabase,
+        eventId as string,
+        correlationId,
+        corsHeaders,
+        'email/password user.created',
+      );
+      if (emailReadBack) return emailReadBack;
+
+      console.log(`[accept-invitation v${DEPLOY_VERSION}] user.created event emitted: event_id=${eventId}, user_id=${userId}, org_id=${invitation.organization_id}, contact_id=${invitation.contact_id || 'none'}`);
 
       // Emit contact.user.linked if user is also a contact
       if (invitation.contact_id) {

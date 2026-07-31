@@ -796,6 +796,14 @@ export type UserOperationErrorCode =
   | 'USER_ACTIVE' // User must be deactivated before deletion
   | 'INVITATION_EXPIRED'
   | 'INVITATION_REVOKED'
+  // A newer invitation is already pending for this address, so resending this
+  // one would produce a second pending row and violate
+  // uq_invitations_pending_org_email. `errorDetails.supersedingInvitationId`
+  // carries the invitation the caller should resend instead.
+  | 'INVITATION_SUPERSEDED'
+  // The supersede probe itself failed, so we could not establish that a resend
+  // is safe. Distinct from INVITATION_SUPERSEDED: this is "unknown", not "no".
+  | 'SUPERSEDE_CHECK_FAILED'
   | 'SUBSET_ONLY_VIOLATION'
   | 'SCOPE_VIOLATION'
   | 'SCOPE_HIERARCHY_VIOLATION'

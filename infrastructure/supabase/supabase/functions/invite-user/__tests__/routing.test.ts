@@ -13,14 +13,22 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.220.1/assert/mod.ts';
 
-import { assignRolesToExistingUser, checkEmailStatus } from '../index.ts';
+import { assignRolesToExistingUser, checkEmailStatus, checkResendSupersede } from '../index.ts';
 
 type RpcResponse = { data: unknown; error: unknown };
 
-/** Minimal Supabase client stub: `.rpc(name)` returns a configured response. */
-function mockClient(responses: Record<string, RpcResponse>): Parameters<typeof checkEmailStatus>[0] {
+/**
+ * Minimal Supabase client stub: `.rpc(name)` returns a configured response.
+ * `onRpc` optionally spies on the call so a test can assert what was probed,
+ * not just what came back.
+ */
+function mockClient(
+  responses: Record<string, RpcResponse>,
+  onRpc?: (name: string, args: unknown) => void,
+): Parameters<typeof checkEmailStatus>[0] {
   return {
-    rpc(name: string) {
+    rpc(name: string, args: unknown) {
+      onRpc?.(name, args);
       return Promise.resolve(responses[name] ?? { data: null, error: null });
     },
   } as unknown as Parameters<typeof checkEmailStatus>[0];
@@ -218,4 +226,73 @@ Deno.test('checkEmailStatus → an errored probe never yields not_found', async 
     const result = await checkEmailStatus(mockClient(responses), 'a@b.com', 'org1');
     assert(result.status !== 'not_found', `${failing} error must not classify as not_found`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// checkResendSupersede — the expired-invitation collision guard (PR E)
+// ---------------------------------------------------------------------------
+//
+// This exists because `handle_invitation_resent` flips status to 'pending'
+// unconditionally. With uq_invitations_pending_org_email in place, resending an
+// expired invitation that has already been superseded is a 23505 raised INSIDE
+// an event handler — which `process_domain_event` absorbs into a processing_error
+// without re-raising. Refusing at the wire keeps that from becoming an opaque
+// failure the admin cannot act on.
+
+Deno.test('checkResendSupersede → superseded when a pending invitation already exists', async () => {
+  const client = mockClient({
+    check_pending_invitation: { data: [{ id: 'proj-pk-1' }], error: null },
+  });
+  const result = await checkResendSupersede(client, 'bob@x.com', 'org1');
+  assertEquals(result.verdict, 'superseded');
+  // The PROJECTION PK is what the admin needs to act on the live invitation.
+  assert(result.verdict === 'superseded' && result.supersedingInvitationId === 'proj-pk-1');
+});
+
+Deno.test('checkResendSupersede → proceed when nothing has superseded it', async () => {
+  // The narrowness matters: resending an expired invitation is a legitimate,
+  // common action. Only the collision is refused.
+  const client = mockClient({
+    check_pending_invitation: { data: [], error: null },
+  });
+  const result = await checkResendSupersede(client, 'bob@x.com', 'org1');
+  assertEquals(result.verdict, 'proceed');
+});
+
+Deno.test('checkResendSupersede → fails CLOSED when the probe errors', async () => {
+  // An unknown state is not a negative result. Falling through here would resend
+  // into the duplicate the guard exists to prevent.
+  const client = mockClient({
+    check_pending_invitation: { data: null, error: { message: 'boom' } },
+  });
+  const result = await checkResendSupersede(client, 'bob@x.com', 'org1');
+  assertEquals(result.verdict, 'lookup_failed');
+});
+
+Deno.test('checkResendSupersede → a null data payload is not treated as superseded', async () => {
+  // PostgREST returns null (not []) in some shapes; that is "no pending row",
+  // and must not be misread as a collision that blocks a legitimate resend.
+  const client = mockClient({
+    check_pending_invitation: { data: null, error: null },
+  });
+  const result = await checkResendSupersede(client, 'bob@x.com', 'org1');
+  assertEquals(result.verdict, 'proceed');
+});
+
+Deno.test('checkResendSupersede → probes by email + org, never by invitation id', async () => {
+  // The guard's whole premise is "is there ANOTHER live invitation for this
+  // ADDRESS", because that is what uq_invitations_pending_org_email keys on
+  // (organization_id, btrim(lower(email))). A probe keyed on the invitation
+  // being resent would always come back empty and the guard would be inert.
+  const calls: Array<{ name: string; args: unknown }> = [];
+  const client = mockClient(
+    { check_pending_invitation: { data: [], error: null } },
+    (name, args) => calls.push({ name, args }),
+  );
+
+  await checkResendSupersede(client, 'bob@x.com', 'org1', 'corr-1');
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].name, 'check_pending_invitation');
+  assertEquals(calls[0].args, { p_email: 'bob@x.com', p_org_id: 'org1' });
 });
