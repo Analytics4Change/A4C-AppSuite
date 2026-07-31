@@ -20,6 +20,11 @@
 --      roles in one org yields three rows. Same user, so `is_active` agrees —
 --      harmless, but `LIMIT 1` is still doing real work.
 --
+-- NOTE (added post-review, 20260731005639): the ORDER BY below was refined once
+-- more to rank liveness ahead of is_active. That migration supersedes this body;
+-- this file is left as-shipped because it is already applied and an in-place edit
+-- would never reach an environment that has it.
+--
 -- So the mitigation stays and only its justification changes. Body is otherwise
 -- byte-identical to the deployed definition (fetched via `pg_get_functiondef`
 -- and diffed before editing, per the CREATE-OR-REPLACE rule).

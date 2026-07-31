@@ -57,10 +57,10 @@ function makeMockClient(config: MockClientConfig) {
   const fromCalls: string[] = [];
 
   return {
-    async rpc(name: string, args: unknown) {
+    rpc(name: string, args: unknown) {
       onRpc(name, args);
       const fixture = config.rpcs[name] ?? { data: null, error: null };
-      return { data: fixture.data, error: fixture.error ?? null };
+      return Promise.resolve({ data: fixture.data, error: fixture.error ?? null });
     },
     // Throw-stub for .from() — the SQL-RPC pivot REMOVED all wire-tier
     // cross-schema reads from checkExistingUserPath. If a future refactor

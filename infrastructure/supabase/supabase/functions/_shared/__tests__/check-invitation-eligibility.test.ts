@@ -41,9 +41,9 @@ function makeMockClient(opts: {
   onRpc?: (call: CapturedRpcCall) => void;
 }) {
   return {
-    async rpc(fnName: string, args: Record<string, unknown>) {
+    rpc(fnName: string, args: Record<string, unknown>) {
       opts.onRpc?.({ fnName, args });
-      return { data: opts.fixture.data ?? null, error: opts.fixture.error ?? null };
+      return Promise.resolve({ data: opts.fixture.data ?? null, error: opts.fixture.error ?? null });
     },
   };
 }

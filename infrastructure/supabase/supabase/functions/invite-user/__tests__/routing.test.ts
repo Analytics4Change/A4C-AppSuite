@@ -17,10 +17,18 @@ import { assignRolesToExistingUser, checkEmailStatus, checkResendSupersede } fro
 
 type RpcResponse = { data: unknown; error: unknown };
 
-/** Minimal Supabase client stub: `.rpc(name)` returns a configured response. */
-function mockClient(responses: Record<string, RpcResponse>): Parameters<typeof checkEmailStatus>[0] {
+/**
+ * Minimal Supabase client stub: `.rpc(name)` returns a configured response.
+ * `onRpc` optionally spies on the call so a test can assert what was probed,
+ * not just what came back.
+ */
+function mockClient(
+  responses: Record<string, RpcResponse>,
+  onRpc?: (name: string, args: unknown) => void,
+): Parameters<typeof checkEmailStatus>[0] {
   return {
-    rpc(name: string) {
+    rpc(name: string, args: unknown) {
+      onRpc?.(name, args);
       return Promise.resolve(responses[name] ?? { data: null, error: null });
     },
   } as unknown as Parameters<typeof checkEmailStatus>[0];
@@ -269,4 +277,22 @@ Deno.test('checkResendSupersede → a null data payload is not treated as supers
   });
   const result = await checkResendSupersede(client, 'bob@x.com', 'org1');
   assertEquals(result.verdict, 'proceed');
+});
+
+Deno.test('checkResendSupersede → probes by email + org, never by invitation id', async () => {
+  // The guard's whole premise is "is there ANOTHER live invitation for this
+  // ADDRESS", because that is what uq_invitations_pending_org_email keys on
+  // (organization_id, btrim(lower(email))). A probe keyed on the invitation
+  // being resent would always come back empty and the guard would be inert.
+  const calls: Array<{ name: string; args: unknown }> = [];
+  const client = mockClient(
+    { check_pending_invitation: { data: [], error: null } },
+    (name, args) => calls.push({ name, args }),
+  );
+
+  await checkResendSupersede(client, 'bob@x.com', 'org1', 'corr-1');
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].name, 'check_pending_invitation');
+  assertEquals(calls[0].args, { p_email: 'bob@x.com', p_org_id: 'org1' });
 });
