@@ -58,7 +58,7 @@ import { buildEventMetadata, readProcessingError } from '../_shared/emit-event.t
 import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v26-user-created-readback';
+const DEPLOY_VERSION = 'v27-refuse-non-pending-invitation';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -240,6 +240,86 @@ export async function checkExistingUserPath(
     isDeleted: !!result.isDeleted,
     rolesCheckError: null,
   };
+}
+
+/**
+ * Whether an invitation may be accepted, and if not, why.
+ *
+ * `INVITATION_NOT_PENDING` is deliberately generic in its user-facing message —
+ * it must not disclose *which* terminal state the invitation is in to a caller
+ * who merely holds a token. The precise reason is served separately by
+ * `api.get_invitation_token_state`, whose whole contract is to return only an
+ * enum with no tenant data attached.
+ */
+export type InvitationUsability =
+  | { usable: true }
+  | {
+      usable: false;
+      code: 'INVITATION_EXPIRED' | 'INVITATION_ALREADY_ACCEPTED' | 'INVITATION_NOT_PENDING';
+      message: string;
+    };
+
+/**
+ * The single acceptance precondition for an invitation.
+ *
+ * # Why the status check exists (PR A commit 1)
+ *
+ * Until migration `20260731195015` **nothing on this path consulted `status`**.
+ * The clock and accepted_at checks were the only guards, and revocation writes
+ * neither: the `invitation.revoked` arm of `process_invitation_event` sets
+ * `status` and `updated_at` only, leaving the token live and the expiry
+ * untouched. So a holder of a revoked invitation's token could walk straight
+ * into `auth.admin.createUser` and end up with a working account.
+ *
+ * Verified on dev at the time: three rows satisfied
+ * `status='revoked' AND token IS NOT NULL AND expires_at > now() AND accepted_at IS NULL`.
+ *
+ * That migration closed it at the source by filtering
+ * `api.get_invitation_by_token` to `status='pending'`, which makes the status
+ * branch here unreachable today. **It is kept deliberately.** The guard must not
+ * depend on a filter inside a function that someone may later relax for an
+ * unrelated reason — the codified pitfall that a safety argument holds for the
+ * callers you enumerated, not for the constraint.
+ *
+ * # Why the clock check is NOT redundant with the RPC filter
+ *
+ * Expiration is **lazy** — nothing sweeps `invitations_projection`, and a row
+ * only flips to `expired` when `invite-user` happens to notice. So
+ * `status='pending'` with `expires_at` in the past is a real, common state that
+ * the RPC filter passes through. Removing this check because "the RPC filters
+ * now" would reopen acceptance of clock-expired invitations.
+ *
+ * @param now injectable purely for deterministic tests
+ */
+export function checkInvitationUsable(
+  invitation: { status?: string | null; expires_at: string; accepted_at?: string | null },
+  now: Date = new Date()
+): InvitationUsability {
+  if (new Date(invitation.expires_at) < now) {
+    return {
+      usable: false,
+      code: 'INVITATION_EXPIRED',
+      message: 'Invitation has expired',
+    };
+  }
+
+  if (invitation.accepted_at) {
+    return {
+      usable: false,
+      code: 'INVITATION_ALREADY_ACCEPTED',
+      message: 'Invitation has already been accepted',
+    };
+  }
+
+  if (invitation.status !== 'pending') {
+    return {
+      usable: false,
+      code: 'INVITATION_NOT_PENDING',
+      message: 'This invitation is no longer valid',
+    };
+  }
+
+  return { usable: true };
 }
 
 /**
@@ -574,19 +654,23 @@ serve(async (req) => {
       console.log(`[accept-invitation v${DEPLOY_VERSION}] No stored correlation_id, using request correlation_id: ${correlationId}`);
     }
 
-    // Validate invitation
-    const expiresAt = new Date(invitation.expires_at);
-    const now = new Date();
-    if (expiresAt < now) {
+    // Validate invitation. All three refusals live in `checkInvitationUsable`
+    // (pure, exported, unit-tested) so the acceptance precondition is one
+    // auditable rule rather than three drifting inline branches.
+    const usability = checkInvitationUsable(invitation);
+    if (!usability.usable) {
+      if (usability.code === 'INVITATION_NOT_PENDING') {
+        console.warn(
+          `[accept-invitation v${DEPLOY_VERSION}] Refusing non-pending invitation ${invitation.id} (status=${invitation.status})`
+        );
+      }
       return new Response(
-        JSON.stringify({ error: 'Invitation has expired' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (invitation.accepted_at) {
-      return new Response(
-        JSON.stringify({ error: 'Invitation has already been accepted' }),
+        JSON.stringify({
+          error: usability.message,
+          code: usability.code,
+          errorDetails: { code: usability.code },
+          correlationId,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
