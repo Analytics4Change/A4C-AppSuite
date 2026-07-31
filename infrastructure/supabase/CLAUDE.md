@@ -251,6 +251,64 @@ grep -rn "emit_domain_event" infrastructure/supabase/supabase/functions/ workflo
 
 Every match should be followed by a `readProcessingError` call before any side effect (email, DNS, returning success). PR #108 found three in `invite-user` alone — including `emitExpirationEvent`, which returned `Promise<void>` and logged its failure, leaving a stale `pending` row that the very next create-invitation would collide with.
 
+### Migrations and Edge Functions deploy on DIFFERENT CLOCKS
+
+A migration and an Edge Function that depend on each other do **not** go live
+together, even when they ship in the same commit.
+
+| Artifact | Reaches the database/runtime |
+|---|---|
+| SQL migration | on `supabase db push` — **immediately**, typically while you are still developing |
+| Edge Function | on **merge**, via `.github/workflows/edge-functions-deploy.yml` |
+
+So every coupled change has a live window: new schema behaviour running against
+the **previously deployed** function. Putting both halves in one commit does not
+close it. Only deploying both does.
+
+**Worked example (PR A, 2026-07-31).** `20260731201018` made
+`handle_invitation_resent` stop writing `token` (the token became write-once) and
+the paired `invite-user` change stopped minting one, reading the existing token
+instead. Both were in the same commit. But the migration was pushed to dev while
+the Edge Function was still at the previously merged version, which continued to
+`generateSecureToken()` and **email it**. The handler ignored the token in the
+event, so the projection kept the original — and every resend emailed a link
+matching nothing. The exact defect the PR existed to fix, temporarily amplified,
+on an environment actively being used for UAT.
+
+**Rule.** Before `db push`ing a migration that changes behaviour an Edge Function
+depends on, decide explicitly which of these you are doing:
+
+1. **Deploy both together.** `supabase db push --linked` immediately followed by
+   `supabase functions deploy <slug> --project-ref <ref>` for every affected
+   function. Simplest, and correct for a prototype environment. It does put
+   unmerged code live — which is what a dev project is for, but say so.
+2. **Expand / contract**, when the window genuinely must not exist. Naive
+   ordering does not help — for the example above, migration-first breaks the
+   emailed link, and function-first is *worse*: the handler's
+   `token = safe_jsonb_extract_text(...)` would resolve to NULL against a
+   `NOT NULL` column, raising inside the handler where
+   `process_domain_event` swallows it into `processing_error` and reports success.
+   The safe shape is three steps: a **tolerant** migration
+   (`token = COALESCE(safe_jsonb_extract_text(...), ip.token)`) that accepts
+   either function version → deploy the function → a final migration that drops
+   the write.
+3. **Do not push until merge.** Costs you the ability to verify on dev, which is
+   usually the wrong trade here.
+
+**Detection.** Compare what is deployed against what you changed — the versions
+and timestamps are in the Management API, and a function last updated before your
+commit is a live mismatch:
+
+```bash
+curl -sS "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/functions" \
+  -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+  | jq -r '.[] | "\(.slug) v\(.version) \(.updated_at)"'
+```
+
+Related: the corollary that **editing an already-applied migration reaches
+nothing**. Both are the same class of error — assuming the repository's contents
+describe what is actually running. They do not; check.
+
 ### A safety argument holds for the WRITERS you enumerated, not for the constraint
 
 The companion to the silent-failure rule above. That rule tells you a constraint on a
