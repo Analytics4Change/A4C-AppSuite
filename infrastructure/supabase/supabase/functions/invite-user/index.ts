@@ -58,7 +58,7 @@ import { buildEventMetadata, readProcessingError } from '../_shared/emit-event.t
 import { maskPii } from '../_shared/maskPii.ts';
 
 // Deployment version tracking
-const DEPLOY_VERSION = 'v20-route-existing-users-narrow-scope';
+const DEPLOY_VERSION = 'v21-write-once-invitation-token';
 
 // CORS headers for frontend requests
 const corsHeaders = standardCorsHeaders;
@@ -177,6 +177,49 @@ function generateSecureToken(): string {
   // Convert to base64url (URL-safe base64 without padding)
   const base64 = btoa(String.fromCharCode(...bytes));
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Read the EXISTING token of an invitation so a resend can re-send the original
+ * link.
+ *
+ * # Why this exists (write-once token, 20260731201018)
+ *
+ * `handle_invitation_resent` no longer writes `token`. Before that, every resend
+ * overwrote it, which silently killed every previously emailed link and produced
+ * a bare "Invitation not found" on the accept page. So the resend email must now
+ * carry the invitation's existing token; minting one here would send a link that
+ * resolves to nothing.
+ *
+ * # Why a dedicated RPC
+ *
+ * `api.get_invitation_for_resend` is granted to `authenticated`. Adding `token`
+ * to it would let any org admin read invitation tokens over the wire — strictly
+ * worse than the bug being fixed. `api.get_invitation_token_for_resend` is
+ * service-role only and tenancy-guarded on `p_org_id`. Rule 19 forbids reading
+ * the projection directly from the wire tier, hence an `api.*` entry point.
+ *
+ * Fails CLOSED: a missing token is reported as an error rather than allowed to
+ * fall through, because emailing an unverifiable link is worse than refusing.
+ */
+export async function fetchResendToken(
+  supabase: AnySchemaSupabaseClient,
+  invitationId: string,
+  orgId: string
+): Promise<{ token: string | null; error: unknown }> {
+  const { data, error } = await supabase.rpc('get_invitation_token_for_resend', {
+    p_invitation_id: invitationId,
+    p_org_id: orgId,
+  });
+
+  if (error) {
+    return { token: null, error };
+  }
+
+  // NULL covers both not-found and cross-tenant — the RPC deliberately does not
+  // distinguish them, so neither does this.
+  const token = (data as string | null) ?? null;
+  return { token, error: token ? null : new Error('No token for this invitation') };
 }
 
 /**
@@ -994,8 +1037,41 @@ serve(async (req) => {
         }
       }
 
-      // Generate new token and expiration
-      const newToken = generateSecureToken();
+      // The token is WRITE-ONCE as of 20260731201018 — a resend extends the
+      // expiry and re-opens the status, it does NOT mint a new secret. So the
+      // email must carry the invitation's EXISTING token; generating one here
+      // would send a link that matches nothing in the projection.
+      //
+      // Read via a service-role-only RPC rather than adding `token` to
+      // api.get_invitation_for_resend, which is granted to `authenticated` and
+      // would therefore expose tokens to every org admin. Rule 19 forbids a
+      // wire-tier .from(), hence an api.* entry point.
+      const { token: existingToken, error: tokenError } = await fetchResendToken(
+        supabaseAdmin,
+        requestData.invitationId,
+        orgId
+      );
+
+      if (tokenError || !existingToken) {
+        // Fail CLOSED. Emailing a link we could not verify would be worse than
+        // refusing: the recipient would get a token that resolves to nothing and
+        // an "Invitation not found" dead end.
+        console.error(
+          `[invite-user v${DEPLOY_VERSION}] Could not read the existing invitation token:`,
+          tokenError
+        );
+        return new Response(
+          JSON.stringify({
+            error: 'Could not retrieve the invitation link; no resend was sent',
+            code: 'INVITATION_TOKEN_UNAVAILABLE',
+            errorDetails: { code: 'INVITATION_TOKEN_UNAVAILABLE', suggestedAction: 'retry' },
+            correlationId,
+          }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const resendToken = existingToken as string;
       const newExpiresAt = new Date();
       newExpiresAt.setDate(newExpiresAt.getDate() + INVITATION_EXPIRY_DAYS);
 
@@ -1023,10 +1099,13 @@ serve(async (req) => {
             invitation_id: existingInvitation.invitation_id,
             org_id: orgId,
             email: existingInvitation.email,
-            token: newToken,
             expires_at: newExpiresAt.toISOString(),
             resent_by: user.id,
-            // previous_token intentionally omitted for security (don't store old tokens)
+            // `token` is deliberately NOT emitted (20260731201018). The handler
+            // no longer reads it — the token is write-once — so including it
+            // would write a live secret into the domain_events audit log for no
+            // functional gain. This extends the existing "don't store old
+            // tokens" intent to not storing the current one either.
           },
           p_event_metadata: eventMetadata,
         });
@@ -1069,7 +1148,7 @@ serve(async (req) => {
         firstName: existingInvitation.first_name || 'User',
         lastName: existingInvitation.last_name || '',
         orgName,
-        token: newToken,
+        token: resendToken,
         expiresAt: newExpiresAt,
         frontendUrl: env.FRONTEND_URL,
         baseDomain: env.PLATFORM_BASE_DOMAIN,

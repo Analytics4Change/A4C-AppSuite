@@ -13,7 +13,12 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.220.1/assert/mod.ts';
 
-import { assignRolesToExistingUser, checkEmailStatus, checkResendSupersede } from '../index.ts';
+import {
+  assignRolesToExistingUser,
+  checkEmailStatus,
+  checkResendSupersede,
+  fetchResendToken,
+} from '../index.ts';
 
 type RpcResponse = { data: unknown; error: unknown };
 
@@ -277,6 +282,59 @@ Deno.test('checkResendSupersede → a null data payload is not treated as supers
   });
   const result = await checkResendSupersede(client, 'bob@x.com', 'org1');
   assertEquals(result.verdict, 'proceed');
+});
+
+// ---------------------------------------------------------------------------
+// fetchResendToken — the write-once token read (PR A commit 2)
+// ---------------------------------------------------------------------------
+//
+// `handle_invitation_resent` no longer writes `token`, so a resend must email the
+// invitation's EXISTING token. Minting one would send a link that resolves to
+// nothing — the exact "Invitation not found" dead end this PR exists to remove.
+
+Deno.test('fetchResendToken → returns the existing token', async () => {
+  const client = mockClient({
+    get_invitation_token_for_resend: { data: 'existing-token-abc', error: null },
+  });
+  const result = await fetchResendToken(client, 'inv-1', 'org1');
+  assertEquals(result.token, 'existing-token-abc');
+  assertEquals(result.error, null);
+});
+
+Deno.test('fetchResendToken → fails CLOSED when the RPC errors', async () => {
+  // Emailing a link we could not verify is worse than refusing to send one.
+  const client = mockClient({
+    get_invitation_token_for_resend: { data: null, error: { message: 'boom' } },
+  });
+  const result = await fetchResendToken(client, 'inv-1', 'org1');
+  assertEquals(result.token, null);
+  assert(result.error !== null);
+});
+
+Deno.test('fetchResendToken → fails CLOSED on a NULL token (not-found or cross-tenant)', async () => {
+  // The RPC returns NULL for both, deliberately, so no existence leak. The
+  // caller must treat NULL as a refusal rather than sending a tokenless link.
+  const client = mockClient({
+    get_invitation_token_for_resend: { data: null, error: null },
+  });
+  const result = await fetchResendToken(client, 'inv-1', 'org-other');
+  assertEquals(result.token, null);
+  assert(result.error !== null, 'a NULL token must surface as an error, not a silent pass');
+});
+
+Deno.test('fetchResendToken → passes both the invitation id and the org (tenancy guard)', async () => {
+  const calls: Array<{ name: string; args: unknown }> = [];
+  const client = mockClient(
+    { get_invitation_token_for_resend: { data: 'tok', error: null } },
+    (name, args) => calls.push({ name, args }),
+  );
+
+  await fetchResendToken(client, 'inv-1', 'org1');
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].name, 'get_invitation_token_for_resend');
+  // Dropping p_org_id would turn this into a cross-tenant token read.
+  assertEquals(calls[0].args, { p_invitation_id: 'inv-1', p_org_id: 'org1' });
 });
 
 Deno.test('checkResendSupersede → probes by email + org, never by invitation id', async () => {
