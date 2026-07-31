@@ -27,6 +27,8 @@ import type { IInvitationService } from '@/services/invitation/IInvitationServic
 import { InvitationServiceFactory } from '@/services/invitation/InvitationServiceFactory';
 import type { IAuthProvider } from '@/services/auth/IAuthProvider';
 import type { InvitationDetails, UserCredentials, AcceptInvitationResult } from '@/types';
+import type { InvitationUnusableReason } from '@/types/organization.types';
+import { InvitationUnusableError } from '@/types/organization.types';
 import type { OAuthProvider, InvitationAuthContext } from '@/types/auth.types';
 import { getAuthContextStorage } from '@/services/storage';
 import { detectPlatform, getCallbackUrl } from '@/utils/platform';
@@ -56,6 +58,15 @@ export class InvitationAcceptanceViewModel {
   // Validation State
   isValidatingToken = false;
   validationError: string | null = null;
+  /**
+   * WHY the token is unusable, when it is.
+   *
+   * Set alongside `validationError`. Null means either "not validated yet" or
+   * "usable" — `isTokenValid` remains the authority on which. This exists so the
+   * page can render an accurate message instead of collapsing revoked, expired,
+   * already-used and bogus into one "Invitation not found".
+   */
+  validationReason: InvitationUnusableReason | null = null;
 
   // User Credentials
   authMethodSelection: AuthMethodSelection = 'email_password';
@@ -97,6 +108,7 @@ export class InvitationAcceptanceViewModel {
       this.token = token;
       this.isValidatingToken = true;
       this.validationError = null;
+      this.validationReason = null;
     });
 
     try {
@@ -124,12 +136,49 @@ export class InvitationAcceptanceViewModel {
       runInAction(() => {
         this.isValidatingToken = false;
         this.validationError = errorMessage;
+        // A resolved-but-unusable token carries its reason on the error, so the
+        // page can say which of revoked / expired / already-used it is. Anything
+        // else (network, malformed response) leaves the reason null and falls
+        // back to the generic copy — deliberately, because we genuinely do not
+        // know in that case.
+        this.validationReason = error instanceof InvitationUnusableError ? error.reason : null;
       });
 
       log.error('Token validation failed', error);
 
       return false;
     }
+  }
+
+  /**
+   * No token in the URL at all.
+   *
+   * Distinct from a failed validation only in that no request was made. From the
+   * visitor's point of view it is the same situation as a token that matches
+   * nothing, so it takes the same `unknown` path rather than leaving the page
+   * blank — which is what it did before, with the reason logged to a console the
+   * visitor cannot see.
+   */
+  /**
+   * Clear the accept-submit failure.
+   *
+   * Called when the user dismisses the failure banner. Per command-feedback.md
+   * the banner and its echo must be cleared together and focus restored to the
+   * submit trigger, so the two surfaces never desync; the page owns the echo and
+   * focus halves, this owns the ViewModel state.
+   */
+  clearAcceptanceError(): void {
+    runInAction(() => {
+      this.acceptanceError = null;
+    });
+  }
+
+  setMissingToken(): void {
+    runInAction(() => {
+      this.isValidatingToken = false;
+      this.validationError = 'No invitation token was provided';
+      this.validationReason = 'unknown';
+    });
   }
 
   /**
@@ -393,6 +442,7 @@ export class InvitationAcceptanceViewModel {
       this.invitationDetails = null;
       this.isValidatingToken = false;
       this.validationError = null;
+      this.validationReason = null;
       this.authMethodSelection = 'email_password';
       this.email = '';
       this.password = '';

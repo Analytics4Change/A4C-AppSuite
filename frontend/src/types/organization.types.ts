@@ -284,6 +284,42 @@ export interface InvitationDetails {
 }
 
 /**
+ * Why an invitation token cannot be used.
+ *
+ * Mirrors `api.get_invitation_token_state`, which the `validate-invitation`
+ * Edge Function consults when a token does not resolve to a usable invitation.
+ *
+ * `unknown` is a catch-all rather than a deny-list: a token matching no row,
+ * and any invitation status outside the enumerated set, both land here — so a
+ * status added later degrades to a generic message instead of leaking.
+ *
+ * Before PR A the accept page collapsed all four into "Invitation not found",
+ * which is indistinguishable from never-existed and sent people (and support)
+ * chasing the wrong thing.
+ */
+export type InvitationUnusableReason = 'expired' | 'accepted' | 'revoked' | 'unknown';
+
+/**
+ * Thrown by `IInvitationService.validateInvitation` when the token resolved but
+ * is not usable.
+ *
+ * A dedicated error type rather than a bare `Error` so the discriminant survives
+ * the throw — the previous implementation discarded the reason entirely and the
+ * ViewModel had only a message string to work with.
+ */
+export class InvitationUnusableError extends Error {
+  readonly reason: InvitationUnusableReason;
+  readonly correlationId?: string;
+
+  constructor(reason: InvitationUnusableReason, message: string, correlationId?: string) {
+    super(message);
+    this.name = 'InvitationUnusableError';
+    this.reason = reason;
+    this.correlationId = correlationId;
+  }
+}
+
+/**
  * User credentials for invitation acceptance.
  * Supports email/password, OAuth, and SSO authentication methods.
  *

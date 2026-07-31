@@ -24,10 +24,45 @@ import {
   type AuthMethodSelection,
 } from '@/viewModels/organization/InvitationAcceptanceViewModel';
 import { getAuthProvider } from '@/services/auth/AuthProviderFactory';
+import type { InvitationUnusableReason } from '@/types/organization.types';
+import { CommandFeedbackBanner } from '@/components/ui/CommandFeedbackBanner';
+import { CommandFeedbackEcho } from '@/components/ui/CommandFeedbackEcho';
+import { useCommandFeedback } from '@/hooks/useCommandFeedback';
+import { useCommandFeedbackFocus } from '@/hooks/useCommandFeedbackFocus';
 import { Building, Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Logger } from '@/utils/logger';
 
 const log = Logger.getLogger('component');
+
+/**
+ * Heading + guidance per unusable reason.
+ *
+ * Before PR A every one of these rendered as "Invalid Invitation / Invitation
+ * not found" — literally true only for `unknown`, and misleading for the other
+ * three. Clicking the older of two invitation emails is the common case, and it
+ * dead-ended with a message that sent people chasing the wrong thing.
+ *
+ * `revoked` copy is deliberately neutral: it states what happened without
+ * implying a judgement about the recipient.
+ */
+const UNUSABLE_COPY: Record<InvitationUnusableReason, { heading: string; body: string }> = {
+  expired: {
+    heading: 'This invitation has expired',
+    body: 'Ask your administrator to send you a new one.',
+  },
+  accepted: {
+    heading: 'This invitation has already been used',
+    body: 'If this was you, sign in instead.',
+  },
+  revoked: {
+    heading: 'This invitation was withdrawn',
+    body: 'Ask your administrator to send you a new one.',
+  },
+  unknown: {
+    heading: "This invitation link isn't valid",
+    body: 'If you were sent a newer invitation email, use that one. Otherwise ask your administrator to send you a new invitation.',
+  },
+};
 
 /**
  * Accept Invitation Page Component
@@ -42,9 +77,33 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
   const token = searchParams.get('token');
 
+  // Command-feedback for the ACCEPT SUBMIT — a state-changing operation, so it
+  // is governed by documentation/frontend/patterns/command-feedback.md. It used
+  // to render as a bare <p>: no role="alert", so a screen-reader user got no
+  // announcement at all when the accept failed; no sanitization, so handler
+  // internals could reach the user; no focus move on a form-blocking failure.
+  //
+  // The token-state panel below is deliberately NOT routed through this. That is
+  // a READ result on page load, not a command result — the standard scopes
+  // itself to commands, and the same call was made for the invite-form email
+  // lookup ("a query failure that gates nothing is not one").
+  const feedback = useCommandFeedback('accept-invitation');
+  const acceptFocus = useCommandFeedbackFocus<HTMLDivElement>(!!viewModel.acceptanceError);
+
+  /** Sanitized display string for the accept failure; null when there is none. */
+  const acceptanceDisplayError = viewModel.acceptanceError
+    ? feedback.failed(viewModel.acceptanceError, {
+        fallback: 'We could not complete your account setup. Please try again.',
+      })
+    : null;
+
   useEffect(() => {
     if (!token) {
+      // Previously this only logged and left a blank card — the user saw an
+      // empty page with no explanation. A missing token is indistinguishable
+      // from a bogus one from here, so it takes the same honest `unknown` path.
       log.error('No invitation token provided');
+      viewModel.setMissingToken();
       return;
     }
 
@@ -95,6 +154,11 @@ export const AcceptInvitationPage: React.FC = observer(() => {
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Record the control that triggered the submit, so a subsequent failure
+    // banner can hand focus back to it on dismiss instead of dropping it to
+    // <body>. Armed only if a banner actually takes focus.
+    acceptFocus.captureTrigger();
+
     const result = await viewModel.acceptWithEmailPassword();
 
     if (result?.redirectUrl) {
@@ -127,6 +191,12 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
+      {/* aria-hidden visual echo of the failure banner. Guarantees the failure
+          is SEEN regardless of scroll position, without a second announcement —
+          the role="alert" banner owns the one announcement (INV-1), and this
+          element contains text only, so it has no focusable descendant under
+          aria-hidden (INV-2 by construction). */}
+      <CommandFeedbackEcho message={feedback.echoMessage} />
       <Card
         className="w-full max-w-md"
         style={{
@@ -144,26 +214,39 @@ export const AcceptInvitationPage: React.FC = observer(() => {
         <CardContent>
           {/* Loading State */}
           {viewModel.isValidatingToken && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="animate-spin text-blue-500 mb-4" size={48} />
+            <div
+              className="flex flex-col items-center justify-center py-12"
+              data-testid="invitation-validating"
+            >
+              <Loader2 className="animate-spin text-blue-500 mb-4" size={48} aria-hidden="true" />
               <p className="text-gray-600">Validating invitation...</p>
             </div>
           )}
 
-          {/* Validation Error */}
+          {/* Token-state panel — a READ result, so polite role="status", not
+              role="alert". See the comment on `feedback` above for why this is
+              outside the command-feedback standard. */}
           {viewModel.validationError && (
             <div
               className="p-4 rounded-lg mb-6"
+              role="status"
+              aria-live="polite"
+              data-testid="invitation-unusable"
+              data-reason={viewModel.validationReason ?? 'unknown'}
               style={{
                 background: 'rgba(254, 242, 242, 0.9)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
               }}
             >
               <div className="flex items-center gap-3">
-                <AlertCircle className="text-red-500" size={24} />
+                <AlertCircle className="text-red-500" size={24} aria-hidden="true" />
                 <div>
-                  <h4 className="font-semibold text-red-900">Invalid Invitation</h4>
-                  <p className="text-red-700 text-sm">{viewModel.validationError}</p>
+                  <h4 className="font-semibold text-red-900">
+                    {UNUSABLE_COPY[viewModel.validationReason ?? 'unknown'].heading}
+                  </h4>
+                  <p className="text-red-700 text-sm">
+                    {UNUSABLE_COPY[viewModel.validationReason ?? 'unknown'].body}
+                  </p>
                 </div>
               </div>
             </div>
@@ -263,7 +346,11 @@ export const AcceptInvitationPage: React.FC = observer(() => {
 
               {/* Email/Password Form */}
               {viewModel.authMethodSelection === 'email_password' && (
-                <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
+                <form
+                  onSubmit={handleEmailPasswordSubmit}
+                  className="space-y-4"
+                  data-testid="accept-invitation-form"
+                >
                   {/* Email */}
                   <div className="space-y-2">
                     <Label htmlFor="email">
@@ -271,6 +358,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                     </Label>
                     <Input
                       id="email"
+                      data-testid="accept-invitation-email"
                       type="email"
                       value={viewModel.email}
                       onChange={(e) => viewModel.setEmail(e.target.value)}
@@ -323,6 +411,7 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                   <Button
                     type="submit"
                     className="w-full"
+                    data-testid="accept-invitation-submit"
                     disabled={!viewModel.canSubmit || viewModel.isAccepting}
                   >
                     {viewModel.isAccepting ? (
@@ -391,18 +480,25 @@ export const AcceptInvitationPage: React.FC = observer(() => {
                 </div>
               )}
 
-              {/* Acceptance Error */}
-              {viewModel.acceptanceError && (
-                <div
-                  className="mt-4 p-3 rounded-lg"
-                  style={{
-                    background: 'rgba(254, 242, 242, 0.9)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
+              {/* Acceptance failure — a COMMAND result, so it follows
+                  command-feedback.md: assertive role="alert" banner owning the
+                  single announcement, plus an aria-hidden echo for
+                  scroll-independence, sanitized display with the raw error
+                  log.warn'd, and focus moved to the banner since this failure is
+                  form-blocking. Dismiss restores focus to the submit control
+                  rather than dropping it to <body>. */}
+              <div className="mt-4">
+                <CommandFeedbackBanner
+                  ref={acceptFocus.bannerRef}
+                  kind="error"
+                  message={acceptanceDisplayError}
+                  onDismiss={() => {
+                    viewModel.clearAcceptanceError();
+                    feedback.clear();
+                    acceptFocus.restore();
                   }}
-                >
-                  <p className="text-sm text-red-700">{viewModel.acceptanceError}</p>
-                </div>
-              )}
+                />
+              </div>
             </div>
           )}
         </CardContent>

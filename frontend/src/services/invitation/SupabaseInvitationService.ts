@@ -21,7 +21,10 @@ import type {
   InvitationDetails,
   UserCredentials,
   AcceptInvitationResult,
+  InvitationUnusableReason,
 } from '@/types/organization.types';
+// Value import (a class), so it cannot ride along in the `import type` block.
+import { InvitationUnusableError } from '@/types/organization.types';
 import { supabaseService } from '@/services/auth/supabase.service';
 import { Logger } from '@/utils/logger';
 import { buildHeadersFromContext, createTracingContext } from '@/utils/tracing';
@@ -78,6 +81,27 @@ export class SupabaseInvitationService implements IInvitationService {
           ? `${extracted.message} (Ref: ${extracted.correlationId})`
           : extracted.message;
         throw new Error(errorWithRef);
+      }
+
+      // The unusable branch is a 200 carrying ONLY `{valid:false, reason}` —
+      // no orgName, no roles, no email. Check the discriminant BEFORE the shape
+      // guard below, so the reason survives instead of being flattened into a
+      // generic "Invalid invitation response".
+      //
+      // This is the fix for the defect that made the whole page dishonest:
+      // validateInvitation used to read neither `valid` nor `expired` nor
+      // `alreadyAccepted`, and its only guard was the orgName check — which an
+      // EXPIRED invitation passed, because the old contract returned the full
+      // row alongside `valid:false`. So the signup form rendered for expired and
+      // already-accepted invitations and the user only discovered the problem
+      // after filling it in and submitting.
+      if (data?.valid === false) {
+        const reason = (data.reason ?? 'unknown') as InvitationUnusableReason;
+        throw new InvitationUnusableError(
+          reason,
+          `Invitation is not usable: ${reason}`,
+          data.correlationId
+        );
       }
 
       if (!data?.orgName || !Array.isArray(data?.roles)) {
