@@ -1,9 +1,14 @@
 ---
-status: seed
+status: PR A — next up, branch `feat/honest-superseded-invitation-links`
 last_updated: 2026-07-31
 ---
 
-# Seed: resend rotates the invitation token in place, and dead links lie about why
+# PR A — resend rotates the invitation token in place, and dead links lie about why
+
+> **Sequencing (decided 2026-07-31)**: this is **PR A**;
+> `consolidate-email-onto-temporal-notification-workflow` is **PR B**. A first because
+> it is small, independently valuable, and a **precondition** — B widens this defect's
+> blast radius. See §Relationship below.
 
 **Origin**: email-lookup epic UAT, S8 setup (2026-07-31). Lars clicked the link in an
 older invitation email and got `Invalid Invitation / Invitation not found`. It read as

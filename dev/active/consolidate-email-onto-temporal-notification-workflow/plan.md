@@ -1,6 +1,6 @@
 # Consolidate email sending onto one sanctioned async (Temporal) path
 
-**Status**: seed (not yet planned)
+**Status**: **PR B** — blocked-ish on PR A (`invitation-resend-token-rotation-dead-links`); see Interaction section
 **Priority**: Medium — architectural debt + unblocks per-event informational emails (e.g. role-assignment notification deferred from the invite-user epic PR 3).
 **Origin**: invite-user epic PR 3 (`invite-user-route-existing-users-to-role-assign`, 2026-06-23). PR 3 deferred a "you've been added to {org}" email after discovering email-sending is scattered across two unrelated Resend integrations.
 
