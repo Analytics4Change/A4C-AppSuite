@@ -234,8 +234,64 @@ splits this case (`other_org_member` vs a roleless zombie) via
 R1 limitation. So `existing_user_no_roles`, which earlier drafts of this card
 predicted for S2/S4, was never a reachable frontend verdict at all.
 
+## 9. S7 — resend supersede refusal — RUN 2026-07-31 ✅ PASS (both halves)
+
+Fixture: `lars.tice+uat-supersede@gmail.com`, created fresh. No existing fixture touched.
+
+| Step | Action | Result |
+|---|---|---|
+| 1 | Invite via UI → **A** `141ccb64…` (`invitation_id` `99211150…`) | pending |
+| 2 | `UPDATE invitations_projection SET status='expired' WHERE id=A` | expired |
+| 3 | Invite same address again → **B** `ec0d912c…` | pending |
+| 4 | **Resend A** (roster card → "Send New Invitation" → confirm) | **REFUSED** ✅ |
+
+Banner (assertive) + toast echo: *"A newer invitation is already pending for that
+address. Resend the current invitation instead."* — the EF's exact
+`INVITATION_SUPERSEDED` copy.
+
+**The assertion that matters**: after the refusal, A was still `expired` with
+`updated_at` unchanged from step 2, and B still `pending`. **Exactly one pending row
+throughout.** The 23505 never happened, because the refusal came at the wire rather
+than in the handler where it would have been swallowed.
+
+### Narrowness half — the guard must not be over-broad
+
+| Step | Action | Result |
+|---|---|---|
+| 5 | Revoke B | revoked |
+| 6 | **Resend A** again, now with no competing pending row | **SUCCEEDED** ✅ |
+
+A flipped `expired` → `pending` (16:00:23) and the card gained Resend/Revoke. So the
+guard refuses only the actual collision; a legitimate resend of an expired invitation
+still works.
+
+### Decisive negative check
+
+```sql
+SELECT event_type, processing_error FROM domain_events
+ WHERE created_at > now() - interval '25 minutes' AND processing_error IS NOT NULL;
+-- [] — zero rows
+```
+
+**No silent handler failure at any point.** Had the guard let step 4 through, this is
+where the swallowed 23505 would have surfaced.
+
+## 10. Bonus — `pending` verdict (S10) ✅
+
+With A back to `pending`, the lookup was re-run against it:
+`email-lookup-pending`, *"This email has a pending invitation."*, fields locked.
+
+**Verdict coverage now complete for all six real verdicts**: `not_found`, `pending`,
+`expired`, `active_member`, `deactivated`, `other_org`. Only `lookup_failed` is
+unexercised against a real backend — it is reachable in mock mode only, by design.
+
+### Leftover fixture state
+
+`lars.tice+uat-supersede@gmail.com` has **A pending** and **B revoked** in
+TestOrg-20260329. Harmless, and A doubles as a durable `pending` fixture. Revoke A if
+a clean roster is wanted.
+
 ### Remaining
 
-- **S7** (§5) — needs a deliberate `UPDATE` on dev to force an invitation to
-  `expired`. Not run.
-- **S8** (§6) — needs an invitation accept against an orphan address. Not run.
+- **S8** (§6) — accept-path orphan collision. Not run: needs a real invitation-accept
+  through an emailed token, which permanently consumes an invitation.
