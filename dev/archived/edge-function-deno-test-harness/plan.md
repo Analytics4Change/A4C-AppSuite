@@ -1,3 +1,16 @@
+---
+status: SUPERSEDED by #112 (2026-08-01) — do not work this card
+last_updated: 2026-08-01
+---
+
+> ## ⚠️ SUPERSEDED — see issue #112
+>
+> A strict subset of #112. The harness exists; the real gap is that no test crosses a tier boundary — all 153 Deno tests mock the client, so a misspelled RPC passes.
+>
+> Retained for its analysis and evidence, which fed the invitation-lifecycle
+> retrospective. **Do not implement from this card** — the approach it describes
+> treats a symptom that #112 removes structurally.
+
 # Plan — Edge Function Deno Test Harness
 
 ## Phases

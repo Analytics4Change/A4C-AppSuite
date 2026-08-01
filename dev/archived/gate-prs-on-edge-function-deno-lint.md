@@ -1,7 +1,15 @@
 ---
-status: partial
-last_updated: 2026-07-30
+status: SUPERSEDED by #112 (2026-08-01) — do not work this card
+last_updated: 2026-08-01
 ---
+
+> ## ⚠️ SUPERSEDED — see issue #112
+>
+> Absorbed into #112's merge-gate work. Gating on deno lint alone leaves the actual hole open: the single required check self-skips when a PR misses `frontend/`.
+>
+> Retained for its analysis and evidence, which fed the invitation-lifecycle
+> retrospective. **Do not implement from this card** — the approach it describes
+> treats a symptom that #112 removes structurally.
 
 # Seed: Gate PRs on Edge Function `deno lint` (and `deno check`)
 

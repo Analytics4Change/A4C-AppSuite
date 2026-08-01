@@ -3,6 +3,9 @@ status: PR A — next up, branch `feat/honest-superseded-invitation-links`
 last_updated: 2026-07-31
 ---
 
+> **Note (2026-08-01)**: the defect this card describes is FIXED in PR A. Its **priority line below is wrong** — it says "LOW-MED, no security hole", and the investigation it triggered found a HIGH authorization defect (revocation did not revoke). Kept unarchived deliberately: that mis-triage is the most instructive artifact here. Systemic follow-up lives in #111–#115.
+
+
 # PR A — resend rotates the invitation token in place, and dead links lie about why
 
 > **Sequencing (decided 2026-07-31)**: this is **PR A**;

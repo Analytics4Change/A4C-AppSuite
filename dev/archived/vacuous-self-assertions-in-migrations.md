@@ -1,7 +1,15 @@
 ---
-status: seed
-last_updated: 2026-07-30
+status: SUPERSEDED by #114 (2026-08-01) — do not work this card
+last_updated: 2026-08-01
 ---
+
+> ## ⚠️ SUPERSEDED — see issue #114
+>
+> Folded into #114's pitfall reform. The taxonomy is right; the remedy is to make entries terminate in a mechanism rather than to catalogue more species.
+>
+> Retained for its analysis and evidence, which fed the invitation-lifecycle
+> retrospective. **Do not implement from this card** — the approach it describes
+> treats a symptom that #114 removes structurally.
 
 # Seed: migration assertions that check what the same migration just wrote
 

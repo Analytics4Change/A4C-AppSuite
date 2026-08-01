@@ -3,6 +3,9 @@ status: seed
 last_updated: 2026-07-30
 ---
 
+> **Note (2026-08-01)**: still open and still the live collision surface for `uq_users_email_normalized` on the accept path — re-proved during the PR A operator UAT, which used these rows to force the 500. Not superseded; cleaning them up is still the fix. See #112 for the harness that would let this be asserted rather than discovered.
+
+
 # Seed: three `public.users` rows with no auth identity — and one lies about its state
 
 **Origin**: fallout of the PR #106 F2 investigation. I had claimed "11 of 14 rows

@@ -1,3 +1,16 @@
+---
+status: SUPERSEDED by #113 (2026-08-01) — do not work this card
+last_updated: 2026-08-01
+---
+
+> ## ⚠️ SUPERSEDED — see issue #113
+>
+> This is the `id` vs `invitation_id` dual identity. #113 collapses the two keys so the parameter-naming question stops existing, rather than renaming around it.
+>
+> Retained for its analysis and evidence, which fed the invitation-lifecycle
+> retrospective. **Do not implement from this card** — the approach it describes
+> treats a symptom that #113 removes structurally.
+
 # `api.revoke_invitation` parameter `p_invitation_id` actually filters on projection PK
 
 **Status**: seed (not yet planned)
