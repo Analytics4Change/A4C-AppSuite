@@ -36,7 +36,8 @@ import { Logger } from '@/utils/logger';
 const log = Logger.getLogger('component');
 
 /** Friendly fallback when the raw accept error looks internal. */
-const ACCEPT_FAILURE_FALLBACK = 'We could not complete your account setup. Please try again.';
+const ACCEPT_FAILURE_FALLBACK =
+  "We couldn't finish setting up your account. Please contact the person who invited you.";
 
 /**
  * Heading + guidance per unusable reason.

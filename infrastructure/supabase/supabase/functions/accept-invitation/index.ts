@@ -372,14 +372,33 @@ export async function readBackUserCreated(
   );
   return new Response(
     JSON.stringify({
-      error: 'Failed to create your account record',
+      // Says what happened, that it is not the invitee's fault, that their
+      // invitation is NOT burned, and who can act. "Try again" would be wrong:
+      // the common cause is a deterministic collision that fails identically
+      // every time, so retrying just wastes the person's time.
+      //
+      // "still valid" is a fact, not reassurance: both call sites return here
+      // BEFORE `invitation.accepted` is emitted, so the row stays `pending`.
+      error:
+        "We couldn't finish setting up your account. Your invitation is still " +
+        'valid, so nothing is lost — please contact the person who invited you.',
       errorDetails: {
         code: 'PROCESSING_FAILED',
         message: maskPii(processingError),
       },
       correlationId,
     }),
-    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        // Without this the client's ` (Ref: <id>)` suffix can never appear —
+        // the header is CORS-exposed but was never set on this function, so
+        // support had no id to trace. validate-invitation already sets it.
+        'x-correlation-id': correlationId,
+      },
+    },
   );
 }
 
@@ -671,7 +690,14 @@ serve(async (req) => {
           errorDetails: { code: usability.code },
           correlationId,
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'x-correlation-id': correlationId,
+          },
+        }
       );
     }
 
